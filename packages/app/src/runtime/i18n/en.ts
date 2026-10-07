@@ -104,7 +104,7 @@ export const dict = {
   "dialog.model.chatgptPlan": "Using ChatGPT plan",
   "dialog.model.chatgptManageUsage": "Manage usage",
 
-  "dialog.model.unpaid.freeModels.title": "Free models provided by OpenCode",
+  "dialog.model.unpaid.freeModels.title": "Free models provided by OpenMAMI",
   "dialog.model.unpaid.addMore.title": "Add more models from popular providers",
   "dialog.model.unpaid.viewMoreProviders": "See 70+ more providers",
 
@@ -112,7 +112,7 @@ export const dict = {
 
   "provider.connect.title": "Connect {{provider}}",
   "provider.connect.opencode.name": "OpenCode Console",
-  "provider.connect.opencode.freeName": "OpenCode Free",
+  "provider.connect.opencode.freeName": "OpenMAMI Free",
   "provider.connect.console.title": "Connecting to OpenCode Console",
   "provider.connect.console.instructions":
     "Continue in your browser. Confirm the code shown there matches the one below.",
@@ -134,7 +134,7 @@ export const dict = {
   "provider.connect.models.description": "Choose a model to start with. You can switch models anytime.",
   "provider.connect.models.available": "Available models",
   "provider.connect.chatgptWelcome.title": "ChatGPT connected",
-  "provider.connect.chatgptWelcome.description": "Eligible requests in OpenCode can use your ChatGPT plan.",
+  "provider.connect.chatgptWelcome.description": "Eligible requests in OpenMAMI can use your ChatGPT plan.",
   "provider.connect.chatgptWelcome.usage": "Manage usage in ChatGPT settings",
   "provider.connect.chatgptWelcome.confirm": "Got it",
   "provider.connect.models.list": "Models available from {{provider}}",
@@ -144,7 +144,7 @@ export const dict = {
   "provider.connect.chatgptUsageLimit.close": "Close",
   "provider.connect.console.refreshFailed":
     "Your account is connected, but we couldn't load your models. Try again to refresh them.",
-  "provider.connect.console.connected": "OpenCode connected",
+  "provider.connect.console.connected": "OpenMAMI connected",
   "provider.connect.console.noModels":
     "Your account is connected, but this Console workspace has no available models. Check its setup in Console, then refresh.",
   "provider.connect.console.modelsLoading": "Your models are still loading. Refresh to check again.",
@@ -154,7 +154,7 @@ export const dict = {
   "provider.connect.console.useApiKey": "Use API key",
   "provider.connect.remote.title": "Connecting on “{{server}}”",
   "provider.connect.remote.description":
-    "Your OpenCode credentials will be stored on this server. Models will be available through this server.",
+    "Your OpenMAMI credentials will be stored on this server. Models will be available through this server.",
   "provider.connect.title.anthropicProMax": "Login with Anthropic",
   "provider.connect.selectMethod": "Select login method for {{provider}}.",
   "provider.connect.method.apiKey": "API key",
@@ -165,7 +165,7 @@ export const dict = {
   "provider.connect.status.failed": "Authorization failed: {{error}}",
   "provider.connect.error.unsupportedFields": "This authentication form contains unsupported fields",
   "provider.connect.apiKey.description":
-    "Enter your {{provider}} API key to connect your account and use {{provider}} models in OpenCode.",
+    "Enter your {{provider}} API key to connect your account and use {{provider}} models in OpenMAMI.",
   "provider.connect.apiKey.label": "{{provider}} API key",
   "provider.connect.apiKey.placeholder": "API key",
   "provider.connect.apiKey.required": "API key is required",
@@ -338,7 +338,7 @@ export const dict = {
   "server.connect.pair.description": "Run this command on your computer to get your connection details.",
   "server.connect.scan": "Scan QR code",
   "server.connect.scan.description": "Point your camera at the QR code shown by opencode pair.",
-  "server.connect.scan.invalid": "This is not an OpenCode pairing code. Scan the code shown by opencode pair.",
+  "server.connect.scan.invalid": "This is not an OpenMAMI pairing code. Scan the code shown by opencode pair.",
   "server.connect.link.expired": "This pairing link expired or was already used. Run opencode pair to get a new one.",
   "server.connect.camera": "Pairing camera",
   "server.connect.camera.starting": "Opening camera…",
@@ -360,7 +360,7 @@ export const dict = {
   "dialog.server.status.default": "Default",
 
   "server.row.incompatible":
-    "This server is running OpenCode {{version}}, which isn't compatible with this app. Upgrade it to OpenCode V2 to continue.",
+    "This server is running OpenMAMI {{version}}, which isn't compatible with this app. Upgrade it to OpenMAMI V2 to continue.",
 
   "dialog.project.edit.title": "Edit project",
   "dialog.project.edit.icon": "Icon",
@@ -421,7 +421,7 @@ export const dict = {
   "error.page.action.checkUpdates": "Check for updates",
   "error.page.action.updateTo": "Update to {{version}}",
   "error.page.circular": "[Circular]",
-  "error.page.report.prefix": "Please report this error to the OpenCode team",
+  "error.page.report.prefix": "Please report this error to the OpenMAMI team",
   "error.page.report.discord": "on Discord",
   "error.page.version": "Version: {{version}}",
 
@@ -446,7 +446,7 @@ export const dict = {
   "error.chain.didYouMean": "Did you mean: {{suggestions}}",
   "error.chain.modelNotFound": "Model not found: {{provider}}/{{model}}",
   "error.chain.checkConfig": "Check your config (opencode.json) provider/model names",
-  "error.chain.mcpFailed": 'MCP server "{{name}}" failed. Note, OpenCode does not support MCP authentication yet.',
+  "error.chain.mcpFailed": 'MCP server "{{name}}" failed. Note, OpenMAMI does not support MCP authentication yet.',
   "error.chain.providerAuthFailed": "Provider authentication failed ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
     'Failed to initialize provider "{{provider}}". Check credentials and configuration.',
@@ -495,7 +495,7 @@ export const dict = {
   "session.error.notFound.closeTab": "Close Tab",
   "session.error.incompatible": "This server version isn't supported",
   "session.error.incompatible.description":
-    "{{server}} is running OpenCode {{version}}, which isn't compatible with this app. Upgrade the server to OpenCode V2 to continue.",
+    "{{server}} is running OpenMAMI {{version}}, which isn't compatible with this app. Upgrade the server to OpenMAMI V2 to continue.",
   "session.background.moveRunning": "Move to background",
   "session.background.moveInline": "Press {{keybind}} to move running work to the background",
   "command.session.background": "Move to background",
@@ -644,8 +644,8 @@ export const dict = {
   "settings.about.firstPublished": "First published in Missouri, USA",
   "settings.about.firstIllustrated": "First illustrated in London, England",
   "settings.about.website": "www.opencode.ai",
-  "settings.about.description": "OpenCode, the open source coding agent",
-  "settings.about.trademark": "OpenCode is a registered trademark of Anomaly Innovations, Inc.",
+  "settings.about.description": "OpenMAMI, the open source coding agent",
+  "settings.about.trademark": "OpenMAMI is a registered trademark of Anomaly Innovations, Inc.",
   "settings.about.typeset": "Typeset in Inter and IBM Plex Mono",
   "settings.about.tagline": "AI can’t build great software, without you",
   "settings.about.copyright": "© Anomaly Innovations, Inc.",
@@ -676,7 +676,7 @@ export const dict = {
   "settings.extensions.addSkills": "How to add skills",
   "project.settings.title": "Edit project",
   "project.settings.name.title": "Project name",
-  "project.settings.name.description": "The name shown for this project throughout OpenCode",
+  "project.settings.name.description": "The name shown for this project throughout OpenMAMI",
   "project.settings.icon.description": "Recommended: 128×128px. Click or drag to upload an image.",
   "project.settings.color.description": "Used for the project icon when no custom image is set",
   "project.settings.worktree.startup.description": "Runs once after creating a new worktree",
@@ -687,11 +687,11 @@ export const dict = {
   "project.settings.extensions.added": "Added to this project",
   "project.settings.extensions.shared": "Shared with all projects",
   "project.settings.extensions.empty.mcps.title": "No MCPs yet",
-  "project.settings.extensions.empty.mcps.description": "MCPs available to OpenCode will appear here",
+  "project.settings.extensions.empty.mcps.description": "MCPs available to OpenMAMI will appear here",
   "project.settings.extensions.empty.plugins.title": "No plugins yet",
-  "project.settings.extensions.empty.plugins.description": "Plugins available to OpenCode will appear here",
+  "project.settings.extensions.empty.plugins.description": "Plugins available to OpenMAMI will appear here",
   "project.settings.extensions.empty.skills.title": "No skills yet",
-  "project.settings.extensions.empty.skills.description": "Skills available to OpenCode will appear here",
+  "project.settings.extensions.empty.skills.description": "Skills available to OpenMAMI will appear here",
   "project.settings.extensions.lsp.description": "Auto-detected from file types",
   "project.settings.extensions.lsp.configured": "Configured language servers",
   "project.settings.extensions.lsp.status.enabled": "Enabled in config",
@@ -742,7 +742,7 @@ export const dict = {
   "settings.timeline.category.tools": "Other tools",
 
   "settings.general.row.language.title": "Language",
-  "settings.general.row.language.description": "Change the display language for OpenCode",
+  "settings.general.row.language.description": "Change the display language for OpenMAMI",
   "settings.general.row.shell.title": "Terminal shell",
   "settings.general.row.shell.description": "Shell used by the terminal and agent tools",
   "settings.general.row.shell.autoDefault": "Auto (Default)",
@@ -752,9 +752,9 @@ export const dict = {
   "settings.general.row.terminalPlacement.side": "Side",
   "settings.general.row.terminalPlacement.bottom": "Bottom",
   "settings.general.row.colorScheme.title": "Color scheme",
-  "settings.general.row.colorScheme.description": "Choose whether OpenCode follows the system, light, or dark theme",
+  "settings.general.row.colorScheme.description": "Choose whether OpenMAMI follows the system, light, or dark theme",
   "settings.general.row.theme.title": "Theme",
-  "settings.general.row.theme.description": "Customise how OpenCode is themed.",
+  "settings.general.row.theme.description": "Customise how OpenMAMI is themed.",
   "settings.general.row.font.title": "Code Font",
   "settings.general.row.font.description": "Customise the font used in code blocks",
   "settings.general.row.terminalFont.title": "Terminal Font",
@@ -929,7 +929,7 @@ export const dict = {
   "settings.workspaces.description": "Review worktrees and manage disk usage",
   "settings.workspaces.filter.all": "All projects",
   "settings.workspaces.empty": "No worktrees yet",
-  "settings.workspaces.empty.description": "Worktrees created in OpenCode will appear here",
+  "settings.workspaces.empty.description": "Worktrees created in OpenMAMI will appear here",
   "settings.workspaces.count.one": "{{count}} worktree",
   "settings.workspaces.count.other": "{{count}} worktrees",
   "settings.workspaces.sessions.one": "{{count}} session in {{project}}",

@@ -43,6 +43,9 @@ import { TabPulse, unreadGlowIntensity } from "./tab-pulse"
 import { tint } from "../theme/color"
 import { SESSION_SIDEBAR_WIDTH, SESSION_TABS_COMPACT_BREAKPOINT } from "../ui/layout"
 import { projectName } from "../util/project"
+import { existsSync, readFileSync, statSync } from "node:fs"
+import { homedir } from "node:os"
+import path from "node:path"
 import { stringWidth } from "../util/string-width"
 import { marqueeCycleWidth, marqueeOverflows, marqueeTextParts } from "../util/marquee"
 import { useDialog } from "../ui/dialog"
@@ -55,6 +58,112 @@ import { SessionTabsRailControls, SessionTabHalfRow } from "./session-tabs-rail"
 import "./title-shimmer"
 
 registerOpencodeSpinner()
+
+// Project tags for session tabs (oc-hub projects registry). Read-only, cached by mtime.
+// Patch: local customization, see skill learned-opencode-core-hot-reload-cause.
+let projectTagCache: { mtime: number; bySession: Map<string, string> } | null = null
+function projectTagFor(sessionID: string): string {
+  try {
+    const dir = process.env.AI_COUNCIL_STATE_DIR ?? path.join(homedir(), ".local/state/ai-council")
+    const file = path.join(dir, "projects.json")
+    const st = statSync(file, { throwIfNoEntry: false })
+    if (!st) return ""
+    if (!projectTagCache || projectTagCache.mtime !== st.mtimeMs) {
+      const raw = JSON.parse(readFileSync(file, "utf8")) as Array<{ name?: string; chats?: string[] }>
+      const bySession = new Map<string, string>()
+      if (Array.isArray(raw)) for (const p of raw) {
+        if (!p || typeof p.name !== "string" || !Array.isArray(p.chats)) continue
+        for (const c of p.chats) if (typeof c === "string" && !bySession.has(c)) bySession.set(c, p.name)
+      }
+      projectTagCache = { mtime: st.mtimeMs, bySession }
+    }
+    return projectTagCache.bySession.get(sessionID) ?? ""
+  } catch {
+    return ""
+  }
+}
+
+// Project group key for the left tabs list (oc-hub registry first, else session directory).
+// Patch: local customization, see skill learned-opencode-core-hot-reload-cause.
+let projectGroupCache: { mtime: number; bySession: Map<string, string> } | null = null
+function projectGroupFor(sessionID: string, fallbackDir: string): string {
+  try {
+    const dir = process.env.AI_COUNCIL_STATE_DIR ?? path.join(homedir(), ".local/state/ai-council")
+    const file = path.join(dir, "projects.json")
+    const st = statSync(file, { throwIfNoEntry: false })
+    if (st && (!projectGroupCache || projectGroupCache.mtime !== st.mtimeMs)) {
+      const raw = JSON.parse(readFileSync(file, "utf8")) as Array<{ name?: string; path?: string; chats?: string[] }>
+      const bySession = new Map<string, string>()
+      if (Array.isArray(raw)) for (const pr of raw) {
+        if (!pr || typeof pr.name !== "string" || !Array.isArray(pr.chats)) continue
+        const label = pr.path ? `${pr.name} · ${pr.path}` : pr.name
+        for (const c of pr.chats) if (typeof c === "string" && !bySession.has(c)) bySession.set(c, label)
+      }
+      projectGroupCache = { mtime: st.mtimeMs, bySession }
+    }
+    return (projectGroupCache?.bySession.get(sessionID) ?? fallbackDir ?? "").toString()
+  } catch {
+    return (fallbackDir ?? "").toString()
+  }
+}
+
+// Project groups block above the tabs list (oc-hub projects.json).
+// Patch: local customization. Reads registry, never reorders items().
+type ProjectEntry = { id: string; name: string; path: string; chats: string[] }
+function readProjectEntries(): ProjectEntry[] {
+  try {
+    const dir = process.env.AI_COUNCIL_STATE_DIR ?? path.join(homedir(), ".local/state/ai-council")
+    const raw = JSON.parse(readFileSync(path.join(dir, "projects.json"), "utf8"))
+    if (!Array.isArray(raw)) return []
+    return raw.filter((p) => p && typeof p.id === "string" && typeof p.name === "string" && Array.isArray(p.chats))
+  } catch {
+    return []
+  }
+}
+function ProjectGroups(props: { tabs: SessionTabsController; items: () => Array<{ sessionID: string; title?: string }> }) {
+  const [open, setOpen] = createSignal<Record<string, boolean>>({})
+  const [tick, setTick] = createSignal(0)
+  const timer = setInterval(() => setTick((t) => t + 1), 10000)
+  onCleanup(() => clearInterval(timer))
+  const muted = useTheme().text.muted
+  const projects = () => { tick(); return readProjectEntries() }
+  const alive = (id: string) => props.items().some((t) => t.sessionID === id)
+  return (
+    <Show when={projects().length > 0}>
+      <box flexDirection="column" paddingLeft={1} paddingRight={1}>
+        <For each={projects()}>
+          {(pr) => {
+            const live = pr.chats.filter(alive)
+            const isOpen = () => open()[pr.id] ?? true
+            return (
+              <box flexDirection="column">
+                <text
+                  fg={muted}
+                  selectable={false}
+                  onMouseUp={() => setOpen((o) => ({ ...o, [pr.id]: !isOpen() }))}
+                >
+                  {"▸ " + pr.name + " (" + live.length + ")"}
+                </text>
+                <Show when={isOpen()}>
+                  <For each={live}>
+                    {(id) => (
+                      <text
+                        selectable={false}
+                        onMouseUp={() => props.tabs.select(id)}
+                      >
+                        {"  · " + id.slice(0, 12)}
+                      </text>
+                    )}
+                  </For>
+                </Show>
+              </box>
+            )
+          }}
+        </For>
+      </box>
+    </Show>
+  )
+}
 
 export const TAB_SPINNERS = {
   dots: { frames: SPINNER_FRAMES, interval: 80 },
@@ -727,6 +836,7 @@ function VerticalSessionTabs(props: {
       <Show when={compact()}>
         <SessionTabsRailControls width={width()} tabs={tabs} belowHighlighted={belowHighlighted()} />
       </Show>
+      <ProjectGroups tabs={tabs} items={() => items().map((t) => ({ sessionID: t.sessionID, title: t.title }))} />
       <scrollbox
         ref={(element) => {
           scroll = element
@@ -878,7 +988,28 @@ function VerticalSessionTabs(props: {
                   : color
                 return separator ? tint(faded, pulseBackground(), 0.55) : faded
               }
+              const groupOf = (id: string | undefined) => {
+                if (!id) return ""
+                const dir = data?.session.get(id)?.location.directory ?? ""
+                const base = dir.split("/").filter(Boolean).slice(-2).join("/")
+                return projectGroupFor(id, base)
+              }
+              const showGroup = () => {
+                const g = groupOf(tab.sessionID)
+                if (!g) return ""
+                const prev = previous()
+                const pg = prev ? groupOf(prev.sessionID) : ""
+                return g === pg ? "" : g
+              }
               return (
+                <>
+                <Show when={showGroup()}>
+                  {(g) => (
+                    <text fg={theme.text.muted} selectable={false} wrapMode="none">
+                      {"▸ " + g}
+                    </text>
+                  )}
+                </Show>
                 <box
                   height={compact() ? 1 : 2}
                   width="100%"
@@ -1138,6 +1269,7 @@ function VerticalSessionTabs(props: {
                     </box>
                   </Show>
                 </box>
+                </>
               )
             }}
           </For>
@@ -1582,7 +1714,12 @@ function HorizontalSessionTabs(props: {
           const glowColor = createMemo(() => tint(background(), feedbackColor() ?? unreadColor(), glowLevel()))
           const glows = () =>
             Boolean(status().attention || (!selected() && !status().busy && status().unread !== undefined))
-          const title = () => data?.session.get(tab.sessionID)?.title ?? tab.title ?? "Untitled session"
+          const rawTitle = () => data?.session.get(tab.sessionID)?.title ?? tab.title ?? "Untitled session"
+          const title = () => {
+            const tag = projectTagFor(tab.sessionID)
+            const t = rawTitle()
+            return tag && !t.startsWith(`[${tag}]`) ? `[${tag}] ${t}` : t
+          }
           const tabNumber = createMemo(() => items().findIndex((item) => item.sessionID === tab.sessionID) + 1)
           const numberWidth = () => Math.max(2, String(items().length).length)
           // Hovering reveals the close mark, so the title's right bound shifts left of it.

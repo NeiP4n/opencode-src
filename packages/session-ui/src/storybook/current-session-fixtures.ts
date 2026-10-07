@@ -370,7 +370,7 @@ export const fileChangeLoadingDocument = document(
           args: {
             path: "packages/app/src/components/empty-session.tsx",
             oldString: "No messages yet",
-            newString: "Ask OpenCode to start working",
+            newString: "Ask OpenMAMI to start working",
           },
         }),
       ],
@@ -393,7 +393,7 @@ export const fileChangeRunningDocument = document(
           args: {
             path: "packages/app/src/components/empty-session.tsx",
             oldString: "No messages yet",
-            newString: "Ask OpenCode to start working",
+            newString: "Ask OpenMAMI to start working",
           },
         }),
       ],
@@ -523,7 +523,7 @@ export const expandedShellDocument = document([
             "opencode2 api get /openapi.json > /private/var/folders/j/gd69b2|16y91666jzf3p9g22asdasc0000gn/T/opencode/temp/tes",
         },
         output:
-          '{"location":{"directory":"/Users/usrnk1","project":{"id":"global","directory":"/","canonical":"/"}},"data":[{"id":"opencode","name":"OpenCode","description":"Use this skill for any question about OpenCode itself, including how OpenCode works, using or configuring it, migrating from V1 to V2, troubleshooting it, developing plugins or integrations, using the OpenCode SDK, clients, server, or API, and contributing to the OpenCode codebase."}]}',
+          '{"location":{"directory":"/Users/usrnk1","project":{"id":"global","directory":"/","canonical":"/"}},"data":[{"id":"opencode","name":"OpenMAMI","description":"Use this skill for any question about OpenMAMI itself, including how OpenMAMI works, using or configuring it, migrating from V1 to V2, troubleshooting it, developing plugins or integrations, using the OpenMAMI SDK, clients, server, or API, and contributing to the OpenMAMI codebase."}]}',
         metadata: { exit: 0 },
       }),
     ],

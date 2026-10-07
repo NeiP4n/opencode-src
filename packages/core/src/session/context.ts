@@ -6,6 +6,7 @@ import { Context, Effect, Layer } from "effect"
 import { Agent } from "../agent.js"
 import { CodeModeInstructions } from "../codemode/instructions.js"
 import { Database } from "../database/database.js"
+import { HubInstructions } from "../hub/instructions.js"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { InstructionDiscovery } from "../instruction-discovery.js"
 import { Instructions } from "../instructions/index.js"
@@ -149,6 +150,7 @@ const layer = Layer.effect(
         // the date and environment, which vary by day and directory.
         instructions: Instructions.combine([
           CodeModeInstructions.make(loaded.tools.codeModeCatalog),
+          HubInstructions.make(),
           loaded.mcp,
           loaded.references,
           loaded.skills,

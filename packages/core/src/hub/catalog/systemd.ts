@@ -1,0 +1,92 @@
+export * as HubSystemd from "./systemd.js"
+
+import type { Entry } from "../types.js"
+
+// systemd unit control and journal queries. Everything past status is marked
+// dangerous because it changes system state.
+export const entries: Entry[] = [
+  {
+    id: "systemd.status",
+    title: "Unit status",
+    description: "Current state of a systemd unit",
+    category: "systemd",
+    requires: ["systemctl"],
+    templates: { bash: "systemctl status {unit}" },
+  },
+  {
+    id: "systemd.list-failed",
+    title: "Failed units",
+    description: "All units currently in failed state",
+    category: "systemd",
+    requires: ["systemctl"],
+    templates: { bash: "systemctl --failed" },
+  },
+  {
+    id: "systemd.list-enabled",
+    title: "Enabled units",
+    description: "Units enabled at boot, one per line",
+    category: "systemd",
+    requires: ["systemctl"],
+    templates: { bash: "systemctl list-unit-files --state=enabled" },
+  },
+  {
+    id: "systemd.logs",
+    title: "Journal for a unit",
+    description: "Recent journal entries for one unit",
+    category: "systemd",
+    requires: ["journalctl"],
+    templates: { bash: "journalctl -u {unit} -n {lines} --no-pager" },
+  },
+  {
+    id: "systemd.logs-since",
+    title: "Journal since a time",
+    description: "Journal entries from the last N minutes across units",
+    category: "systemd",
+    requires: ["journalctl"],
+    templates: { bash: "journalctl --since '{minutes} min ago' --no-pager" },
+  },
+  {
+    id: "systemd.restart",
+    title: "Restart a unit",
+    description: "Restart one systemd service",
+    category: "systemd",
+    requires: ["systemctl"],
+    danger: true,
+    templates: { bash: "sudo systemctl restart {unit}" },
+  },
+  {
+    id: "systemd.enable",
+    title: "Enable a unit",
+    description: "Start a unit at boot",
+    category: "systemd",
+    requires: ["systemctl"],
+    danger: true,
+    templates: { bash: "sudo systemctl enable {unit}" },
+  },
+  {
+    id: "systemd.disable",
+    title: "Disable a unit",
+    description: "Stop a unit from starting at boot",
+    category: "systemd",
+    requires: ["systemctl"],
+    danger: true,
+    templates: { bash: "sudo systemctl disable {unit}" },
+  },
+  {
+    id: "systemd.daemon-reload",
+    title: "Reload unit definitions",
+    description: "Re-read unit files after editing them",
+    category: "systemd",
+    requires: ["systemctl"],
+    danger: true,
+    templates: { bash: "sudo systemctl daemon-reload" },
+  },
+  {
+    id: "systemd.boot-time",
+    title: "Boot time and uptime",
+    description: "Kernel boot timestamp and current uptime",
+    category: "systemd",
+    requires: ["systemctl"],
+    templates: { bash: "systemctl show -p ActiveEnterTimestampMonotonic -p ExecMainStartTimestamp {unit}" },
+  },
+]

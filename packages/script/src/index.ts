@@ -27,13 +27,22 @@ const CHANNEL = await (async () => {
   if (env.OPENCODE_CHANNEL) return env.OPENCODE_CHANNEL
   if (env.OPENCODE_BUMP) return "latest"
   if (env.OPENCODE_VERSION && !env.OPENCODE_VERSION.startsWith("0.0.0-")) return "latest"
-  return await $`git branch --show-current`.text().then((x) => x.trim())
+  const branch = await $`git branch --show-current`.text().then((x) => x.trim())
+  if (branch) return branch
+  return "local"
 })()
 const IS_PREVIEW = CHANNEL !== "latest"
+// A local build announces itself as 0.0.0-<channel>-<date>, which every provider reads as
+// version 0.0.0. The opencode.ai free tier rejects clients below 1.18.0, so a local build
+// made from a tagged checkout announces the release it was cut from instead.
+const MINIMUM_ANNOUNCED_VERSION = "1.18.0"
 
 const VERSION = await (async () => {
   if (env.OPENCODE_VERSION) return env.OPENCODE_VERSION
-  if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${previewBuildNumber()}`
+  if (IS_PREVIEW) {
+    const tagged = await releaseTagVersion()
+    return tagged ?? `0.0.0-${CHANNEL}-${previewBuildNumber()}`
+  }
   const version = await fetch("https://registry.npmjs.org/@opencode%2fcli/latest")
     .then((res) => {
       if (!res.ok) throw new Error(res.statusText)
@@ -54,6 +63,16 @@ function previewBuildNumber() {
   const runAttempt = process.env["GITHUB_RUN_ATTEMPT"]
   if (runAttempt && runAttempt !== "1") return `${runNumber}.${runAttempt}`
   return runNumber
+}
+
+// Untagged checkouts, and tags below the floor, fall back to the preview build number.
+async function releaseTagVersion() {
+  const tag = await $`git describe --tags --abbrev=0`
+    .text()
+    .then((x) => x.trim().replace(/^v/, ""))
+    .catch(() => "")
+  if (!semver.valid(tag)) return undefined
+  return semver.lt(tag, MINIMUM_ANNOUNCED_VERSION) ? undefined : tag
 }
 
 const bot = ["actions-user", "opencode", "opencode-agent[bot]"]

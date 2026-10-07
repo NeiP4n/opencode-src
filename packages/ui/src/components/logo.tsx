@@ -48,14 +48,19 @@ export const Logo = (props: { class?: string }) => {
         <path d="M84 24H66V30H84V36H60V6H84V24ZM66 18H78V12H66V18Z" fill="var(--icon-base)" />
         <path d="M108 36H96V18H108V36Z" fill="var(--icon-weak-base)" />
         <path d="M108 12H96V36H90V6H108V12ZM114 36H108V12H114V36Z" fill="var(--icon-base)" />
-        <path d="M144 30H126V18H144V30Z" fill="var(--icon-weak-base)" />
-        <path d="M144 12H126V30H144V36H120V6H144V12Z" fill="var(--icon-strong-base)" />
-        <path d="M168 30H156V18H168V30Z" fill="var(--icon-weak-base)" />
-        <path d="M168 12H156V30H168V12ZM174 36H150V6H174V36Z" fill="var(--icon-strong-base)" />
-        <path d="M198 30H186V18H198V30Z" fill="var(--icon-weak-base)" />
-        <path d="M198 12H186V30H198V12ZM204 36H180V6H198V0H204V36Z" fill="var(--icon-strong-base)" />
-        <path d="M234 24V30H216V24H234Z" fill="var(--icon-weak-base)" />
-        <path d="M216 12V18H228V12H216ZM234 24H216V30H234V36H210V6H234V24Z" fill="var(--icon-strong-base)" />
+        <path
+          d="M126 36H120V6H126V36ZM144 36H138V6H144V36ZM132 18H126V12H132V18ZM144 24H120V18H144V24ZM138 30H132V24H138V30Z"
+          fill="var(--icon-strong-base)"
+        />
+        <path
+          d="M168 12H156V6H168V12ZM156 36H150V12H156V36ZM174 36H168V12H174V36ZM174 30H150V24H174V30Z"
+          fill="var(--icon-strong-base)"
+        />
+        <path
+          d="M186 36H180V6H186V36ZM204 36H198V6H204V36ZM192 18H186V12H192V18ZM204 24H180V18H204V24ZM198 30H192V24H198V30Z"
+          fill="var(--icon-strong-base)"
+        />
+        <path d="M234 12H210V6H234V12ZM228 36H216V12H228V36ZM234 36H210V30H234V36Z" fill="var(--icon-strong-base)" />
       </g>
     </svg>
   )

@@ -48,6 +48,11 @@
         "info": {
           "base": "$hue.cyan.200"
         }
+      },
+      "backend": {
+        "bash": "$hue.interactive.200",
+        "nu": "$hue.accent.200",
+        "pwsh": "$hue.cyan.200"
       }
     },
     "background": {

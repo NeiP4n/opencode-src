@@ -46,7 +46,7 @@ const decodeVpPackages = Schema.decodeUnknownOption(
 )
 
 const installNames: Record<Method, string> = {
-  curl: "The OpenCode installer",
+  curl: "The OpenMAMI installer",
   npm: "npm",
   pnpm: "pnpm",
   bun: "Bun",
@@ -247,7 +247,7 @@ const make = Effect.gen(function* () {
       catch: (cause) =>
         new UpgradeError(
           {
-            title: "Could not check for OpenCode updates",
+            title: "Could not check for OpenMAMI updates",
             detail: errorDetail(cause),
             retry: "Check your network, then run opencode upgrade again.",
           },
@@ -257,7 +257,7 @@ const make = Effect.gen(function* () {
     if (!response.ok)
       return yield* Effect.fail(
         new UpgradeError({
-          title: "Could not check for OpenCode updates",
+          title: "Could not check for OpenMAMI updates",
           detail: `The update service returned HTTP ${response.status}.`,
           retry: "Try again in a few minutes.",
         }),
@@ -267,7 +267,7 @@ const make = Effect.gen(function* () {
       catch: (cause) =>
         new UpgradeError(
           {
-            title: "Could not read the OpenCode update information",
+            title: "Could not read the OpenMAMI update information",
             detail: errorDetail(cause),
             retry: "Try again in a few minutes.",
           },
@@ -277,7 +277,7 @@ const make = Effect.gen(function* () {
     if (!data.metadata?.package)
       return yield* Effect.fail(
         new UpgradeError({
-          title: "Could not read the OpenCode update information",
+          title: "Could not read the OpenMAMI update information",
           detail: "The update service returned incomplete release information.",
           retry: "Try again in a few minutes.",
         }),
@@ -396,7 +396,7 @@ const make = Effect.gen(function* () {
             method,
             command: ["curl", "-fsSL", "-o", installer, "https://opencode.ai/v2/install"],
             displayCommand: ["curl", "-fsSL", "https://opencode.ai/v2/install"],
-            title: "Could not download the OpenCode installer",
+            title: "Could not download the OpenMAMI installer",
             retry: "Check your network, then run opencode upgrade again.",
           })
           return yield* retaining(
@@ -405,7 +405,7 @@ const make = Effect.gen(function* () {
               method,
               command: ["bash", installer, "--version", version, "--no-modify-path"],
               displayCommand: ["opencode", "upgrade", version, "--method", "curl"],
-              title: "The OpenCode installer failed",
+              title: "The OpenMAMI installer failed",
             }),
           )
         }
@@ -418,7 +418,7 @@ const make = Effect.gen(function* () {
           ? cause
           : new UpgradeError(
               {
-                title: "Could not prepare the OpenCode upgrade",
+                title: "Could not prepare the OpenMAMI upgrade",
                 detail: errorDetail(cause),
                 retry: "Fix the issue above, then run opencode upgrade again.",
               },
@@ -455,7 +455,7 @@ const make = Effect.gen(function* () {
       yield* Effect.logInfo("update check done", { action: "up-to-date" })
       return undefined
     }
-    yield* Effect.logInfo("OpenCode update available", { current, latest: version, action: next })
+    yield* Effect.logInfo("OpenMAMI update available", { current, latest: version, action: next })
     return { policy, version }
   })
 
@@ -480,7 +480,7 @@ const make = Effect.gen(function* () {
     if (OPENCODE_LOCAL)
       return {
         type: "unavailable" as const,
-        message: "This build runs from a source checkout. Use an installed OpenCode release to check for updates.",
+        message: "This build runs from a source checkout. Use an installed OpenMAMI release to check for updates.",
       }
     const version = yield* latest()
     if (!parseReleaseVersion(version)) return yield* Effect.fail(new Error(`Invalid version: ${version}`))

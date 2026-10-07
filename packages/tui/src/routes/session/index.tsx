@@ -25,6 +25,7 @@ import { Spinner, SPINNER_FRAMES } from "../../component/spinner"
 import { PatchDiff } from "../../component/patch-diff"
 import { useTheme, useThemes } from "../../context/theme"
 import { BoxRenderable, ScrollBoxRenderable, addDefaultParsers, TextAttributes, RGBA, MouseEvent } from "@opentui/core"
+import type { ResolvedTheme, TerminalBackend } from "@opencode/theme/tui"
 import { Prompt, type PromptRef } from "../../component/prompt"
 import type {
   SessionMessageInfo,
@@ -2418,6 +2419,9 @@ function ToolPart(props: { part: SessionMessageAssistantTool; images?: boolean }
       <Match when={display() === "shell"}>
         <Shell {...toolprops} />
       </Match>
+      <Match when={display() === "hub"}>
+        <Hub {...toolprops} />
+      </Match>
       <Match when={display() === "glob"}>
         <Glob {...toolprops} />
       </Match>
@@ -2691,11 +2695,11 @@ function InlineTool(props: {
   )
 }
 
-function StatusBadge(props: { children: string; raised?: boolean }) {
+function StatusBadge(props: { children: string; raised?: boolean; color?: RGBA }) {
   const theme = useTheme()
   const background = () => (props.raised ? theme.background.raised.base : theme.background.base)
   return (
-    <text flexShrink={0} bg={theme.decrease(background())} fg={theme.text.muted}>
+    <text flexShrink={0} bg={theme.decrease(background())} fg={props.color ?? theme.text.muted}>
       {" "}
       {props.children}{" "}
     </text>
@@ -2814,6 +2818,39 @@ function Shell(props: ToolProps) {
   )
 }
 
+function Hub(props: ToolProps) {
+  const theme = useTheme()
+  const hubID = () => stringValue(props.metadata.hubID) ?? stringValue(props.input.id)
+  const backend = () => stringValue(props.metadata.backend) ?? stringValue(props.input.backend)
+  return (
+    <ShellDisplay
+      part={props.part}
+      shellID={stringValue(props.metadata.shellID)}
+      command={stringValue(props.metadata.command) ?? stringValue(props.input.command)}
+      workdir={stringValue(props.input.workdir)}
+      status={props.part.state.status}
+      background={props.part.state.status === "completed" && props.metadata.status === "running"}
+      output={stringValue(props.metadata.shellID) ? undefined : props.output}
+      badge={hubBadge(hubID(), backend())}
+      badgeColor={hubBadgeColor(theme, backend())}
+    />
+  )
+}
+
+export function hubBadge(hubID?: string, backend?: string) {
+  if (!hubID && !backend) return undefined
+  if (hubID && backend) return `HUB:${hubID} · ${backend}`
+  return `HUB:${hubID ?? backend}`
+}
+
+// The backend is named in the badge, so it gets its own text color: the theme
+// carries one per backend and a theme without the role falls back to muted, the
+// color every other badge already uses.
+export function hubBadgeColor(theme: ResolvedTheme, backend?: string) {
+  if (!backend) return theme.text.muted
+  return theme.text.backend?.[backend as TerminalBackend] ?? theme.text.muted
+}
+
 function ShellDisplay(props: {
   part?: SessionMessageAssistantTool
   shellID?: string
@@ -2823,6 +2860,8 @@ function ShellDisplay(props: {
   background?: boolean
   output?: string
   error?: string
+  badge?: string
+  badgeColor?: RGBA
 }) {
   const theme = useTheme()
   const ctx = use()
@@ -2968,6 +3007,9 @@ function ShellDisplay(props: {
         </Show>
         <Show when={props.background}>
           <StatusBadge raised>Background</StatusBadge>
+        </Show>
+        <Show when={props.badge}>
+          {(badge) => <StatusBadge color={props.badgeColor}>{badge()}</StatusBadge>}
         </Show>
       </box>
     </BlockTool>

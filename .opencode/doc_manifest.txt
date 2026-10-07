@@ -1,0 +1,38 @@
+# Манифест пакетов ядра OpenCode, которые обязаны иметь PACKAGE.md
+# Формат строки: <слой>\t<каталог>\t<строк в src>\t<файлов в src>\t<зависит от @opencode/*>
+# Числа и зависимости сняты из packages/*/package.json и подсчёта *.ts/*.tsx в src/ на 2026-10-06.
+# Столбец «строк» — размер src/, без тестов (core/test — отдельно, не в счёт).
+# Знак «-» означает «внутри opencode не зависит от других пакетов opencode».
+#
+# Слои: L0 листья → L6 поверхности. Порядок строк = порядок работы (от фундамента к поверхности).
+
+L0	schema	5785	102	-
+L0	util	4565	44	-
+L0	codemode	10764	45	-
+L0	theme	1592	10	-
+L0	ui	35114	214	-
+L0	http-recorder	1601	14	-
+L0	httpapi-codegen	1977	1	-
+L0	web	2649	18	-
+L0	script	88	1	-
+L0	function	402	2	-
+L0	posts	14	1	-
+L1	protocol	4201	36	schema
+L1	ai	29218	201	schema
+L1	latex	2646	14	plugin
+L1	merman	21359	88	plugin
+L2	client	16722	30	protocol,schema
+L2	plugin-browser	1530	7	plugin,schema
+L3	plugin	3089	60	ai,client,protocol,schema,util
+L4	core	65299	431	ai,codemode,plugin,plugin-browser,schema,util
+L4	simulation	2182	13	ai,core,plugin,protocol,util
+L5	server	3883	52	core,protocol,schema,simulation,util
+L5	session-ui	24443	113	client,ui,util
+L6	cli	12297	109	client,plugin,schema,server,tui,util
+L6	tui	62303	281	client,core,latex,merman,plugin,schema,simulation,theme,ui,util
+L6	sdk	647	15	client,core,plugin,schema,server,util
+L6	app	121153	516	client,gui-extensions,schema,session-ui,ui,util
+L6	gui-extensions	44877	799	client,plugin-browser,schema,session-ui,ui,util
+L6	enterprise	1466	13	client,core,schema,session-ui,ui,util
+L6	desktop	9569	142	-
+L6	storybook	0	0	-

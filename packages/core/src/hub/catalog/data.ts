@@ -1,0 +1,103 @@
+export * as HubData from "./data.js"
+
+import type { Entry } from "../types.js"
+
+// Tabular data (CSV/TSV) and database work with mlr, csvkit, sqlite3.
+export const entries: Entry[] = [
+  {
+    id: "data.csv-head",
+    title: "Preview a CSV",
+    description: "Show the first N rows with headers aligned",
+    category: "data",
+    requires: ["mlr"],
+    templates: { bash: "mlr --icsv --opprint cat -n then head -n {limit} {file}" },
+  },
+  {
+    id: "data.csv-columns",
+    title: "List CSV columns",
+    description: "Print column names of a delimited file",
+    category: "data",
+    requires: ["mlr"],
+    templates: { bash: "mlr --icsv --ojson cat {file} | jq -r 'keys[]'" },
+  },
+  {
+    id: "data.csv-select",
+    title: "Select CSV columns",
+    description: "Project a subset of columns into a new CSV",
+    category: "data",
+    requires: ["mlr"],
+    templates: { bash: "mlr --icsv --ocsv cut -f {columns} {file}" },
+  },
+  {
+    id: "data.csv-filter",
+    title: "Filter CSV rows",
+    description: "Keep rows where a column satisfies a numeric expression",
+    category: "data",
+    requires: ["mlr"],
+    templates: { bash: "mlr --icsv --ocsv filter '{expression}' {file}" },
+  },
+  {
+    id: "data.csv-sort",
+    title: "Sort CSV by column",
+    description: "Sort rows by one or more columns, numerically",
+    category: "data",
+    requires: ["mlr"],
+    templates: { bash: "mlr --icsv --ocsv sort -f {columns} {file}" },
+  },
+  {
+    id: "data.csv-group-count",
+    title: "Group and count",
+    description: "Count rows per distinct value of a column",
+    category: "data",
+    requires: ["mlr"],
+    templates: { bash: "mlr --icsv --opprint then count-distinct -f {column} {file}" },
+  },
+  {
+    id: "data.csv-stats",
+    title: "Column statistics",
+    description: "Summary statistics for numeric columns",
+    category: "data",
+    requires: ["mlr"],
+    templates: { bash: "mlr --icsv --opprint stats1 -a count,sum,mean,min,max {file}" },
+  },
+  {
+    id: "data.csv-join",
+    title: "Join two CSV files",
+    description: "Inner join on a shared key column",
+    category: "data",
+    requires: ["mlr"],
+    templates: { bash: "mlr --icsv --ocsv join -j {key} -f {left} {right}" },
+  },
+  {
+    id: "data.csv-to-json",
+    title: "CSV to JSON",
+    description: "Transcode CSV rows into a JSON array",
+    category: "data",
+    requires: ["mlr"],
+    templates: { bash: "mlr --icsv --ojson cat {file}" },
+  },
+  {
+    id: "data.tsv-to-csv",
+    title: "TSV to CSV",
+    description: "Convert tab-separated values to comma-separated",
+    category: "data",
+    requires: ["mlr"],
+    templates: { bash: "mlr --itsv --ocsv cat {file}" },
+  },
+  {
+    id: "data.sqlite-query",
+    title: "Query a SQLite database",
+    description: "Run read-only SQL against a local database file",
+    category: "data",
+    requires: ["sqlite3"],
+    templates: { bash: "sqlite3 -readonly {database} {sql}" },
+  },
+  {
+    id: "data.sqlite-schema",
+    title: "Database schema",
+    description: "List tables and columns of a SQLite database",
+    category: "data",
+    requires: ["sqlite3"],
+    templates: { bash: "sqlite3 -readonly {database} '.schema'" },
+  },
+]

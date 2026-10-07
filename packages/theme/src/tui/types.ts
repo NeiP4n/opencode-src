@@ -16,6 +16,9 @@ export type HueScale = Readonly<Record<HueStep, RGBA>>
 export type Hue = Readonly<Record<SemanticHue, HueScale>>
 export type HueSource = Readonly<{ hue: string; step: HueStep }>
 export type Categorical = readonly HueScale[]
+// Execution backends a catalog entry can select. Each one gets its own text
+// color so a badge naming the backend reads at a glance.
+export type TerminalBackend = "bash" | "nu" | "pwsh"
 export type ActionStates = Readonly<Partial<Record<ActionState, boolean>>>
 export type StatefulColor = Readonly<Record<ResolvedActionState, RGBA>> & {
   readonly state: (states: ActionStates) => RGBA
@@ -34,6 +37,9 @@ export type ResolvedThemeTokens = {
     readonly action: Readonly<Record<ActionVariant, StatefulColor>>
     readonly formfield: FormfieldColor
     readonly feedback: Readonly<Record<FeedbackKind, { readonly base: RGBA; readonly muted: RGBA }>>
+    // Optional so a theme written before this role existed keeps resolving; a
+    // component that needs a backend color falls back to `text.muted`.
+    readonly backend?: Readonly<Record<TerminalBackend, RGBA>>
   }
   readonly background: {
     readonly base: RGBA

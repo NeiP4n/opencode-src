@@ -20,6 +20,7 @@ export const INLINE_TOOL_ICON_WIDTH = 2
 
 const toolDisplays = new Set([
   "shell",
+  "hub",
   "glob",
   "read",
   "grep",

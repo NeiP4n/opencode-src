@@ -29,13 +29,13 @@ describe("acp session lifecycle over the wire", () => {
         sessionCapabilities: { additionalDirectories: {}, close: {}, delete: {}, fork: {}, list: {}, resume: {} },
         _meta: { "opencode/child-session-updates": true },
       },
-      agentInfo: { name: "OpenCode" },
+      agentInfo: { name: "OpenMAMI" },
     })
     expect(plain.authMethods).toEqual([
       { id: "opencode-login", name: "Login with opencode", description: "Run `opencode auth login` in the terminal" },
     ])
     expect(terminal.authMethods?.[0]?._meta).toEqual({
-      "terminal-auth": { command: "opencode", args: ["auth", "login"], label: "OpenCode Login" },
+      "terminal-auth": { command: "opencode", args: ["auth", "login"], label: "OpenMAMI Login" },
     })
     expect(await acp.request("authenticate", { methodId: "opencode-login" })).toEqual({})
     expect(await rpcError(acp.request("authenticate", { methodId: "missing" }))).toMatchObject({

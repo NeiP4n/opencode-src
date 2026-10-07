@@ -40,7 +40,7 @@ const parser = createMarkdownParser(async (code, language) => {
   if (!instance.getLoadedLanguages().includes(name))
     await instance.loadLanguage(bundledLanguages[name as BundledLanguage])
   return instance
-    .codeToHtml(code, { lang: name as BundledLanguage, theme: "OpenCode", tabindex: false })
+    .codeToHtml(code, { lang: name as BundledLanguage, theme: "OpenMAMI", tabindex: false })
     .replace("<code>", `<code class="language-${name}">`)
 })
 
@@ -93,7 +93,7 @@ async function highlight(request: Extract<MarkdownWorkerRequest, { type: "highli
       await instance.loadLanguage(bundledLanguages[language as BundledLanguage])
 
     if (request.complete) {
-      const result = instance.codeToTokens(request.text, { lang: language as BundledLanguage, theme: "OpenCode" })
+      const result = instance.codeToTokens(request.text, { lang: language as BundledLanguage, theme: "OpenMAMI" })
       streams.delete(request.key)
       post({
         type: "highlight",
@@ -117,7 +117,7 @@ async function highlight(request: Extract<MarkdownWorkerRequest, { type: "highli
       ? {
           language,
           source: "",
-          tokenizer: new ShikiStreamTokenizer({ highlighter: instance, lang: language, theme: "OpenCode" }),
+          tokenizer: new ShikiStreamTokenizer({ highlighter: instance, lang: language, theme: "OpenMAMI" }),
         }
       : previous
     const result = await stream.tokenizer.enqueue(request.text.slice(stream.source.length))

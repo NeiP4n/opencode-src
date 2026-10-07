@@ -1,0 +1,111 @@
+export * as HubFiles from "./files.js"
+
+import type { Entry } from "../types.js"
+
+// Filesystem operations: listing, copying, moving, permissions, archives.
+export const entries: Entry[] = [
+  {
+    id: "files.list",
+    title: "Detailed file listing",
+    description: "Human-readable recursive listing with sizes and permissions",
+    category: "files",
+    requires: ["lsd"],
+    templates: { bash: "lsd -la --tree --depth {depth} {path}" },
+  },
+  {
+    id: "files.list-basic",
+    title: "Plain file listing",
+    description: "Portable one-per-line listing when lsd is unavailable",
+    category: "files",
+    templates: { bash: "ls -la {path}" },
+  },
+  {
+    id: "files.tree",
+    title: "Directory tree",
+    description: "Show directory structure as a tree with depth limit",
+    category: "files",
+    requires: ["tree"],
+    templates: { bash: "tree -L {depth} {path}" },
+  },
+  {
+    id: "files.copy",
+    title: "Copy file or directory",
+    description: "Copy recursively with progress and archive preservation",
+    category: "files",
+    requires: ["rsync"],
+    templates: { bash: "rsync -a {source} {destination}" },
+  },
+  {
+    id: "files.move",
+    title: "Move or rename",
+    description: "Move a file or directory to a new location",
+    category: "files",
+    templates: { bash: "mv {source} {destination}" },
+  },
+  {
+    id: "files.remove",
+    title: "Remove files",
+    description: "Delete files or directories recursively",
+    category: "files",
+    danger: true,
+    templates: { bash: "rm -rf {path}" },
+  },
+  {
+    id: "files.chmod-exec",
+    title: "Make file executable",
+    description: "Add execute permission for user, group and others",
+    category: "files",
+    templates: { bash: "chmod +x {path}" },
+  },
+  {
+    id: "files.owner",
+    title: "Change file ownership",
+    description: "Reassign user and group ownership of a path",
+    category: "files",
+    danger: true,
+    templates: { bash: "chown {user}:{group} {path}" },
+  },
+  {
+    id: "files.size-dir",
+    title: "Directory sizes",
+    description: "Human-readable disk usage per subdirectory, sorted",
+    category: "files",
+    templates: { bash: "du -h {path} | sort -hr | head -{limit}" },
+  },
+  {
+    id: "files.disk-usage",
+    title: "Filesystem free space",
+    description: "Show available and used space for all mounted filesystems",
+    category: "files",
+    templates: { bash: "df -h" },
+  },
+  {
+    id: "files.watch",
+    title: "Watch file changes",
+    description: "Run a command whenever files under a path change",
+    category: "files",
+    requires: ["watchexec"],
+    templates: { bash: "watchexec -- {command}" },
+  },
+  {
+    id: "files.archive-create",
+    title: "Create tar.gz archive",
+    description: "Compress a path into a gzip tarball",
+    category: "files",
+    templates: { bash: "tar -czf {archive} -C {parent} {name}" },
+  },
+  {
+    id: "files.archive-extract",
+    title: "Extract tar.gz archive",
+    description: "Unpack a tarball into a target directory",
+    category: "files",
+    templates: { bash: "tar -xzf {archive} -C {destination}" },
+  },
+  {
+    id: "files.hardlink-count",
+    title: "Count hard links",
+    description: "Show how many hard links point at each file",
+    category: "files",
+    templates: { bash: "find {path} -type f -links +1 -ls" },
+  },
+]

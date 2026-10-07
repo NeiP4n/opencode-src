@@ -22,8 +22,12 @@ const entries = (skills: ReadonlyArray<Summary>) =>
     "  </skill>",
   ])
 
+const HUB_GUIDANCE =
+  "Shell policy: prefer the `hub` tool over hand-written shell when a catalog entry covers the task. Hub commands use fast modern CLIs (rg, fd, jq, yq, mlr) with the best available backend. Use `shell` as fallback when no entry fits."
+
 const render = (skills: ReadonlyArray<Summary>) =>
   [
+    HUB_GUIDANCE,
     "Skills provide specialized instructions and workflows for specific tasks.",
     "Use the skill tool to load a skill when a task matches its description.",
     "The user may also invoke a skill directly. When that happens, its instructions appear in the conversation as a <skill_content> block, the same shape the skill tool returns. A skill that is already present this way does not need to be invoked again.",

@@ -82,6 +82,15 @@ const TextFeedbackDefinition = Schema.Struct({
   muted: Schema.optional(ColorValue),
 })
 
+// Per-backend text colors for a badge that names the executor. Optional
+// everywhere: theme files written before this role existed must keep decoding,
+// and a theme without it leaves the component on `text.muted`.
+const TextBackendDefinition = Schema.Struct({
+  bash: Schema.optional(ColorValue),
+  nu: Schema.optional(ColorValue),
+  pwsh: Schema.optional(ColorValue),
+})
+
 const BackgroundFeedbackDefinition = Schema.Struct({
   base: Schema.optional(ColorValue),
 })
@@ -99,6 +108,7 @@ const TextDefinition = Schema.Struct({
       info: Schema.optional(TextFeedbackDefinition),
     }),
   ),
+  backend: Schema.optional(TextBackendDefinition),
 })
 export type TextDefinition = Schema.Schema.Type<typeof TextDefinition>
 
@@ -230,6 +240,9 @@ const CompleteThemeTokensDefinition = Schema.Struct({
       success: CompleteTextFeedbackDefinition,
       info: CompleteTextFeedbackDefinition,
     }),
+    // Deliberately optional in the complete shape: requiring it would reject
+    // every theme file written before the role existed.
+    backend: Schema.optional(TextBackendDefinition),
   }),
   background: Schema.Struct({
     base: ColorValue,

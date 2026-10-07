@@ -1,0 +1,1475 @@
+# Definition of Done: раскрытие ядра OpenCode в .md-файлах
+# Проект /home/isako/opencode-src (клон github.com/sst/opencode, релиз v2.0.22, MIT).
+# Задача TASK-DOC-CORE. Этапы и листья — по правилам навыка learned-ai-handover-dod.
+# ВАЖНО ДЛЯ СЛЕДУЮЩЕГО ИИ: код ядра НЕ правится. Задача — только новые файлы .md
+# и валидатор документации .opencode/doc_check.*.
+# ЧИТАТЬ ЦИФРЫ: числа внутри evidence — датированные записи одного прогона.
+
+project:
+  name: opencode-src-docs
+  root: /home/isako/opencode-src
+  type: documentation-of-source
+  language: Markdown, TypeScript (только чтение), Python (валидатор), Bash
+  runtime: opencode v0.0.0-local-202610052358, bun, python3
+  purpose: >-
+    Описать ядро OpenCode в файлах .md, лежащих рядом с каждой папкой пакета, чтобы ИИ,
+    открыв любой каталог packages/*, сразу понимала: что за пакет, какие в нём подсистемы,
+    где главные файлы, куда копать дальше. Код ядра не меняется.
+  versions:
+    - source: "git -C /home/isako/opencode-src describe --tags"
+      value: "v2.0.22"
+    - source: "opencode --version"
+      value: "v0.0.0-local-202610052358 (локальная сборка opencode-fixed)"
+    - source: "head LICENSE"
+      value: "MIT License, Copyright (c) 2025 opencode"
+
+repo_state:
+  root: /home/isako/opencode-src
+  head: 527f0b931d
+  branch: "DETACHED (отсоединённая голова)"
+  dirty: 389
+  note: >-
+    HEAD 527f0b931d = тег v2.0.22, клон github.com/sst/opencode. Ветка отсоединённая:
+    коммитить нечего и не нужно, git push запрещён правилом permissions.
+    Счётчик грязности ОБНОВЛЁН 07.10 (второй проход): `git status --porcelain` даёт 389
+    записей, из них 47 untracked — среди них ядро Universal Tool Hub
+    (packages/core/src/hub/, packages/core/src/tool/plugin/hub.ts, packages/core/test/hub.test.ts)
+    и другие правки параллельных задач. Из трекаемых — правки лида
+    по пульту oc-hub и переименование OpenCode → OpenMAMI (packages/app/src/**,
+    packages/cli/src/acp/*, packages/core/src/plugin/provider/opencode.ts,
+    packages/core/src/oauth/page.ts, packages/core/src/plugin/skill.ts,
+    packages/core/src/tool/plugin/*, packages/desktop/src/**, packages/enterprise/src/**).
+    Все они обязательны к сохранению: TASK-BUILD-VERSION собирает бинарь из этого
+    дерева, git checkout / reset / stash / clean запрещены.
+
+task_id: TASK-DOC-CORE
+
+scope:
+  in_scope:
+    - "ARCHITECTURE.md в корне репозитория: карта слоёв и пакетов со ссылками на PACKAGE.md"
+    - "packages/<пакет>/PACKAGE.md для каждого пакета из .opencode/doc_manifest.txt"
+    - "подпапочные документы внутри крупных пакетов (core/src/<подсистема>/PACKAGE.md, tui/src/<каталог>/PACKAGE.md) — по листьям этапов 3 и 5"
+    - "валидатор документации .opencode/doc_check.py (наличие, обязательные разделы, отсутствие заглушек, битые ссылки) и .opencode/doc_check.sh (отрицательный контроль)"
+    - ".opencode/doc_manifest.txt: список пакетов, которые обязаны иметь PACKAGE.md"
+    - ".opencode/plan.md и .opencode/dod.yaml — состояние работы"
+    - "приёмка: dod-check зелёный, отрицательный контроль валидатора выполнен"
+    - "TASK-HUB-REGISTRY (этап 8): панель Registry в packages/tui/src/component/devtools-bar.tsx, новые файлы component/devtools-registry.tsx и util/hub-registry.ts, тесты packages/tui/test/util/hub-registry.test.ts и packages/tui/test/component/devtools-registry.test.tsx"
+    - "TASK-HUB-CONTROL (этап 9): состояние вкл/выкл и подсказки промпта в packages/core/src/hub (новые state.ts, prompt.ts, actions.ts, правка install.ts) + врезка Instructions.Source в packages/core/src/session/context.ts, построчные кнопки в packages/tui/src/component/devtools-registry.tsx и данные в util/hub-registry.ts, тесты packages/core/test/hub-*.test.ts и расширенные тесты packages/tui/test"
+  out_of_scope:
+    - "правка кода ядра opencode ВНЕ файлов этапов 8-9: TASK-DOC-CORE не меняет код; этап 8 трогал только devtools-bar.tsx и новые файлы панели; этап 9 трогает в packages/core ровно src/hub/{state,prompt,actions,install,index}.ts и src/session/context.ts — protocol, client, schema, server и остальной core не правятся (без bun run generate)"
+    - "три уже изменённых файла (packages/script/src/index.ts, packages/tui/src/component/session-tabs.tsx, packages/tui/src/context/storage.tsx): правки прошлой работы, не трогаются"
+    - "существующие README.md 14 пакетов (ai, app, client, codemode, containers, core, desktop, enterprise, httpapi-codegen, http-recorder, plugin-browser, sdk, stats, web): не перезаписываются"
+    - "git commit и git push: push запрещён правилом permissions, коммит в чужой репозиторий без разрешения владельца не делается"
+    - "глубокая документация console и stats: это инфраструктура Astro/SST, а не ядро CLI — только поверхностная карточка"
+    - "плагин lan-rooms (связь устройств по локальной сети): отложен решением владельца, разведка и факты лежат в plan.md предыдущей сессии"
+    - "node_modules, артефакты сборки, база данных, живые сессии"
+    - "packages/core/src/account/sql.ts — мёртвый код (0 импортов), только упоминание, не чинится"
+
+oracles:
+  - id: O-DOC
+    command: "python3 .opencode/doc_check.py && python3 .opencode/doc_check.py --links"
+    oracle_scope:
+      detects:
+        - "пакет из манифеста остался без PACKAGE.md"
+        - "PACKAGE.md пустой или короче 20 строк — ИИ ничего не поймёт"
+        - "в PACKAGE.md нет обязательных разделов (что это / подсистемы / точки входа / на что смотреть)"
+        - "в документе осталась заглушка: TODO, FIXME, 'раскрыть позже', Lorem"
+        - "документ ссылается на путь packages/..., которого нет на диске (файл переехал или выдуман)"
+        - "документ ссылается на каталог, которого нет (опечатка в пути)"
+        - "у документа нет ссылки на соседние документы — ИИ не знает, куда идти дальше"
+      misses:
+        - "фактическую верность описания: валидатор проверяет форму и существование путей, но не то, что написанное совпадает со смыслом кода"
+        - "полноту описания подсистем: наличие обязательных разделов не значит, что каждая подсистема пакета описана"
+        - "дублирование и противоречия между документами разных пакетов"
+        - "читаемость текста для ИИ: это свойство текста, а не файла"
+    command_status: VERIFIED_CMD
+    validated_at: "2026-10-06"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "копия пакета util и манифеста во временном каталоге /tmp/opencode/docneg.XXXXXX, четыре отдельные мутации по очереди"
+      expected_failure: "каждая мутация даёт ненулевой код и печатает СВОЮ причину: пустой документ, отсутствующий раздел «Точки входа», битая ссылка packages/util/src/nope.ts, заглушка TODO"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        06.10 bash .opencode/doc_check.sh util → строка «ИТОГ: все 4 мутации пойманы, чистая копия прошла» файла .opencode/doc_check.sh.
+        Первый прогон был ЛОЖНО ЗЕЛЁНЫМ: все 4 мутации прошли незамеченными, потому что
+        валидатор выводил корень из пути к себе и читал живой репозиторий. Причина найдена и
+        устранена (флаг --root), после этого поймано по своей причине:
+        «PACKAGE.md короче 20 строк (0)», «нет обязательного раздела «Точки входа»»,
+        «путь не существует — packages/util/src/nope.ts», «заглушка «TODO»»
+
+  - id: O-DOC-REALITY
+    command: "cd /home/isako/opencode-src && python3 .opencode/doc_check.py --sample"
+    oracle_scope:
+      detects:
+        - "в документе назван символ (функция, класс, константа), которого нет в исходниках пакета — выдумка автора вместо чтения кода"
+        - "в документе назван файл, который существует, но лежит не в том пакете, о котором документ"
+        - "цифра в документе (число строк, число файлов, число провайдеров) не сходится с реальным подсчётом"
+      misses:
+        - "верность объяснения логики кода: символ существует, но описано не то, что он делает"
+        - "полноту: не проверяет, что описаны все важные подсистемы пакета"
+        - "устаревание: проверка идёт по текущему дереву и не ловит, что текст писался про старую ревизию"
+    command_status: VERIFIED_CMD
+    validated_at: "2026-10-06"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "временная копия packages/core (PACKAGE.md плюс src/session.ts) и манифест из одной строки; в документ дописан выдуманный символ core.madeUpFunctionInCore"
+      expected_failure: "--sample печатает 'символ не найден в исходниках core' и выходит с кодом 1"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        06.10 прогон на копии дал ровно «ПРОБЛЕМА  core: символ не найден в исходниках core —
+        core.madeUpFunctionInCore», код 1. Первая попытка фикстуры была ЛОЖНО ЗЕЛЁНОЙ: копия
+        пакета без каталога src, а check_sample делал continue и пропускал пакет целиком.
+        Причина найдена и устранена: пакет без packages/<pkg>/src теперь даёт нарушение
+        «сверять символы нечем», а не молчаливый проход. После правки та же фикстура без src
+        даёт «ПРОБЛЕМА  schema: нет packages/schema/src — сверять символы нечем».
+
+  - id: O-CORE-DOCS
+    command: "python3 .opencode/check_core_docs.py"
+    oracle_scope:
+      detects:
+        - "в packages/core/docs/ нет файла для любой папки packages/core/src/* — список берётся из дерева, а не из захардкоженного (на 07.10 это 39 папок: 38 каталогов src плюс тема models-dev)"
+        - "файл пустой или короче 20 строк — ИИ открыть нечего"
+        - "нет первого заголовка вида '# core/<папка> — назначение'"
+        - "нет одного из разделов: Что в папке, Ключевые файлы, Важные детали, Связи, Ловушки"
+        - "файл длиннее потолка: 150 строк для папки меньше 1000 строк кода, 260 для крупной. Потолок считается от размера папки, иначе нельзя честно описать session (10 тыс. строк кода) и нельзя простынить мелочь"
+        - "в документе осталась заглушка-запретное слово или FIXME/Lorem"
+        - "путь packages/... из документа не существует на диске"
+      misses:
+        - "фактическую верность описания: проверяется форма и существование путей, а не совпадение текста со смыслом кода"
+        - "полноту пересказа: файл может перечислить не все файлы папки и всё равно пройти"
+    command_status: VERIFIED_CMD
+    validated_at: "2026-10-07"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "копия всех документов packages/core/docs в /tmp/opencode/coreneg.XXXXXX, четыре мутации по очереди в permission.md: вырезан раздел, вписан несуществующий путь, вписано запрещённое слово, в первой строке названа чужая папка"
+      expected_failure: "скрипт называет свою причину по каждой из четырёх мутаций и выходит с кодом 1"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        07.10 прогнано дважды, на старой и на новой версии оракула. Новая версия берёт папки
+        из дерева, и на чистом дереве сама нашла нарушение: заголовок core/v1. Причина была
+        в самой регулярке оракула — класс символов не пропускал цифры, поэтому любая папка с
+        номером в имени давала ложное нарушение. Регулярка исправлена, документ не тронут.
+        После этого пять мутаций пойманы каждая по своей причине: удалённый v1.md («нет
+        файла»), чужая папка в заголовке instance.md, битая ссылка в kv.md, запрещённое
+        слово FIXME, пустой файл. Боевой прогон после мутаций — код 0 при 39 из 39.
+
+  - id: O-DIRDOC
+    command: "python3 .opencode/doc_check.py --dirs --links --sample"
+    oracle_scope:
+      detects:
+        - "подпапочный каталог из .opencode/doc_manifest_dirs.txt остался без PACKAGE.md (сейчас это 14 каталогов: 8 в core/src, 6 в tui/src)"
+        - "подпапочный документ короче 20 строк или без обязательных разделов"
+        - "подпапочный документ не ссылается на документ своего пакета (packages/core/PACKAGE.md) — ИИ теряется между уровнями"
+        - "подпапочный документ ссылается на несуществующий путь packages/..."
+        - "подпапочный документ называет символ, которого нет в исходниках пакета"
+      misses:
+        - "фактическую верность описания: то же, что у O-DOC, — проверяется только чтением исходников"
+        - "подкаталоги второго уровня (packages/core/src/database/*/ и т.п.): манифест держит один уровень вглубь"
+    command_status: VERIFIED_CMD
+    validated_at: "2026-10-06"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "временная копия packages/core/src/session (документ отсутствует как и на живом дереве), манифест .opencode/doc_manifest_dirs.txt"
+      expected_failure: "--dirs печатает 14 нарушений вида «core/session: нет PACKAGE.md в packages/core/src/session/» и выходит с кодом 1"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        06.10 python3 .opencode/doc_check.py --dirs на живом дереве (всех документов ещё нет)
+        дал 14 нарушений и последнюю строку «ИТОГ: 14 нарушение(й)» — оракул различает
+        «написано» и «не написано», а не печатает зелёное вслепую.
+
+  - id: O-FREE
+    command: >-
+      cd /tmp/opencode && for m in space-bunny-free fledge-alpha-free exo-free
+      muse-spark-1.3-contributor-free ling-3.1-flash-free mimo-v2.6-flash-free
+      nemotron-3-ultra-free nemotron-3.5-lightning-free longcat-2.5-preview-free
+      ling-3.0-flash-fin-free; do printf '%-34s ' "$m";
+      timeout 120 opencode run -m opencode/$m "ок" < /dev/null 2>&1 | tail -1; done
+    oracle_scope:
+      detects:
+        - "сборка объявляет версию < 1.18.0: провайдер opencode.ai отвечает 403 «OpenCode 1.18.0 or newer is required to use the free tier»"
+        - "любая из 10 бесплатных моделей перестала отвечать после замены бинаря (регрессия)"
+        - "патчи OpenMAMI потеряны: провайдер называется иначе или роли не грузятся"
+      misses:
+        - "модели, недоступные в регионе (fledge-alpha-free отдаёт RegionError при прямой пробе, но работает через клиент) — это не дефект сборки"
+        - "качество ответов моделей и лимиты запросов: оракул проверяет доступность, а не ум"
+    command_status: VERIFIED_CMD
+    validated_at: "2026-10-07"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: DOCUMENTED
+      target: "тот же цикл на бинаре opencode-fixed версии 0.0.0-local-202610052358 до пересборки"
+      expected_failure: "8 из 10 моделей печатают «1.18.0 or newer», 2 отвечают"
+      executed: true
+      exit_code: 1
+      target_is_fixture: false
+      summary: >-
+        07.10 до пересборки: space-bunny-free и fledge-alpha-free ответили текстом, остальные 8
+        вернули «Error from provider (Console): OpenCode 1.18.0 or newer is required to use the
+        free tier». Оракул различает «доступна» и «недоступна», а не печатает зелёное вслепую.
+
+  - id: O-HUB-REGISTRY
+    command: >-
+      cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test test/util/hub-registry.test.ts
+      test/component/devtools-registry.test.tsx
+    oracle_scope:
+      detects:
+        - "typecheck пакета tui сломан: панель Registry или данные не собираются tsgo -b (packages/tui)"
+        - "юнит-тест данных падает: счётчики ready/installed/missing/terminals/categories в packages/tui/src/util/hub-registry.ts расходятся с каталогом packages/core/src/hub/catalog"
+        - "рендер-тест падает: RegistryPanel не рендерится или секции Registry/Terminals/Missing не попадают в кадр"
+        - "тестовые файлы не содержат assert или не запускаются: bun test выходит с ненулевым кодом"
+      misses:
+        - "заметность панели в живом терминале владельца: тест рендерит компонент в тестовом рендерере opentui, а не в реальном TUI"
+        - "цвета токенов темы: кадровый тест проверяет текст, а не цвета"
+        - "точность при remote-сервере с чужим PATH: панель читает PATH локального процесса TUI"
+    command_status: VERIFIED_CMD
+    validated_at: "2026-10-07"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "временный файл packages/tui/test/util/__negctl.test.ts с assert(1)===2, создаётся перед прогоном и удаляется после него"
+      expected_failure: "bun test печатает failed и выходит с ненулевым кодом — оракул не печатает зелёное вслепую"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        07.10 тестер прогнал боевую команду оракула вместе с файлом-фикстурой
+        packages/tui/test/util/__negctl.test.ts (expect(1).toBe(2)): EXIT=1, строки
+        «4 pass 1 fail 62 expect» и «(fail) negative control … Expected: 2 / Received: 1»,
+        файл после прогона удалён (ls — отсутствует). Оракул различает падение и проход.
+
+  - id: O-HUB-CONTROL
+    command: >-
+      cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-state.test.ts
+      test/hub-prompt.test.ts test/hub-instructions.test.ts test/hub-actions.test.ts && cd ../tui
+      && bun typecheck && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts
+    oracle_scope:
+      detects:
+        - "typecheck core или tui сломан: состояние, подсказки, врезка или кнопки панели не собираются"
+        - "тест состояния падает: дефолт off, переключение или битый JSON не дают дефолт (packages/core/src/hub/state.ts)"
+        - "тест рендера подсказок падает: включённый доступный инструмент не попадает в блок либо выключенный/недоступный попадает (packages/core/src/hub/prompt.ts)"
+        - "тест врезки падает: Instructions.Source не добавляет блок в собираемые инструкции (packages/core/src/session/context.ts)"
+        - "тест действий падает: команда по платформе неверна или exit/stderr не прокидываются в результат (packages/core/src/hub/actions.ts)"
+        - "тест панели падает: строки с кнопками и тумблером не рендерятся, pending/ошибка не отражаются или регрессия секций этапа 8"
+        - "тестовые файлы не содержат assert или не запускаются: bun test выходит с ненулевым кодом"
+      misses:
+        - "реальное выполнение pacman/apt: тесты подставляют runner, пакетный менеджер не запускается"
+        - "содержимое системного промпта живой сессии: тест рендерит Source, а не полный шаг LLM-запроса"
+        - "поведение sudo с запросом пароля: проверить из сессии нельзя (sudo запрещён правилами)"
+    command_status: VERIFIED_CMD
+    validated_at: "2026-10-07"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "временный файл packages/core/test/__negctl.test.ts с expect(1).toBe(2), добавленный к core-части команды оракула и удалённый после прогона"
+      expected_failure: "bun test печатает failed и выходит с ненулевым кодом — оракул не печатает зелёное вслепую"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        07.10 22:38 позитив: команда оракула целиком → exit 0, core «23 pass / 0 fail»
+        (4 файла: состояние, подсказки, врезка, действия), tui «17 pass / 0 fail» (панель + данные).
+        Негатив: та же команда с файлом-фикстурой в core-части → exit 1, строка
+        «(fail) negative control fixture»; файл после прогона удалён (ls — нет такого файла).
+        Оракул различает падение и проход.
+
+  - id: O-HUB-STATE
+    command: >-
+      cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-state.test.ts
+      test/hub-actions.test.ts
+    oracle_scope:
+      detects:
+        - "typecheck core сломан: state.ts или actions.ts не собираются tsgo -b (packages/core)"
+        - "тест состояния падает: дефолт off, переключение или битый JSON не дают дефолт (packages/core/src/hub/state.ts:24)"
+        - "тест действий падает: команда по платформе неверна, exit не прокидывается или пакетный менеджер запускается вместо подставленного runner (packages/core/src/hub/actions.ts:29)"
+        - "тестовые файлы не содержат assert или не запускаются: bun test выходит с ненулевым кодом"
+      misses:
+        - "живое выполнение pacman/apt: тесты подставляют runner, пакетный менеджер не запускается"
+        - "поведение sudo с запросом пароля: проверить из сессии нельзя (sudo запрещён правилами)"
+        - "прочие тесты packages/core: команда запускает только два файла этапа 9"
+    command_status: VERIFIED_CMD
+    validated_at: "2026-10-07"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "временный файл packages/core/test/__negctl.test.ts с expect(1).toBe(2), создан перед прогоном и удалён после него"
+      expected_failure: "bun test печатает failed и выходит с ненулевым кодом — оракул не печатает зелёное вслепую"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        07.10 21:15 позитив: пустая команда оракула → exit 0, «10 pass / 0 fail» на двух файлах
+        (605ms). Негатив: та же команда с фикстурой → exit 1, «10 pass / 1 fail», строка
+        «(fail) negative control fixture»; файл после прогона удалён (ls — нет такого файла).
+        Оракул различает падение и проход.
+
+  - id: O-HUB-PROMPT
+    command: >-
+      cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-prompt.test.ts
+      test/hub-instructions.test.ts
+    oracle_scope:
+      detects:
+        - "typecheck core сломан: prompt.ts, instructions.ts или врезка session/context.ts не собираются tsgo -b"
+        - "тест рендера падает: фильтр вкл/доступен, cap 40 строк/2000 символов или маркер обрезки не выполняются (packages/core/src/hub/prompt.ts:28)"
+        - "тест инструкций падает: источник даёт текст не тому состоянию, читает не тот каталог, пустое состояние не схлопывается в removed (packages/core/src/hub/instructions.ts:42)"
+        - "тестовые файлы не содержат assert или не запускаются: bun test выходит с ненулевым кодом"
+      misses:
+        - "живой select сессии и byte-identity промпта в production: тест собирает текст через Instructions.renderInitial, а не через реальный шаг LLM"
+        - "прочие тесты packages/core: команда запускает только два файла этапа 9"
+        - "поведение на Windows: команды и тексты платформенно-нейтральны, win32 не проверяется"
+    command_status: VERIFIED_CMD
+    validated_at: "2026-10-07"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "временный файл packages/core/test/__negctl.test.ts с expect(1).toBe(2), добавленный к команде оракула и удалённый после прогона"
+      expected_failure: "bun test печатает failed и выходит с ненулевым кодом — оракул не печатает зелёное вслепую"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        07.10 21:45 позитив: команда оракула → exit 0, «13 pass / 0 fail» на двух файлах (250ms).
+        Негатив: та же команда плюс файл-фикстура → exit 1, «(fail) negative control fixture»;
+        файл после прогона удалён (ls — нет такого файла). Оракул различает падение и проход.
+
+coverage:
+  complete: false
+  reason: >-
+    Исполняемая поверхность не извлечена формальным парсером: символы TypeScript и Effect
+    Schema в этом проекте не имеют готового extractor'а, который дал бы перечень всех
+    экспортов пакетов. Слои зависимостей прочитаны из packages/*/package.json, подсистемы
+    ядра — из чтения кода. Поэтому сопоставление «символ → документ» не построено, и полнота
+    покрытия не заявляется. Проверка O-DOC-REALITY ловит выдуманные символы точечно,
+    но не доказывает, что описано всё.
+  surface:
+    extractor: "./.opencode/doc_check.py --surface"
+    fingerprint: "527f0b931d-v2.0.22"
+    generated_at: "2026-10-06"
+    note: >-
+      Поверхность = список пакетов из packages/* плюс список пакетов из
+      .opencode/doc_manifest.txt. Расхождение этих двух списков — дефект.
+  items:
+    - id: COV-1
+      what: "35 пакетов из packages/*, каждый получает свой PACKAGE.md"
+      status: IN_SCOPE
+    - id: COV-2
+      what: "8 каталогов packages/core/src/{session,tool,config,database,filesystem,instructions,permission,plugin} — по PACKAGE.md в каждом"
+      status: IN_SCOPE
+      note: >-
+        Снимок дерева 06.10: provider, snapshot и instruction в core/src — одиночные .ts рядом
+        с одноимёнными каталогами ради sql.ts, отдельного каталога provider/ или snapshot/
+        нет. Поэтому в манифест подпапок попали 8 реальных каталогов, а не 11 имён из
+        первоначальной формулировки; provider и snapshot описаны в packages/core/PACKAGE.md.
+    - id: COV-3
+      what: "6 каталогов packages/tui/src/{component,routes,context,mini,feature-plugins,plugin} — по PACKAGE.md в каждом"
+      status: IN_SCOPE
+    - id: COV-4
+      what: "ARCHITECTURE.md в корне: карта слоёв и указатель пакетов"
+      status: IN_SCOPE
+    - id: COV-5
+      what: "node_modules/** и артефакты сборки (dist, ts-dist, artifacts)"
+      status: OUT_OF_SCOPE
+      reason: "не исходники ядра, документация не имеет смысла"
+    - id: COV-6
+      what: "packages/core/test/** (96.5 тыс. строк тестов из 162.7 тыс. в core)"
+      status: OUT_OF_SCOPE
+      reason: "тесты не разбираются построчно, в core/PACKAGE.md упоминаются обзорно"
+    - id: COV-7
+      what: "console/** и stats/**"
+      status: OUT_OF_SCOPE
+      reason: "инфраструктура Astro/SST для хостинга, а не ядро CLI — только карточка по решению DEC-4"
+
+stages:
+  - name: "Этап 1 — каркас документации и карта ядра"
+    goal: >-
+      Валидатор документации, манифест пакетов и ARCHITECTURE.md: дальше на каркасе
+      пишутся все PACKAGE.md, и без работающего валидатора нельзя доказать, что
+      документация полная.
+    done_when: "python3 .opencode/doc_check.py → код 0; bash .opencode/doc_check.sh → код 0 (отрицательный контроль ловит 4 дефекта)"
+    depends_on: []
+  - name: "Этап 2 — фундамент: типы и транспорт типов"
+    goal: >-
+      schema, util, protocol, client — четыре пакета, на которых стоит всё остальное:
+      из них типы и контракты берут верхние слои.
+    done_when: "python3 .opencode/doc_check.py → код 0, в манифесте 4 пакета с PACKAGE.md и все подпапочные документы этапа"
+    depends_on: ["Этап 1 — каркас документации и карта ядра"]
+  - name: "Этап 3 — ядро выполнения"
+    goal: >-
+      core с его подсистемами (session, tool, config, database, provider, permission),
+      плюс codemode и plugin: здесь живёт сама работа ИИ — сессии, инструменты, провайдеры.
+    done_when: "python3 .opencode/doc_check.py → код 0, у packages/core и его подпапок есть документы"
+    depends_on: ["Этап 2 — фундамент: типы и транспорт типов"]
+  - name: "Этап 4 — транспорт и модели"
+    goal: >-
+      server (HTTP/SSE, авторизация, порты), ai (провайдеры и протоколы), sdk,
+      session-ui: связь ядра с внешним миром и с клиентами.
+    done_when: "python3 .opencode/doc_check.py → код 0, документы server/ai/sdk/session-ui на месте"
+    depends_on: ["Этап 3 — ядро выполнения"]
+  - name: "Этап 5 — поверхности и периферия"
+    goal: >-
+      tui, cli, app, ui и остальные пакеты: то, что видит человек, плюс Electron/web
+      и служебные пакеты — чтобы карта ядра была полной.
+    done_when: "python3 .opencode/doc_check.py → код 0, все пакеты манифеста закрыты"
+    depends_on: ["Этап 4 — транспорт и модели"]
+  - name: "Этап 6 — приёмка"
+    goal: >-
+      Отрицательный контроль валидатора выполнен на настоящей мутации, dod-check зелёный,
+      владелец получил отчёт с числами.
+    done_when: "bash .opencode/doc_check.sh → код 0; ~/.config/opencode/bin/dod-check . → ИТОГ: OK"
+    depends_on: ["Этап 5 — поверхности и периферия"]
+  - name: "Этап 7 — версия сборки и доступ к free-tier моделям"
+    goal: >-
+      Собрать локальное ядро OpenCode с настоящей версией (2.0.22, тег исходников)
+      вместо 0.0.0-local-даты, чтобы User-Agent, который уходит провайдеру
+      opencode.ai, содержал число ≥ 1.18.0. Из-за этого сейчас 8 из 10 бесплатных
+      моделей отвечают 403. Этап даёт остальным задачам рабочий инструмент: без
+      него любой прогон на muse-spark, exo, ling, mimo, nemotron, longcat обрывается.
+    done_when: >-
+      `opencode --version` печатает 2.0.22 и цикл O-FREE даёт 10 из 10 ответов без
+      строки «1.18.0 or newer»
+    depends_on: []
+  - name: "Этап 8 — Registry-панель Universal Tool Hub в devtools-bar"
+    goal: >-
+      Панель Registry в нижней devtools-строке TUI показывает человеку, какие инструменты
+      и терминалы каталога Hub установлены, какие нет, и какова готовность записей каталога —
+      без консоли и без вызова hub-инструмента. Панель стоит на уже готовом ядре
+      packages/core/src/hub (оно появилось в дереве отдельной работой и тестами hub.test.ts
+      не тронуто) и на существующей структуре devtools-bar с панелями Server/UI/Theme/Tools.
+    done_when: >-
+      cd /home/isako/opencode-src/packages/tui && bun typecheck → код 0; bun test test/util/hub-registry.test.ts
+      test/component/devtools-registry.test.tsx → 0 fail; bun test --timeout 30000 --only-failures →
+      без новых падений против baseline /tmp/opencode/tui-test-baseline.log (10 предсуществующих fail)
+    depends_on: []
+
+  - name: "Этап 9 — действия Registry: состояние вкл/выкл, подсказки в промпте, кнопки Install/Remove"
+    goal: >-
+      Панель Registry из статусной становится панелью управления: ядро получает состояние
+      вкл/выкл инструментов (opt-in, JSON на уровне core), автоматическую подсказку
+      включённого в системный промпт (модель не знает о возможностях ядра) и выполнение
+      install/remove по платформе; TUI даёт построчные кнопки над этими действиями.
+      Состояние и логика живут в packages/core, панель только вызывает и показывает результат.
+    done_when: >-
+      sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-state.test.ts test/hub-prompt.test.ts test/hub-instructions.test.ts test/hub-actions.test.ts" → код 0 и 0 fail;
+      sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts" → код 0 и 0 fail;
+      negative control O-HUB-CONTROL выполнен (exit 1); dod-check → ИТОГ: OK
+    depends_on: ["Этап 8 — Registry-панель Universal Tool Hub в devtools-bar"]
+
+leaves:
+  - id: L-101
+    what: ".opencode/doc_check.py проверяет каждый пакет манифеста: есть непустой PACKAGE.md с обязательными разделами и без заглушек"
+    target: { path: ".opencode/doc_check.py" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.sh util"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "./.opencode/doc_check.sh util"
+        exit_code: 0
+        at: "2026-10-06T21:40:00+04:00"
+        output_summary: "файлы .opencode/doc_check.py и .opencode/doc_manifest.txt: строки «ИТОГ: 1 пакет(ов) [links]» и «ИТОГ: 30 пакет(ов)» в выводе .opencode/doc_check.py, ruff check .opencode/doc_check.py — All checks passed; на входе без документов код 1 со списком 30 претензий"
+    next_action: { command: "cd /home/isako/opencode-src && python3 .opencode/doc_check.py" }
+    group: "Этап 1 — каркас документации и карта ядра"
+    steps:
+      - "[x] Написать .opencode/doc_manifest.txt: по строке на пакет из packages/* с пометкой слоя (L0-L6) и колонкой «подпапки» для крупных"
+      - "[x] Определить обязательные разделы PACKAGE.md: Что это / Слои и зависимости / Подсистемы и файлы / Точки входа / На что смотреть дальше / Ловушки"
+      - "[x] Написать doc_check.py: обход манифеста, проверка наличия файла, минимум 20 строк, наличие всех обязательных разделов, отсутствие заглушек (TODO/FIXME/«позже»/Lorem)"
+      - "[x] Добавить в doc_check.py режим --links: каждый путь вида packages/... из .md проверяется на существование на диске"
+      - "[x] Сделать вывод построчный «пакет: ОК/ПРОБЛЕМА», код возврата 1 при любой проблеме"
+      - "[x] Прогнать на пустом манифесте-заглушке и убедиться, что код возврата 1 и список проблем не пуст"
+    depends_on: []
+
+  - id: L-102
+    what: "ARCHITECTURE.md в корне описывает 7 слоёв зависимостей и ведёт к PACKAGE.md каждого пакета"
+    target: { path: "ARCHITECTURE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --surface"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "./.opencode/doc_check.py --surface"
+        exit_code: 0
+        at: "2026-10-06T21:55:00+04:00"
+        output_summary: "файл ARCHITECTURE.md на 12 250 байт содержит 30 ссылок вида packages/<пакет>/PACKAGE.md; строка «ИТОГ: 30 пакет(ов) [surface]» — манифест сошёлся с каталогом packages/. Ссылки на код сверены чтением: packages/cli/src/index.ts, packages/server/src/routes.ts:176, packages/core/src/instance.ts:114"
+    next_action: { command: "cd /home/isako/opencode-src && head -40 ARCHITECTURE.md" }
+    group: "Этап 1 — каркас документации и карта ядра"
+    steps:
+      - "[x] Описать слои L0-L6 таблицей: пакет, слой, от кого зависит (из packages/*/package.json)"
+      - "[x] Добавить раздел «Как запускается»: opencode → serve/TUI → protocol → server → core, со ссылками на файлы"
+      - "[x] Добавить раздел «Где что искать»: карта задача → пакет (сессия, инструменты, сервер, TUI, плагины, модели)"
+      - "[x] На каждый пакет дать ссылку на его PACKAGE.md"
+      - "[x] Прогнать doc_check.py --links и убедиться, что битых ссылок нет"
+      - "[x] Вынести оговорку про слои из манифестов, а не из графа импортов, с двумя примерами расхождения"
+      - "[x] Перенести правила репозитория из AGENTS.md в документ, включая запрет запускать тесты из корня"
+    depends_on: [L-101]
+
+  - id: L-103
+    what: ".opencode/doc_check.sh ловит сломанную документацию мутацией на временной копии"
+    target: { path: ".opencode/doc_check.sh" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.sh util"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "./.opencode/doc_check.sh util"
+        exit_code: 0
+        at: "2026-10-06T21:40:00+04:00"
+        output_summary: "файл .opencode/doc_check.sh: строка «ИТОГ: все 4 мутации пойманы, чистая копия прошла» файла .opencode/doc_check.sh. Поймано по своей причине: «PACKAGE.md короче 20 строк (0)», «нет обязательного раздела «Точки входа»», «путь не существует — packages/util/src/nope.ts», «заглушка «TODO»». shellcheck .opencode/doc_check.sh — чисто"
+    next_action: { command: "./.opencode/doc_check.sh util" }
+    group: "Этап 1 — каркас документации и карта ядра"
+    steps:
+      - "[x] Скрипт копирует манифест и документы в /tmp/opencode/docneg, не трогая репозиторий"
+      - "[x] Прогнать doc_check.py на чистой копии: ожидается код 0"
+      - "[x] Мутация 1: пустой PACKAGE.md → ожидается непустой список проблем и код 1"
+      - "[x] Мутация 2: убрать раздел «Точки входа» → ожидается код 1"
+      - "[x] Мутация 3: вписать путь packages/core/src/nope.ts → --links должен дать код 1"
+      - "[x] Мутация 4: вписать 'TODO раскрыть' → ожидается код 1"
+      - "[x] Проверить скрипт через shellcheck и убедиться, что код 0"
+      - "[x] Переделать скрипт на --root: выяснилось, что валидатор читал живой репозиторий и все 4 мутации проходили незамеченными"
+    depends_on: [L-101]
+
+  - id: L-104
+    what: "packages/schema/PACKAGE.md описывает 102 файла схем: данные сессий, событий, инструментов, моделей"
+    target: { path: "packages/schema/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --package schema --links"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "python3 .opencode/doc_check.py && python3 .opencode/doc_check.py --links"
+        exit_code: 0
+        at: "2026-10-06T23:55:00+04:00"
+        output_summary: >-
+          Документ packages/schema/PACKAGE.md на 111 строк создан прошлой сессией и проверен мной
+          в этой: общий прогон .opencode/doc_check.py и прогон с --links дали по 30 пакетов без
+          нарушений, код 0. Выборочная сверка чисел сходится: 102 файла в packages/schema/src,
+          таблица потребителей начинается со 132 файлов в packages/core/src.
+    next_action: { command: "cd /home/isako/opencode-src && head -30 packages/schema/PACKAGE.md" }
+    group: "Этап 2 — фундамент: типы и транспорт типов"
+    steps:
+      - "[x] Прочитать packages/schema/src/index.ts и понять, что экспортируется наружу"
+      - "[x] Разобрать ключевые схемы: session.ts, session-message.ts, event.ts, tool.ts, model.ts, permission.ts"
+      - "[x] Отметить легаси-пару *-v1.ts и папку schema/src/v1 — зачем они и кто их читает"
+      - "[x] Описать, чем schema отличается от protocol (данные против эндпоинтов)"
+      - "[x] Написать PACKAGE.md с обязательными разделами и ссылками на соседние документы"
+      - "[x] Прогнать doc_check.py --package schema и --links"
+    depends_on: [L-102]
+
+  - id: L-105
+    what: "packages/util/PACKAGE.md описывает служебный слой: global-roots, hash, flock, effect-хелперы"
+    target: { path: "packages/util/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.sh util"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "./.opencode/doc_check.sh util"
+        exit_code: 0
+        at: "2026-10-06T21:40:00+04:00"
+        output_summary: "файл packages/util/PACKAGE.md прошёл проверку: строки «util: 1 пакет(ов) [links]» в выводе .opencode/doc_check.py. 44 файла пакета, таблица 11 потребителей (packages/core/src — 232 импорта), механизм EffectFlock на mkdir с heartbeat"
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/util/src" }
+    group: "Этап 2 — фундамент: типы и транспорт типов"
+    steps:
+      - "[x] Прочитать packages/util/src/global-roots.ts: откуда берутся корни состояния и почему каналы разводятся по файлам"
+      - "[x] Разобрать effect-flock.ts и flock.ts: зачем атомарная запись и что ломается без неё"
+      - "[x] Отметить encode.ts, hash.ts, glob.ts и npm.ts — что именно они дают верхним слоям"
+      - "[x] Написать PACKAGE.md, указав, что util — слой L0 и его правка ломает всё"
+      - "[x] Прогнать doc_check.py --package util и --links"
+    depends_on: [L-102]
+
+  - id: L-106
+    what: "packages/protocol/PACKAGE.md описывает 30 групп эндпоинтов и то, как api.ts собирает один HttpApi"
+    target: { path: "packages/protocol/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --package protocol --links"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "python3 .opencode/doc_check.py --links"
+        exit_code: 0
+        at: "2026-10-06T23:55:00+04:00"
+        output_summary: >-
+          Документ packages/protocol/PACKAGE.md на 84 строки создан прошлой сессией, проверен
+          моим прогоном с --links: 30 пакетов без нарушений, код 0. Сверка числа групп:
+          в packages/protocol/src/groups ровно 30 файлов — совпадает с заявленным в документе.
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/protocol/src/groups | wc -l" }
+    group: "Этап 2 — фундамент: типы и транспорт типов"
+    steps:
+      - "[x] Прочитать packages/protocol/src/api.ts: как 30 групп собираются в один HttpApi"
+      - "[x] Разобрать устройство группы на примере groups/session.ts: эндпоинт, схема, тип ответа"
+      - "[x] Отметить расхождение: группы и server/src/handlers не совпадают 1:1 (pty-socket, session-error есть только в handlers)"
+      - "[x] Описать errors.ts и middleware — как ошибки и авторизация объявляются в протоколе"
+      - "[x] Написать PACKAGE.md с таблицей «группа — что описывает» и ссылками на соседние документы"
+      - "[x] Прогнать doc_check.py --package protocol и --links"
+    depends_on: [L-102]
+
+  - id: L-107
+    what: "packages/client/PACKAGE.md описывает три варианта API (effect/promise/solid) и связь с protocol"
+    target: { path: "packages/client/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --links"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "python3 .opencode/doc_check.py --links"
+        exit_code: 0
+        at: "2026-10-07T00:20:00+04:00"
+        output_summary: >-
+          Документ packages/client/PACKAGE.md на 91 строку. Проверен моим прогоном doc_check.py с --links: 30 пакетов без нарушений, код 0; в packages/client/src ровно 30 файлов .ts, что сходится с заявленным в документе объёмом.
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/client/src" }
+    group: "Этап 2 — фундамент: типы и транспорт типов"
+    steps:
+      - "[x] Прочитать packages/client/src/contract.ts: как реэкспортируется ClientApi из protocol"
+      - "[x] Разобрать разницу трёх API (effect, promise, solid) и кто какой использует"
+      - "[x] Отметить service.ts, service-contender.ts, service-version.ts — как клиент выбирает сервер"
+      - "[x] Описать pty-handoff.ts и rpc-runtime.ts отдельным абзацем: это отдельный механизм, не HTTP"
+      - "[x] Написать PACKAGE.md со ссылками на соседние документы"
+      - "[x] Прогнать doc_check.py --package client и --links"
+    depends_on: [L-106]
+
+  - id: L-108
+    what: "packages/core/PACKAGE.md описывает ядро: сессии, инструменты, конфиг, база, провайдеры, права"
+    target: { path: "packages/core/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --links"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "python3 .opencode/doc_check.py --links"
+        exit_code: 0
+        at: "2026-10-07T00:20:00+04:00"
+        output_summary: >-
+          Документ packages/core/PACKAGE.md на 115 строк. Проверен моим прогоном и сверкой с деревом лично: bus.ts 908 строк, session.ts 483, tool.ts 332, aisdk.ts 1082, каталоги session 49 файлов, database 77, plugin 67 — все числа совпали с документом. Файл packages/core/src/instance.ts:114 содержит graph, как и обещает документ.
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/core/src" }
+    group: "Этап 3 — ядро выполнения"
+    steps:
+      - "[x] Разделить этот лист на подпапки: session, tool, config, database, provider, permission, snapshot, filesystem, instruction — по отдельному листу на каждую группу"
+      - "[x] Прочитать packages/core/src/instance.ts и instance/service.ts: точка сборки DI-графа (~45 сервисов)"
+      - "[x] Написать packages/core/PACKAGE.md: что такое ядро, какие подсистемы, куда копать за сессиями и за инструментами"
+      - "[x] Создать документы подпапок: session/, tool/, config/, database/, и по одной на provider и permission (они .ts + папка ради sql.ts)"
+      - "[x] Отметить в core/PACKAGE.md, что bus.ts — реальный движок событий, а папка event/ содержит только таблицы"
+      - "[x] Отметить мёртвый код core/src/account/sql.ts (0 импортов) как находку, не чинить"
+      - "[x] Прогнать doc_check.py --package core и --links"
+    depends_on: [L-107]
+
+  - id: L-116
+    what: "packages/core/docs/config.md и ещё 14 документов в packages/core/docs/ по папкам core/src второй партии (config, credential, account, oauth, permission, kv, instance, event, project, workspace, util, effect, github-copilot, models-dev, modal)"
+    target: { path: "packages/core/docs/config.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "python3 .opencode/check_core_docs.py"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-CORE-DOCS
+      evidence:
+        command: "python3 .opencode/check_core_docs.py"
+        exit_code: 0
+        at: "2026-10-07"
+        output: "15/15 документов, нарушений нет; 742 строки суммарно, самый длинный github-copilot.md 108 строк"
+      negative_control_exit_code: 1
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/core/docs/*.md | wc -l" }
+    group: "Этап 3 — ядро выполнения"
+    steps:
+      - "[x] Прочитать сплошным cat все .ts из 15 папок: util, oauth, effect, modal, credential, account, permission, kv, instance, event, project, workspace (12 мелких)"
+      - "[x] Прочитать config целиком (26 файлов, 2806 строк) и github-copilot целиком (23 файла, 4297 строк)"
+      - "[x] Написать 13 документов по мелким папкам: заголовок '# core/<папка> — назначение', разделы Что в папке / Ключевые файлы / Важные детали / Связи / Ловушки"
+      - "[x] Написать docs/config.md, docs/github-copilot.md и docs/models-dev.md (про snapshot.txt) по тому же шаблону"
+      - "[x] Проверить оракулом O-CORE-DOCS: 15 файлов, заголовок, 5 разделов, ≤150 строк, нет запрещённых слов, все пути packages/... существуют"
+      - "[x] Выполнить отрицательный контроль оракула O-CORE-DOCS на копии в /tmp и вписать код возврата в dod.yaml"
+      - "[x] Прогнать dod-check и отметить этот лист шагами через oc-dod step opencode-src L-116 N"
+    depends_on: [L-108]
+
+  - id: L-109
+    what: "packages/plugin/PACKAGE.md описывает хост расширений: index.ts/tui.tsx, контексты и API плагинов"
+    target: { path: "packages/plugin/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --links"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "python3 .opencode/doc_check.py --links"
+        exit_code: 0
+        at: "2026-10-07T00:20:00+04:00"
+        output_summary: >-
+          Документ packages/plugin/PACKAGE.md на 100 строк, проходит общий прогон doc_check.py и прогон с --links без нарушений.
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/plugin/src packages/plugin/src/tui" }
+    group: "Этап 3 — ядро выполнения"
+    steps:
+      - "[x] Разобрать discovery плагинов: как каталоги в plugins/ попадают в загрузку и как находится tui.tsx"
+      - "[x] Описать app.ts (серверный контекст плагина) и tui/ (контекст интерфейса): разные API, разные слоты"
+      - "[x] Отметить worktree.ts и storage.ts: изоляция состояния плагина и работа с worktree"
+      - "[x] Выписать полный список хуков TUI-плагина из packages/plugin/dist/tui/context.d.ts, если он есть в node_modules"
+      - "[x] Написать PACKAGE.md: для автора плагина это главный документ"
+      - "[x] Прогнать doc_check.py --package plugin и --links"
+    depends_on: [L-108]
+
+  - id: L-110
+    what: "packages/server/PACKAGE.md описывает HTTP-сервер: маршруты, авторизацию, pair, SSE, порты и привязку"
+    target: { path: "packages/server/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --links"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "python3 .opencode/doc_check.py --links"
+        exit_code: 0
+        at: "2026-10-07T00:20:00+04:00"
+        output_summary: >-
+          Документ packages/server/PACKAGE.md на 82 строки, проходит общий прогон и прогон с --links без нарушений.
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/server/src packages/server/src/middleware" }
+    group: "Этап 4 — транспорт и модели"
+    steps:
+      - "[x] Разобрать routes.ts: как монтируется HttpApi и склеиваются core-слои"
+      - "[x] Описать auth.ts: пароль обязателен, username жёстко opencode, путь без проверки авторизации"
+      - "[x] Описать pairing.ts: код 5 минут, одноразовый, обмен на токен 30 дней"
+      - "[x] Описать event-feed.ts: формат SSE-кадра, heartbeat, что происходит при переполнении"
+      - "[x] Описать location.ts: заголовок x-opencode-directory и дефолт process.cwd()"
+      - "[x] Описать cors.ts: почему запрос без Origin работает, а браузер с чужого origin — нет"
+      - "[x] Написать PACKAGE.md с таблицей маршрутов и ссылками на соседние документы"
+      - "[x] Прогнать doc_check.py --package server и --links"
+    depends_on: [L-108]
+
+  - id: L-111
+    what: "packages/ai/PACKAGE.md описывает 35 провайдеров, протоколы и разрешение моделей"
+    target: { path: "packages/ai/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --links"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "python3 .opencode/doc_check.py --links"
+        exit_code: 0
+        at: "2026-10-07T00:20:00+04:00"
+        output_summary: >-
+          Документ packages/ai/PACKAGE.md на 112 строк, проходит общий прогон и прогон с --links без нарушений.
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/ai/src/protocols packages/ai/src/route" }
+    group: "Этап 4 — транспорт и модели"
+    steps:
+      - "[x] Прочитать packages/ai/src/llm.ts и generation.ts: где модель превращается в запрос провайдера"
+      - "[x] Разобрать protocols/: чем отличаются protocol-чаты OpenAI, Anthropic, OpenResponses"
+      - "[x] Разобрать route/: как выбирается провайдер и что делает кэш-политика"
+      - "[x] Отметить providers.ts и provider-package.ts: как подключается новый провайдер"
+      - "[x] Описать media/image-клиенты отдельным абзацем: это отдельные модели, не чат"
+      - "[x] Написать PACKAGE.md со списком провайдеров и ссылками на соседние документы"
+      - "[x] Прогнать doc_check.py --package ai и --links"
+    depends_on: [L-110]
+
+  - id: L-112
+    what: "packages/tui/PACKAGE.md описывает интерфейс терминала и карту его каталогов"
+    target: { path: "packages/tui/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --package tui --links"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "python3 .opencode/doc_check.py --links"
+        exit_code: 0
+        at: "2026-10-07T00:20:00+04:00"
+        output_summary: >-
+          Документ packages/tui/PACKAGE.md на 99 строк прошёл мой прогон с проверкой путей:
+          30 пакетов без нарушений, код 0. Размеры каталогов из документа сошлись с деревом:
+          component 55 файлов, routes 28, context 29, mini 40, feature-plugins 23. Точка входа
+          packages/tui/src/context/client.tsx:1 — единственное место подключения TUI к серверу.
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/tui/src" }
+    group: "Этап 5 — поверхности и периферия"
+    steps:
+      - "[x] Написать packages/tui/PACKAGE.md: общая карта интерфейса и таблица каталогов по строкам кода"
+      - "[x] Описать context/client.tsx как единственную точку подключения TUI к серверу"
+      - "[x] Отметить, что mini/ — отдельный фронтенд-рантайм с собственной командой CLI, а не уменьшенная версия"
+      - "[x] Отметить routes/session/index.tsx как крупнейший файл TUI и объяснить, что полезно читать первым"
+      - "[x] Описать plugin/ внутри TUI: как TUI-плагины цепляются к слотам и клавишам"
+      - "[x] Прогнать doc_check.py --package tui и --links"
+      - "[x] Документы каталогов вынесены в лист L-117: по решению DEC-6 документация папок по core лежит в packages/core/docs/"
+    depends_on: [L-111]
+
+  - id: L-117
+    what: "шесть документов packages/tui/src/<каталог>/PACKAGE.md по списку .opencode/doc_manifest_dirs.txt: component, routes, context, mini, feature-plugins, plugin"
+    target: { path: ".opencode/doc_manifest_dirs.txt" }
+    task_state: NOT_STARTED
+    coverage: IN_SCOPE
+    verification:
+      state: NOT_CHECKED
+      command: "./.opencode/doc_check.py --dirs --links --sample"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DIRDOC
+      evidence:
+    next_action: { command: "cd /home/isako/opencode-src && python3 .opencode/doc_check.py --dirs" }
+    group: "Этап 5 — поверхности и периферия"
+    steps:
+      - "[ ] Прочитать packages/tui/src/component/ (55 файлов, 14 тыс. строк) и routes/ (28 файлов, 8.9 тыс. строк)"
+      - "[ ] Написать PACKAGE.md в component/ и routes/ по образцу packages/core/docs/README.md: Что это / Слои и зависимости / Подсистемы и файлы / Точки входа / На что смотреть дальше / Ловушки"
+      - "[ ] Прочитать context/ (29 файлов) и feature-plugins/ (23 файла) — как TUI-плагины цепляются к слотам"
+      - "[ ] Написать PACKAGE.md в context/ и feature-plugins/"
+      - "[ ] Прочитать mini/ (40 файлов, 18 тыс. строк) — отдельный фронтенд-рантайм, не уменьшенный TUI"
+      - "[ ] Написать PACKAGE.md в mini/ и в tui/src/plugin/"
+      - "[ ] Прогнать doc_check.py --dirs --links --sample: 6 из 6 документов, код 0"
+      - "[ ] Прогнать мутацию на копии одного документа и вписать результат в dod.yaml"
+    depends_on: [L-112]
+
+  - id: L-113
+    what: "packages/cli/PACKAGE.md описывает команды, фоновую службу, запуск сервера и подключение к чужому серверу"
+    target: { path: "packages/cli/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --links"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "python3 .opencode/doc_check.py --links"
+        exit_code: 0
+        at: "2026-10-07T00:20:00+04:00"
+        output_summary: >-
+          Документ packages/cli/PACKAGE.md на 102 строки, проходит общий прогон и прогон с --links без нарушений.
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/cli/src/commands packages/cli/src/services" }
+    group: "Этап 5 — поверхности и периферия"
+    steps:
+      - "[x] Разобрать index.ts и commands/: как объявляются команды и подкоманды"
+      - "[x] Описать server-process.ts: привязка по умолчанию 127.0.0.1, пароль от OPENCODE_PASSWORD или случайный"
+      - "[x] Описать services/service-config.ts: порт по умолчанию и каналы"
+      - "[x] Описать services/server-connection.ts: как работает --server и откуда берётся пароль"
+      - "[x] Отметить session-target.ts и mini-host.ts: два входа в одну сессию"
+      - "[x] Написать PACKAGE.md со списком команд и ссылками на соседние документы"
+      - "[x] Прогнать doc_check.py --package cli и --links"
+    depends_on: [L-112]
+
+  - id: L-114
+    what: "PACKAGE.md для остальных пакетов манифеста: app, ui, sdk, session-ui, codemode, merman, desktop, web и служебные"
+    target: { path: "packages/app/PACKAGE.md" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.py --links"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "python3 .opencode/doc_check.py && python3 .opencode/doc_check.py --links"
+        exit_code: 0
+        at: "2026-10-07T00:20:00+04:00"
+        output_summary: >-
+          Все 30 пакетов манифеста имеют документ: от 60 строк (enterprise) до 137 (util).
+          Прогон без нарушений и прогон с проверкой путей оба дали код 0 при 30 из 30. Пять
+          пакетов без документа вынесены в лист L-118: они вне манифеста по решению DEC-4
+          и DEC-1, поэтому их отсутствие оракулом не проверяется.
+    next_action: { command: "cd /home/isako/opencode-src && python3 .opencode/doc_check.py" }
+    group: "Этап 5 — поверхности и периферия"
+    steps:
+      - "[x] Разделить лист на блоки по пакетам; порядок — от важных к служебным"
+      - "[x] Написать карточки для app, ui, sdk, session-ui, codemode, merman, desktop, web"
+      - "[x] Написать короткие карточки для служебных: theme, latex, http-recorder, httpapi-codegen, plugin-browser, simulation, storybook, gui-extensions, script, posts, function"
+      - "[x] Проверить, что ни одна существующая README.md не перезаписана: git status показывает только новые файлы"
+      - "[x] Прогнать doc_check.py — все пакеты манифеста закрыты"
+      - "[x] Пять пакетов вне манифеста (console, containers, effect-drizzle-sqlite, identity, stats) вынесены в лист L-118"
+    depends_on: [L-113]
+
+  - id: L-118
+    what: "по одному PACKAGE.md на пять пакетов, которых нет в .opencode/doc_manifest.txt: console, containers, effect-drizzle-sqlite, identity, stats"
+    target: { path: ".opencode/doc_manifest.txt" }
+    task_state: NOT_STARTED
+    coverage: IN_SCOPE
+    verification:
+      state: NOT_CHECKED
+      command: "./.opencode/doc_check.py --surface"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+    next_action: { command: "cd /home/isako/opencode-src && ls packages/identity/src packages/console" }
+    group: "Этап 5 — поверхности и периферия"
+    steps:
+      - "[ ] Разобрать packages/identity: что это за слой и кто его читает"
+      - "[ ] Разобрать packages/effect-drizzle-sqlite: слой хранения на drizzle, кто его ставит"
+      - "[ ] Описать packages/containers и packages/console как инфраструктуру хостинга (решение DEC-4), с явной пометкой, что это не ядро CLI"
+      - "[ ] Описать packages/stats так же"
+      - "[ ] Написать по PACKAGE.md на каждый из пяти пакетов и внести их в doc_manifest.txt"
+      - "[ ] Прогнать doc_check.py --surface: расхождение манифеста и packages/ — дефект"
+      - "[ ] Прогнать doc_check.py --links: все пять документов без нарушений"
+    depends_on: [L-114]
+
+  - id: L-115
+    what: "Приёмка: .opencode/doc_check.sh и .opencode/dod.yaml проходят отрицательные контроли на мутациях, dod-check зелёный, git status показывает только новые файлы"
+    target: { path: ".opencode/doc_check.sh" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/doc_check.sh util"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-DOC
+      evidence:
+        command: "bash .opencode/doc_check.sh util && ~/.config/opencode/bin/dod-check ."
+        exit_code: 0
+        at: "2026-10-07T00:45:00+04:00"
+        output_summary: >-
+          Финальный прогон 07.10: семь проверок подряд дали код 0 — форма, пути, символы,
+          сверка манифеста с packages/, 39 папок ядра, четыре мутации doc_check.sh и dod-check
+          файла dod.yaml. Отрицательные контроли не зелёные «по счастливой случайности»:
+          doc_check.sh ловит четыре мутации по своей причине, check_core_docs.py пять,
+          включая папку без документа. Проверка --dirs даёт код 1 с шестью нарушениями — это
+          верно, работа по tui/src не сделана. git status: 41 новый файл, изменены три файла
+          ядра, и все три — правки прошлой работы по пульту, они вне TASK-DOC-CORE.
+    next_action: { command: "cd /home/isako/opencode-src && python3 .opencode/doc_check.py --dirs" }
+    group: "Этап 6 — приёмка"
+    steps:
+      - "[x] Выполнить --sample на выборке документов: сверить названные символы с исходниками"
+      - "[x] Прогнать мутацию на копии документа и записать реальный вывод в evidence"
+      - "[x] Проверить, что git status показывает только новые .md и .opencode/doc_* — ни одного изменённого файла ядра"
+      - "[x] Прогнать dod-check . и довести до ИТОГ: OK"
+      - "[x] Прогнать dod-check --self-test, чтобы убедиться, что валидатор ловит плохие фикстуры"
+      - "[x] Отчёт владельцу: сколько пакетов закрыто, где лежат документы, что осталось открытым"
+    depends_on: [L-114]
+
+  - id: L-701
+    what: "/home/isako/.local/bin/oc-core/opencode-fixed собран заново и объявляет версию 2.0.22 вместо 0.0.0-local-202610052358; старый бинарь сохранён как .bak"
+    target: { path: "/home/isako/.local/bin/oc-core/opencode-fixed" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "opencode --version"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-FREE
+      evidence:
+        command: "opencode --version"
+        exit_code: 0
+        at: "2026-10-07T15:08:00+04:00"
+        output_summary: >-
+          Сборка: cd packages/cli && OPENCODE_CHANNEL=local bun run build --single --skip-install
+          (bun 1.4.2, требуемая версия packageManager совпала). Артефакт 229 426 656 байт,
+          dist/cli-linux-x64/package.json version 2.0.22, ошибок сборки 0 (в логе только
+          предупреждение vite INEFFECTIVE_DYNAMIC_IMPORT про @sentry/solid). После установки
+          `opencode --version` → opencode v2.0.22. Бэкапы: opencode-fixed.bak-20261007
+          (исходный бинарь 0.0.0-local-202610052358), .bak-20261007-1459 (сборка владельца),
+          .bak-20261007-prehub (первая сборка 2.0.22) — все три на месте и запускаются.
+    next_action: { command: "opencode --version" }
+    group: "Этап 7 — версия сборки и доступ к free-tier моделям"
+    steps:
+      - "[x] Скопировать ~/.local/bin/oc-core/opencode-fixed в opencode-fixed.bak-20261007 и проверить размер копии"
+      - "[x] Запустить сборку: cd packages/cli && OPENCODE_VERSION=2.0.22 OPENCODE_CHANNEL=local bun run build --single --skip-web-ui"
+      - "[x] Убедиться, что в выводе сборки нет строки error и появился outfile dist/cli-linux-x64/bin/opencode"
+      - "[x] Проверить, что версия нового бинаря 2.0.22: dist/cli-linux-x64/bin/opencode --version"
+      - "[x] Положить новый бинарь на место ~/.local/bin/oc-core/opencode-fixed одним mv и подтвердить opencode --version"
+    depends_on: []
+
+  - id: L-702
+    what: "/home/isako/.local/bin/oc-core/opencode-fixed отвечает на живой прогон 8 из 10 бесплатных моделей; exo-free и ling-3.0-flash-fin-free падают с ошибкой апстрима, а не версии"
+    target: { path: "/home/isako/.local/bin/oc-core/opencode-fixed" }
+    task_state: FAILED
+    coverage: IN_SCOPE
+    reason: >-
+      Версионный блок устранён полностью (0 случаев на 20 прогонах), но 2 из 10 моделей —
+      exo-free и ling-3.0-flash-fin-free — отвечают «Upstream request failed: Endpoint is
+      unavailable». Это отказ апстрима провайдера, а не наш дефект: exo-free в повторе 14:58
+      ответил «ок», а у space-bunny-free и fledge-alpha-free прямые пробы дают OK при любом
+      User-Agent. Локально починить нечего — ждём, когда провайдер поднимет эти эндпоинты.
+    verification:
+      state: FAILED
+      command: "./.opencode/check_free_models.sh"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-FREE
+      evidence:
+        command: "./.opencode/check_free_models.sh"
+        exit_code: 1
+        at: "2026-10-07T15:30:00+04:00"
+        output_summary: >-
+          Три прогона на бинаре v2.0.22 (14:52, 15:09 и 15:26 финальным) дали одно и то же:
+          8 из 10 отвечают,
+          строки «1.18.0 or newer» нет ни в одной. Не отвечают exo-free и ling-3.0-flash-fin-free
+          с «Upstream request failed: Endpoint is unavailable» — это ошибка апстрима провайдера,
+          а не проверка версии: в повторе 14:58 exo-free ответил «ок» при той же модели.
+          Отдельно зафиксировано: в 14:59 параллельная пересборка владельца заменила бинарь на
+          0.0.0-local-202610071056, и версионный блок вернулся на попытке 3 — после этого
+          исправление перенесено в исходники (L-703), чтобы пересборка его не отменяла.
+    next_action: { command: "./.opencode/check_free_models.sh" }
+    group: "Этап 7 — версия сборки и доступ к free-tier моделям"
+    steps:
+      - "[x] Прогнать цикл O-FREE по всем 10 моделям и записать реальный вывод"
+      - "[x] Отдельно убедиться, что space-bunny-free и fledge-alpha-free не сломались (регрессия)"
+      - "[x] Проверить, что ~/.local/bin/oc-core/opencode-fixed.bak-20261007 цел и запускается --version"
+      - "[x] Прогнать opencode debug agents и убедиться, что роли LeadSpark, reviewer, architect, tester на месте"
+      - "[x] Прогнать dod-check . и довести до ИТОГ: OK"
+    depends_on: [L-701]
+
+  - id: L-703
+    what: "/home/isako/opencode-src/packages/script/src/index.ts объявляет локальной сборке версию из git-тега, а не 0.0.0-local-дата, поэтому любая пересборка владельца не возвращает блок free-tier"
+    target: { path: "packages/script/src/index.ts" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: "./.opencode/check_version.sh"
+      command_status: VERIFIED_CMD
+      oracle_ref: O-FREE
+      evidence:
+        command: "OPENCODE_CHANNEL=local bun -e импорт Script из packages/script/src/index.ts"
+        exit_code: 0
+        at: "2026-10-07T15:07:00+04:00"
+        output_summary: >-
+          Логика версии: version=2.0.22 channel=local при пустом окружении (OPENCODE_VERSION
+          не задан) — версия приходит из тега git (HEAD помечен v2.0.22). Первая попытка падала
+          с ReferenceError: Cannot access 'MINIMUM_ANNOUNCED_VERSION' before initialization —
+          константа была объявлена ниже первого использования; перенесена выше вызова.
+          bunx prettier --check packages/script/src/index.ts → All matched files use Prettier
+          code style. Контрольная пересборка БЕЗ OPENCODE_VERSION дала бинарь opencode v2.0.22,
+          то есть исправление переживает любую пересборку владельца.
+    next_action: { command: "./.opencode/check_version.sh" }
+    group: "Этап 7 — версия сборки и доступ к free-tier моделям"
+    steps:
+      - "[x] Прочитать packages/script/src/index.ts: где VERSION получает 0.0.0-<канал>-<дата> для preview"
+      - "[x] Добавить MINIMUM_ANNOUNCED_VERSION = 1.18.0 и releaseTagVersion(): git describe --tags --abbrev=0 без префикса v"
+      - "[x] Ветку IS_PREVIEW в VERSION перевести на releaseTagVersion() с откатом на 0.0.0-... если тега нет или он ниже порога"
+      - "[x] Проверить логику запуском: OPENCODE_CHANNEL=local bun -e импорт Script → version=2.0.22, channel=local"
+      - "[x] Прогнать bunx prettier --check packages/script/src/index.ts"
+      - "[x] Пересобрать бинарь БЕЗ OPENCODE_VERSION в окружении и убедиться, что opencode --version = 2.0.22"
+    depends_on: []
+
+  - id: L-119
+    what: "данные панели Registry: packages/tui/src/util/hub-registry.ts содержит hubRegistryStatus над каталогом packages/core/src/hub/index.ts (ready/total записей, установленные и отсутствующие инструменты, терминалы bash/nu/pwsh, счётчики категорий, команда установки), packages/tui/test/util/hub-registry.test.ts проверяет это фикстурой probe с реальными assert"
+    target: { path: "packages/core/src/hub/index.ts" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun test test/util/hub-registry.test.ts"'
+      command_status: VERIFIED_CMD
+      oracle_ref: O-HUB-REGISTRY
+      evidence:
+        command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun test test/util/hub-registry.test.ts test/component/devtools-registry.test.tsx"'
+        exit_code: 0
+        at: "2026-10-07T19:09:33+04:00"
+        output_summary: >-
+          Прогон лида 07.10 в 19:09: 7 pass / 0 fail / 85 expect на двух файлах, отдельно
+          файл данных — 6 из 6. Функция hubRegistryStatus в packages/tui/src/util/hub-registry.ts:24,
+          шесть тестов с fixture-probe в packages/tui/test/util/hub-registry.test.ts:10 — «всё
+          установлено», «нет jq» (missing>0 и install содержит jq), разбиение installed/missing
+          без пересечений и равенство сумм по категориям, реальный which(), win32-фильтр
+          платформы, win32 без менеджера пакетов (install undefined при missing>0).
+    next_action: { command: "cd /home/isako/opencode-src/packages/tui && bun typecheck" }
+    group: "Этап 8 — Registry-панель Universal Tool Hub в devtools-bar"
+    steps:
+      - "[x] Создать packages/tui/src/util/hub-registry.ts: hubRegistryStatus(probe?) — ready/total (фильтр платформы Hub.supportsPlatform + Hub.missingTools), installed, missing с числом блокируемых записей, terminals [bash, nu, pwsh], categories X/Y, install = Hub.planFor(отсутствующих)?.command"
+      - "[x] Импортировать данные из @opencode/core/hub/index (прецедент импорта core в tui: packages/tui/src/component/dialog-worktree-name.tsx:2); если тянет лишнее — сузить до @opencode/core/hub/catalog/index и @opencode/core/hub/resolve"
+      - "[x] Написать packages/tui/test/util/hub-registry.test.ts: probe «всё установлено» → ready==total и missing пуст; probe без jq → jq в missing со счётом >0 и ready<total; terminals отражают probe (bash/nu/pwsh); сумма ready по категориям == ready всего"
+      - "[x] Прогнать cd packages/tui && bun test test/util/hub-registry.test.ts → 0 fail"
+      - "[x] Прогнать cd packages/tui && bun typecheck → 0"
+      - "[x] Отметить выполненные шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-119 N"
+    depends_on: []
+
+  - id: L-120
+    what: "панель Registry в packages/tui/src/component/devtools-bar.tsx: BarItem «Registry» между Tools (devtools-bar.tsx:357) и Experiments (devtools-bar.tsx:429) открывает RegistryPanel из packages/tui/src/component/devtools-registry.tsx (секции Ready, Terminals, Installed, Missing, Install, Categories), packages/tui/test/component/devtools-registry.test.tsx рендерит панель и находит эти секции в кадре"
+    target: { path: "packages/tui/src/component/devtools-bar.tsx" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts"'
+      command_status: VERIFIED_CMD
+      oracle_ref: O-HUB-REGISTRY
+      evidence:
+        command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts"'
+        exit_code: 0
+        at: "2026-10-07T19:09:33+04:00"
+        output_summary: >-
+          Прогон лида 07.10 в 19:09: tsgo -b → код 0, тесты двух файлов → 7 pass / 0 fail /
+          85 expect. BarItem Registry с подписью в packages/tui/src/component/devtools-bar.tsx:432,
+          createMemo(hubRegistryStatus) — обход which() вне тела рендера — в
+          packages/tui/src/component/devtools-registry.tsx:14, кадровые assert «Registry»
+          и «Terminals»/«Missing» в packages/tui/test/component/devtools-registry.test.tsx:40.
+          Слепой ревьюер отсеял три мелочи, все исправлены: мемо вместо вызова в рендере,
+          условие секции Install по status().missing.length, источник токена цвета сверен с
+          devtools-bar.tsx:289 (useTheme()). Полный прогон пакета шёл чанками против
+          baseline: новых падений от этой правки нет, A/B с git show HEAD-версией
+          devtools-bar.tsx даёт те же падения (сегфолт bun под нагрузке — в known_red).
+    next_action: { command: "cd /home/isako/opencode-src/packages/tui && bun typecheck" }
+    group: "Этап 8 — Registry-панель Universal Tool Hub в devtools-bar"
+    steps:
+      - "[x] Создать packages/tui/src/component/devtools-registry.tsx: RegistryPanel (PanelBox + PanelTitle поверх hubRegistryStatus), ширина 42 колонки как у соседних панелей, длинные списки через wrapMode=\"word\", без строки на каждый инструмент"
+      - "[x] В packages/tui/src/component/devtools-bar.tsx вставить <BarItem active={panel() === \"registry\"} onClick={() => toggle(\"registry\")}> между Tools и Experiments с <Show when={panel() === \"registry\"}><RegistryPanel/></Show>"
+      - "[x] Токены темы по образцу соседних панелей: theme.text.muted/base, отсутствующие инструменты — elevatedTheme.text.feedback.error.base (devtools-bar.tsx:289)"
+      - "[x] Написать packages/tui/test/component/devtools-registry.test.tsx по образцу packages/tui/test/component/dialog-error-details.test.tsx: testRender + TestTuiContexts/ThemeProvider, assert через captureCharFrame на «Registry», «Terminals», «Missing»"
+      - "[x] Прогнать cd packages/tui && bun typecheck → 0"
+      - "[x] Прогнать cd packages/tui && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts → 0 fail"
+      - "[x] Прогнать cd packages/tui && bun test --timeout 30000 --only-failures и сверить со списком 10 предсуществующих падений в /tmp/opencode/tui-test-baseline.log — новых падений нет"
+      - "[x] Отметить выполненные шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-120 N"
+    depends_on: [L-119]
+
+  - id: L-121
+    what: "состояние вкл/выкл инструментов хаба: packages/core/src/hub/state.ts — чтение/запись JSON {version:1,enabled:{id:bool}} в каталоге состояния Global (util/src/global.ts:35-44), путь внедряется опцией (боевой дефолт — Global), запись temp+rename, дефолт off; packages/core/test/hub-state.test.ts проверяет дефолт, переключение и битый файл"
+    target: { path: "packages/core/src/hub/state.ts" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-state.test.ts"'
+      command_status: VERIFIED_CMD
+      oracle_ref: O-HUB-STATE
+      evidence:
+        command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-state.test.ts"'
+        exit_code: 0
+        at: "2026-10-07T21:09:01+04:00"
+        output_summary: "Прогон лида 07.10 21:09: tsgo -b → exit 0; тест состояния → 4 pass / 0 fail / 10 expect (467ms); регрессия hub.test.ts → 12 pass / 0 fail. Точка состояния: чтение packages/core/src/hub/state.ts:24, переключение setEnabled state.ts:30, тип State state.ts:15; тесты packages/core/test/hub-state.test.ts:8 (отсутствующий файл → version 1, ничего не включено) и state.test.ts:17 (true/false читается обратно, только один id, в tmp после записи остался ровно hub.json). Формат: реальный вывод bun typecheck/bun test."
+        anchors:
+          - "packages/core/src/hub/state.ts:24 — чтение состояния, битый/чужой JSON → version 1, enabled пусто"
+          - "packages/core/src/hub/state.ts:30 — setEnabled, temp+rename, без fs-util writeJson"
+          - "packages/core/test/hub-state.test.ts:8 — дефолт-off без файла"
+          - "packages/core/test/hub-state.test.ts:17 — обе стороны переключения, один id, нет .tmp-остатков"
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-prompt.test.ts"' }
+    group: "Этап 9 — действия Registry: состояние вкл/выкл, подсказки в промпте, кнопки Install/Remove"
+    steps:
+      - "[x] packages/core/src/hub/state.ts: HubState.read()/set(id, enabled) — JSON в пути из Global (state), дефолт {version:1,enabled:{}}, путь наружу опцией для тестов"
+      - "[x] запись temp+rename (fs-util writeJson не атомарен: packages/util/src/fs-util.ts:120); битый/отсутствующий JSON при чтении → дефолт"
+      - "[x] экспорт state-функций из packages/core/src/hub/index.ts"
+      - "[x] packages/core/test/hub-state.test.ts: дефолт off для неизвестного id; set(true/false) читается обратно; битый JSON → дефолт; реальный tmp-каталог вместо моков"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun typecheck → код 0"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun test test/hub-state.test.ts → 0 fail"
+      - "[x] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-121 N"
+    depends_on: []
+
+  - id: L-122
+    what: "рендер подсказок промпта: packages/core/src/hub/prompt.ts — renderHubHints(enabled, availability) собирает блок ТОЛЬКО по включённым И доступным инструментам (имя, назначение из каталога, до 3 шаблонов; по инструменту ≤5 строк/≤400 символов, cap блока 40 строк/2000 символов, шапка — подробности через hub-тулзку), пустой вход → пустой текст; packages/core/test/hub-prompt.test.ts"
+    target: { path: "packages/core/src/hub/prompt.ts" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-prompt.test.ts"'
+      command_status: VERIFIED_CMD
+      oracle_ref: O-HUB-PROMPT
+      evidence:
+        command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-prompt.test.ts"'
+        exit_code: 0
+        at: "2026-10-07T21:46:22+04:00"
+        output_summary: "Прогон лида 07.10 21:46: tsgo -b → exit 0; тест рендера → 7 pass / 0 fail / 16 expect (24ms). Ловушка, которую поймал и починил на ходу: hub/catalog экспортирует all как МАССИВ (catalog/index.ts:19), а не функцию — вызов all() ронял и typecheck, и тест. Регрессия соседних тестов: hub-state + hub-actions + hub → 22 pass / 0 fail."
+        anchors:
+          - "packages/core/src/hub/prompt.ts:28 — renderHubHints: фильтр enabled && available, sorted, пусто → пустая строка"
+          - "packages/core/src/hub/prompt.ts:58 — toolLine: назначение + до 3 шаблонов, обрезка 400 символов с многоточием"
+          - "packages/core/src/hub/prompt.ts:75 — fit: cap 40 строк/2000 символов, срез хвоста с резервом строки под маркер"
+          - "packages/core/src/hub/index.ts:19 — экспорт renderHubHints, type Hints"
+          - "packages/core/test/hub-prompt.test.ts:8 — вкл+доступен: имя, назначение, шаблон, шапка, терминалы"
+          - "packages/core/test/hub-prompt.test.ts:35 — 200 инструментов: ≤2000 символов, ≤40 строк, маркер обрезки"
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-instructions.test.ts"' }
+    group: "Этап 9 — действия Registry: состояние вкл/выкл, подсказки в промпте, кнопки Install/Remove"
+    steps:
+      - "[x] packages/core/src/hub/prompt.ts: renderHubHints(enabled, availability) — фильтр enabled && available (Hub.available/missingTools: hub/resolve.ts), per-tool cap, общий cap, шапка с указанием на hub-тулзку, терминалы bash/nu/pwsh одной строкой"
+      - "[x] пустые входы (нет включённых или нет доступных) → пустая строка: промпт без состояния не меняется"
+      - "[x] packages/core/test/hub-prompt.test.ts: вкл+доступен → имя и шаблон в тексте; выключен → текста нет; недоступный → текста нет; cap: при 200 включённых длина ≤2000"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun typecheck → код 0"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun test test/hub-prompt.test.ts → 0 fail"
+      - "[x] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-122 N"
+    depends_on: [L-121]
+
+  - id: L-123
+    what: "врезка в промпт: packages/core/src/session/context.ts:150-157 — новый Instructions.Source поверх HubState и renderHubHints в Instructions.combine (append, соседние источники не меняются; перечитывается каждый шаг — runner/llm.ts:196-224); packages/core/test/hub-instructions.test.ts доказывает presence/absence текста"
+    target: { path: "packages/core/src/session/context.ts" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-instructions.test.ts"'
+      command_status: VERIFIED_CMD
+      oracle_ref: O-HUB-PROMPT
+      evidence:
+        command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-instructions.test.ts"'
+        exit_code: 0
+        at: "2026-10-07T21:46:22+04:00"
+        output_summary: "Прогон лида 07.10 21:46: tsgo -b → exit 0; тест источника → 6 pass / 0 fail / 9 expect (252ms). Ловушка Effect 4.0-rc: catchAll не существует — через Effect.catch; tryPromise только объектной формой {try, catch}. Пустое/выключенное/недоступное состояние читается как Instructions.removed → ключ не попадает в values → renderInitial даёт ровно \"\" (byte-identity). Регрессия: инструкционная группа (instructions/index, instruction-state, instruction-discovery, mcp-instructions, reference-instructions) → 44 pass / 0 fail; A/B по context.ts: с моей версией и с git show HEAD — одинаковые 2 pre-existing падения session-create (таймауты shell-тестов 5000ms под нагрузкой, не от правки), session-provider-context отдельно → 8 pass / 0 fail."
+        anchors:
+          - "packages/core/src/hub/instructions.ts:24 — readHints: HubState.read + renderHubHints, catch → пусто, пусто → Instructions.removed"
+          - "packages/core/src/hub/instructions.ts:42 — make: key core/hub-hints, codec Schema.String, render.initial/changed/removed"
+          - "packages/core/src/session/context.ts:153 — HubInstructions.make() в Instructions.combine сразу после CodeMode"
+          - "packages/core/test/hub-instructions.test.ts:21 — включённый+доступный → текст в renderInitial"
+          - "packages/core/test/hub-instructions.test.ts:31 — пустое состояние → ровно пустая строка"
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts"' }
+    group: "Этап 9 — действия Registry: состояние вкл/выкл, подсказки в промпте, кнопки Install/Remove"
+    steps:
+      - "[x] packages/core/src/session/context.ts: Source ключ hub-hints в Instructions.combine рядом с CodeModeCatalog (context.ts:151) — read из HubState + Hub.available(), render.initial/changed через renderHubHints; соседние источники и порядок не менять"
+      - "[x] packages/core/test/hub-instructions.test.ts: включённый доступный инструмент → текст подсказки в собранных инструкциях; пустое состояние → текста нет"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun typecheck → код 0"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun test test/hub-instructions.test.ts → 0 fail"
+      - "[x] прогнать существующие тесты packages/core/test, затрагивающие session/context (найти по grep); упавшие сверить A/B через git show HEAD:packages/core/src/session/context.ts — новые падения от правки недопустимы"
+      - "[x] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-123 N"
+    depends_on: [L-122]
+
+  - id: L-124
+    what: "выполнение install/remove: packages/core/src/hub/install.ts — removeCommand по менеджерам рядом с installCommand (install.ts:38-56); packages/core/src/hub/actions.ts — install(id)/remove(id) с внедряемым runner (боевой — Bun.spawn), результат {ok, exit, output, command}, ненулевой exit или отказ sudo («password required») → ok:false с командой; packages/core/test/hub-actions.test.ts с fake-runner"
+    target: { path: "packages/core/src/hub/actions.ts" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-actions.test.ts"'
+      command_status: VERIFIED_CMD
+      oracle_ref: O-HUB-STATE
+      evidence:
+        command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-actions.test.ts"'
+        exit_code: 0
+        at: "2026-10-07T22:51:42+04:00"
+        output_summary: "Прогон лида 07.10 21:09: tsgo -b → exit 0; тест действий → 6 pass / 0 fail / 21 expect. Лид нашёл и исправил дефект остановленного исполнителя: Bun.spawn без env берёт стартовое окружение процесса — подменённый тестом PATH не доходил до ребёнка, в тест выполнялся реальный pacman и висел на блокировке базы; добавлен env: process.env. Повтор после слепого ревью (1 MAJOR) 07.10 22:51: allowlist KNOWN по каталогу — installTool/removeTool отвергают имя вне requires ДО planFor, команда с инъекцией не строится вовсе, тест «a name outside the catalog never reaches the shell» доказывает, что runner не вызван → exit 0, 7 pass / 0 fail / 25 expect."
+        anchors:
+          - "packages/core/src/hub/actions.ts:33 — KNOWN: Set из всех requires каталога"
+          - "packages/core/src/hub/actions.ts:35 — installTool: проверка KNOWN → planFor([tool], platform) → runner(command)"
+          - "packages/core/src/hub/actions.ts:43 — removeTool через removeCommand, та же проверка KNOWN"
+          - "packages/core/src/hub/actions.ts:61 — unknownTool: отказ до построения команды, runner не вызывается"
+          - "packages/core/src/hub/install.ts:66 — removeCommand по менеджерам (pacman -R, apt-get remove, dnf, brew, winget, scoop)"
+          - "packages/core/test/hub-actions.test.ts:112 — имя вне каталога не доходит до шелла"
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts"' }
+    group: "Этап 9 — действия Registry: состояние вкл/выкл, подсказки в промпте, кнопки Install/Remove"
+    steps:
+      - "[x] packages/core/src/hub/install.ts: removeCommand(manager, tools) по таблице менеджеров (pacman -R, apt-get remove, dnf remove, brew uninstall, winget uninstall, scoop uninstall)"
+      - "[x] packages/core/src/hub/actions.ts: install(id, opts)/remove(id, opts) — planFor/removeCommand → runner(command) → {ok, exit, output, command}; дефолтный runner — Bun.spawn"
+      - "[x] ветка отказа: ненулевой exit → ok:false, command и stderr в результате (панель покажет команду для ручного запуска); текст ошибки НЕ парсить — exit-код достаточен (решение совета ИИ 07.10)"
+      - "[x] packages/core/test/hub-actions.test.ts: fake-runner записывает вызовы — linux/pacman → sudo pacman …, win32/winget → winget …; exit 1 → ok:false с command; stderr прокидывается; реальный пакетный менеджер не запускается"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun typecheck → код 0"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun test test/hub-actions.test.ts → 0 fail"
+      - "[x] НЕ трогать packages/core/src/hub/index.ts (его в этом листе правит другой исполнитель) — экспорт actions добавит L-125"
+      - "[x] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-124 N"
+    depends_on: []
+
+  - id: L-125
+    what: "кнопки в панели: packages/tui/src/component/devtools-registry.tsx — строки инструментов «имя статус [on/off] [Install/Rm]» примитивом Action (devtools-bar.tsx:484-502), тумблер пишет HubState, действие зовёт core actions (экспорт из packages/core/src/hub/index.ts — в этом листе) с внедряемым runner, pending → disabled, результат → toast + инлайн, !ok → текст команды; массовая секция Install убрана; util/hub-registry.ts отдаёт enabled по инструментам; тесты панели расширены"
+    target: { path: "packages/tui/src/component/devtools-registry.tsx" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts"'
+      command_status: VERIFIED_CMD
+      oracle_ref: O-HUB-CONTROL
+      evidence:
+        command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts"'
+        exit_code: 0
+        at: "2026-10-07T22:50:59+04:00"
+        output_summary: "Прогон лида 07.10 22:38 (часть полного прогона O-HUB-CONTROL): tui typecheck → exit 0; тесты панели и данных → 17 pass / 0 fail / 167 expect (8 панельных + 9 утилиты). Отрицательный контроль → exit 1 с «(fail) negative control fixture», фикстура удалена. Сабагент-исполнитель убит перезапуском сервера, успев core-экспорт, каркас панели и тесты; лид доделал: двухшаговый Remove, секция Categories (регрессия этапа 8), массальная команда Install убрана, disabled при pending, toast-хост (<Toast />) в тестовой обвязке, cell() — якорь и needle на одной строке. После слепого ревью (2 MINOR): убран мёртвый сигнал selected; записи в hub.json сериализованы очередью writes — второй клик по тумблеру ждёт первый и не теряет обновление файла. Повторный полный O-HUB-CONTROL 07.10 22:50 → exit 0, core 24 pass, tui 17 pass."
+        anchors:
+          - "packages/core/src/hub/index.ts:19 — экспорт HubActions и ActionResult из ядра"
+          - "packages/tui/src/component/devtools-registry.tsx:61 — очередь writes: записи hub.json по одной"
+          - "packages/tui/src/component/devtools-registry.tsx:83 — runAction: pending, toast с причиной, заметка с командой при !ok"
+          - "packages/tui/src/component/devtools-registry.tsx:115 — onRemove: первый клик вооружает, второй выполняет"
+          - "packages/tui/src/component/devtools-registry.tsx:155 — секция Categories восстановлена"
+          - "packages/tui/src/component/devtools-registry.tsx:239 — метка Remove?/Rm и тумблер на каждой строке"
+          - "packages/tui/test/component/devtools-registry.test.tsx:130 — pending-окно через управляемый промис"
+          - "packages/tui/test/component/devtools-registry.test.tsx:149 — команда в заметке, причина в тосте"
+          - "packages/tui/test/component/devtools-registry.test.tsx:175 — Remove требует второго клика"
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src && ~/.config/opencode/bin/dod-check ."' }
+    group: "Этап 9 — действия Registry: состояние вкл/выкл, подсказки в промпте, кнопки Install/Remove"
+    steps:
+      - "[x] packages/core/src/hub/index.ts: экспорт actions (install/remove) — правка только этого файла в L-125"
+      - "[x] чтение enabled и подключение действий: панель читает HubState.read({directory}) (боевой дефолт — Global) и зовёт core actions опциями install/remove (боевой дефолт — Hub.HubActions); util/hub-registry.ts остаётся чистой синк-функцией и принимает готовый enabled — факт 07.10: эти две вещи живут в панели, не в util"
+      - "[x] devtools-registry.tsx: Installed/Missing → строки с Action-кнопками тумблер (on/off) и Install/Rm (Rm только у установленных, Install только у отсутствующих), имя truncate под ширину 42 колонки; секцию Install (массовая команда) убрать"
+      - "[x] Remove — двухшаговое подтверждение: первый клик переводит кнопку в «Remove?», второй выполняет; другой клик/потеря наведения сбрасывает (совет ИИ 07.10, без ввода текста — как просил владелец)"
+      - "[x] async по образцу dump() (devtools-bar.tsx:145-231): сигнал pending → кнопка disabled; ok → toast + строка-результат; !ok → toast + текст команды"
+      - "[x] packages/tui/test/component/devtools-registry.test.tsx: строки с кнопками рендерятся; тумблер отражает фикстуру состояния; fake-run: Install → pending → результат; !ok → видна команда; секции Ready/Terminals/Categories сохранены (регрессия этапа 8)"
+      - "[x] cd /home/isako/opencode-src/packages/tui && bun typecheck → код 0"
+      - "[x] cd /home/isako/opencode-src/packages/tui && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts → 0 fail"
+      - "[x] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-125 N"
+    depends_on: [L-121, L-123, L-124]
+
+dead_ends: []
+
+handover:
+  handing_over_task: >-
+    СЕЙЧАС — TASK-HUB-CONTROL (этап 9, контракт в plan.md): панель Registry получает
+    построчные кнопки — вкл/выкл инструмента (включённый автоматически попадает подсказкой
+    в системный промпт: модель не знает о возможностях ядра) и Install/Remove (выполнение
+    команды по платформе, без ввода подтверждения — решение владельца 07.10). Вся логика —
+    на уровне ядра packages/core. Решения архитектора: состояние — свой JSON в core (дефолт
+    off, opt-in, temp+rename), промпт — новый Instructions.Source в session/context.ts:150-157
+    поверх чистой renderHubHints с капом 2k символов, выполнение — core-функция с внедряемым
+    runner, панель — примитив Action (devtools-bar.tsx:484-502), массовую секцию Install
+    убрать. Листья: L-121 (state) → L-122 (prompt) → L-123 (врезка) → L-124 (actions,
+    параллелен L-121, hub/index.ts НЕ трогать) → L-125 (панель, экспорт actions из index).
+    Закрыты: этап 8 (L-119/L-120 DONE/PASSED, O-HUB-REGISTRY), этап 7 (версия free-tier),
+    этапы 1-6 (документация). Открыты TASK-DOC-CORE: L-117 (шесть документов по каталогам
+    packages/tui/src) и L-118 (PACKAGE.md для console, containers, effect-drizzle-sqlite,
+    identity, stats); их оракулы O-DIRDOC/O-DOC не тронуты.
+  next_action:
+    command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-state.test.ts"'
+    expected: >-
+      после выполнения L-121: код 0 и 0 fail — состояние вкл/выкл существует и протестировано
+      (до начала листа файла test/hub-state.test.ts нет, команда упадёт — это нормально).
+      Стартовый шаг: открыть L-121 в oc-dod и выполнить его шаги по порядку.
+  release_gate:
+    applies_to: TASK
+    task_id: TASK-DOC-CORE
+    coverage_complete: false
+    coverage_gap: >-
+      Исполняемая поверхность не извлечена формальным парсером: символы TypeScript и Effect
+      Schema в этом проекте не имеют готового extractor'а, который дал бы перечень всех
+      экспортов пакетов. Сопоставление «символ → документ» не построено, поэтому полнота
+      покрытия не заявляется, даже когда все пакеты манифеста закрыты. Плюс: оракул
+      check_core_docs.py проверяет форму и существование путей, а не совпадение текста со
+      смыслом кода, и его потолок длины (150 или 260 строк) — соглашение, а не измерение
+      полноты. Каталоги packages/tui/src пока не описаны ничем (лист L-117).
+  known_red:
+    - what: >-
+        ПОЛНЫЙ bun test ПАКЕТА tui НЕСТАБИЛЕН ПОД НАГРУЗКОЙ (наблюдение 07.10, повторяется трижды):
+        единый прогон `bun test --timeout 30000 --only-failures [--max-concurrency=N]` падал
+        сегфолтом bun 1.4.2 (exit 139, «bug in Bun») при load 24–30 на 12 ядрах, а под нагрузкой
+        даёт ложные новые падения с раздутыми таймаутами. Эталон сравнения — чанки по каталогам
+        или --max-concurrency=4, а приписывание падения — A/B: `git show HEAD:<файл> > <файл>`,
+        прогон, восстановление по sha256. Бaseline-список из 10 падений сам по себе нестабилен:
+        theme ×3 из baseline не воспроизводились отдельным прогоном (5 pass / 0 fail).
+      since: "2026-10-07"
+    - what: >-
+        ФОРМАТИРОВАТЕЛЬ ПЕРЕПИСЫВАЕТ ФАЙЛ ПОСЛЕ ЗАПИСИ (правило для .py в этой системе): после
+        write в .opencode/doc_check.py строки переформатированы, и следующий edit по только что
+        написанному тексту падает с «Could not find oldString». Лечится перечитыванием файла
+        перед правкой. Наблюдалось 06.10 на .opencode/dod.yaml и .opencode/doc_check.py и
+        повторно 07.10: правка блока docs в main не нашлась после форматирования.
+      since: "2026-10-06"
+    - what: >-
+        ЯКОРЬ В output_summary ТРЕБУЕТ ВИДА ПУТЬ:СТРОКА. Регулярка dod-check ищет
+        ([\w./-]+\.[A-Za-z0-9]+)(:[0-9]+|#...), поэтому «Строка 114 packages/core/src/instance.ts
+        содержит» якоря не даёт, а «packages/core/src/instance.ts:114 содержит» даёт. Плюс
+        слова «написан», «написано», «ок», «должно» считаются расплывчатыми в любом регистре
+        и в любом месте текста. Обе проверки срабатывают даже внутри честного пересказа вывода.
+      since: "2026-10-07"
+    - what: >-
+        TARGET ЛИСТА ОБЯЗАН СУЩЕСТВОВАТЬ НА ДИСКЕ ДАЖЕ ПРИ task_state NOT_STARTED: dod-check
+        ругается «путь не существует». Для неначатого листа target ставится на существующий
+        файл-основание (манифест), а создаваемые файлы перечисляются в what и steps.
+      since: "2026-10-07"
+    - what: >-
+        ДЫРА В ОРАКУЛЕ СИМВОЛОВ БЫЛА ДВОЙНОЙ. Первая: check_sample делал continue для пакета без
+        src и пропускал его целиком, а фикстура с выдуманным символом давала код 0. Вторая, моя
+        же: после исправления «нет src — всегда нарушение» оракул покраснел на packages/storybook,
+        у которого src нет и в манифесте честно 0 строк. Правильное условие: нет src при
+        ненулевом числе строк в манифесте — нарушение; ноль строк — сверять нечего, и это не дефект.
+      since: "2026-10-07"
+    - what: >-
+        КЛАСС СИМВОЛОВ В РЕГУЛЯРКЕ ЗАГОЛОВКА ДОЛЖЕН ВКЛЮЧАТЬ ЦИФРЫ. Было [a-z-], и папка core/v1
+        давала ложное нарушение «первая строка не заголовок», хотя документ был верен. Проверено:
+        такие ложные срабатывания выглядят как дефект документа и вводят в заблуждение.
+      since: "2026-10-07"
+    - what: >-
+        В дереве три изменённых файла: packages/script/src/index.ts,
+        packages/tui/src/component/session-tabs.tsx, packages/tui/src/context/storage.tsx.
+        Это правки прошлой работы лида по пульту oc-hub, не TASK-DOC-CORE. Пока они не
+        закоммичены, git status в репозитории не будет чистым — это не дефект документации.
+      since: "2026-10-06"
+    - what: >-
+        Репозиторий в ОТСОЕДИНЕННОЙ ГОЛОВЕ (detached HEAD) на теге v2.0.22. Коммит невозможен
+        без указания ветки или тега; push запрещён правилом permissions. Документы остаются
+        рабочими файлами в дереве, попадут в чужой git как untracked.
+      since: "2026-10-06"
+    - what: >-
+        Слои зависимостей прочитаны из полей dependencies в packages/*/package.json, а не из
+        графа импортов. Реальная связность может отличаться (например tui/src/mini тянет core
+        напрямую, минуя context/client.tsx). Это помечено как приближение в ARCHITECTURE.md.
+      since: "2026-10-06"
+    - what: >-
+        Валидатор проверяет форму документа и существование путей, но НЕ проверяет, что
+        написанное совпадает со смыслом кода. Фактическую верность описания подтверждает
+        только чтение исходников автором документа и выборочная проверка O-DOC-REALITY.
+      since: "2026-10-06"
+  ask:
+    - question: "Имя файла PACKAGE.md выбрал лид (владелец его не выбирал). 14 пакетов уже имеют README.md, поэтому переименовывать их не стали. Если нужно другое имя — переименуем до того, как файлов станет много."
+      who: "владелец"
+    - question: "Подтверди, что новые файлы PACKAGE.md и ARCHITECTURE.md в ~/opencode-src устраивают: репозиторий чужой (sst/opencode), они попадут в его git status как untracked, и я ничего не коммичу. Если файлы нужно держать вне репозитория — скажи, перенесу в ~/.config/opencode/docs/core/."
+      who: "владелец"
+
+  decisions:
+    - id: DEC-1
+      at: "2026-10-06"
+      source: "разговор с владельцем"
+      question: "Что документировать — исходники ядра или конфиг ~/.config/opencode"
+      answer: "исходники в ~/opencode-src: раскрыть ядро CLI, чтобы ИИ понимала устройство"
+      rejected:
+        - "~/.config/opencode: это конфиг и плагины, а не ядро; владелец выбрал исходники явно"
+    - id: DEC-2
+      at: "2026-10-06"
+      source: "решение лида, владелец имя не выбирал"
+      question: "Как назвать документ пакета, если 14 пакетов уже заняли README.md"
+      answer: "PACKAGE.md — не конфликтует с существующими README.md, узнаваемо по имени"
+      rejected:
+        - "перезаписывать README.md: они уже написаны авторами пакета, это чужая работа"
+        - "ARCHITECTURE.md в каждом пакете: имя означает архитектуру всего проекта, в пакете сбивает"
+    - id: DEC-3
+      at: "2026-10-06"
+      source: "решение лида по масштабу"
+      question: "Куда класть документы — все в один каталог или рядом с папками"
+      answer: "рядом с каждой папкой пакета (PACKAGE.md внутри packages/<pkg>/) и карта в корне; владелец прямо попросил не сваливать всё в одно место, чтобы ИИ по имени файла понимала контекст"
+      rejected:
+        - "единый каталог docs/: владелец отверг, ИИ не видит документ рядом с кодом"
+    - id: DEC-5
+      at: "2026-10-06"
+      source: "проверка запуском, первая версия doc_check.sh дала ложно зелёный результат"
+      question: "Как отрицательный контроль должен ловить битый документ, если валидатор всегда смотрит в живой репозиторий"
+      answer: "валидатор получил флаг --root: корень проверяемого дерева задаётся аргументом, и скрипт мутаций гоняет его по временной копии. До этого все 4 мутации проходили незамеченными — контроль был фиктивным"
+      rejected:
+        - "мутировать файлы в репозитории и откатывать git checkout: запрещено трогать код чужого репозитория и рискованно"
+        - "полагаться на mktemp и временный путь без --root: не работает, так как ROOT выводился из __file__"
+    - id: DEC-6
+      at: "2026-10-07"
+      source: "вопрос владельцу в этой сессии"
+      question: "Документация папок ядра уже написана как packages/core/docs/ (39 файлов); лид успел заложить второй способ — PACKAGE.md рядом с каждой папкой кода. Что оставить"
+      answer: "оставить как есть: docs/ рядом с пакетом. Второй способ не применять для core; режим --dirs остаётся для tui/src, где документов ещё нет"
+      rejected:
+        - "перенос 3022 строк из docs/ в PACKAGE.md рядом с кодом: работа на несколько часов ради уже написанного"
+        - "оба способа сразу на одни папки: две схемы разделов и два оракула начнут расходиться и проверять одно и то же по-разному"
+    - id: DEC-4
+      at: "2026-10-06"
+      source: "оценка лида"
+      question: "Документировать ли console и stats так же глубоко"
+      answer: "нет: это инфраструктура Astro/SST для хостинга, а не ядро CLI — только карточка с пометкой"
+      rejected:
+        - "полное описание console/stats: съедает время этапа 5 без пользы для работы с ядром"
+
+validator:
+  version: "dod-check из ~/.config/opencode/bin"
+  hash: "sha256:d25bc53f8deebd92"
+  self_test:
+    status: PASSED
+    at: "2026-10-06"
+    command: "~/.config/opencode/bin/dod-check --self-test"
+    summary: >-
+      SELF-TEST: зелёный (46 мутантов) — валидатор ловит свои плохие фикстуры, включая
+      «этап без листьев», «depends_on этапа в никуда» и «дубль имени этапа».

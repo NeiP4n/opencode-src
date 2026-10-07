@@ -246,7 +246,7 @@ describe("OpencodePlugin", () => {
             if (orgID === "org-missing") {
               expect(status).toMatchObject({
                 status: "failed",
-                message: "OpenCode organization not found: org-missing",
+                message: "OpenMAMI organization not found: org-missing",
               })
               expect(yield* credentials.list(integrationID)).toEqual([])
               expect(config).toEqual([])
@@ -356,7 +356,7 @@ describe("OpencodePlugin", () => {
         })
         .pipe(Effect.flip)
       expect(error).toBeInstanceOf(Integration.AuthorizationError)
-      expect(String(error.cause)).toContain("Invalid OpenCode server URL: expected HTTP(S)")
+      expect(String(error.cause)).toContain("Invalid OpenMAMI server URL: expected HTTP(S)")
     }),
   )
 
@@ -619,20 +619,20 @@ describe("OpencodePlugin", () => {
           yield* drain
           expect(state.requests).toBe(2)
           expect(rebuilds).toEqual({ provider: initial.provider + 1, websearch: initial.websearch + 1 })
-          expect(yield* websearch.default()).toEqual({ id: WebSearch.ID.make("opencode"), name: "OpenCode Web Search" })
+          expect(yield* websearch.default()).toEqual({ id: WebSearch.ID.make("opencode"), name: "OpenMAMI Web Search" })
 
           yield* TestClock.adjust("1 minute")
           yield* drain
           expect(state.requests).toBe(3)
           expect(rebuilds).toEqual({ provider: initial.provider + 1, websearch: initial.websearch + 1 })
-          expect(yield* websearch.default()).toEqual({ id: WebSearch.ID.make("opencode"), name: "OpenCode Web Search" })
+          expect(yield* websearch.default()).toEqual({ id: WebSearch.ID.make("opencode"), name: "OpenMAMI Web Search" })
 
           state.failing = true
           yield* TestClock.adjust("1 minute")
           yield* drain
           expect(state.requests).toBe(4)
           expect(rebuilds).toEqual({ provider: initial.provider + 1, websearch: initial.websearch + 1 })
-          expect(yield* websearch.default()).toEqual({ id: WebSearch.ID.make("opencode"), name: "OpenCode Web Search" })
+          expect(yield* websearch.default()).toEqual({ id: WebSearch.ID.make("opencode"), name: "OpenMAMI Web Search" })
 
           state.failing = false
           state.advertised = false
@@ -1239,9 +1239,9 @@ describe("OpencodePlugin", () => {
           yield* addPlugin()
           expect(yield* websearch.providers()).toContainEqual({
             id: WebSearch.ID.make("opencode"),
-            name: "OpenCode Web Search",
+            name: "OpenMAMI Web Search",
           })
-          expect(yield* websearch.default()).toEqual({ id: WebSearch.ID.make("opencode"), name: "OpenCode Web Search" })
+          expect(yield* websearch.default()).toEqual({ id: WebSearch.ID.make("opencode"), name: "OpenMAMI Web Search" })
           expect(yield* websearch.query({ query: "effect web search" })).toEqual(
             new WebSearch.Response({
               providerID: WebSearch.ID.make("opencode"),
@@ -1373,7 +1373,7 @@ describe("OpencodePlugin", () => {
 
           expect(yield* websearch.default()).toEqual({
             id: WebSearch.ID.make("managed-search"),
-            name: "OpenCode Web Search",
+            name: "OpenMAMI Web Search",
           })
           expect(yield* websearch.query({ query: "default Console" })).toEqual(
             new WebSearch.Response({ providerID: WebSearch.ID.make("managed-search"), results: [] }),

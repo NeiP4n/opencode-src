@@ -142,6 +142,14 @@ function migrateMode(theme: Theme, mode: Mode): ThemeDefinition {
         success: { base: color("success") },
         info: { base: color("info") },
       },
+      // Only names that always resolve: `accent` and `interactive` fall back to
+      // gray when the source theme has no chromatic hue, and a monochrome theme
+      // legitimately renders every backend the same.
+      backend: {
+        bash: "$text.muted",
+        nu: "$hue.accent.300",
+        pwsh: "$hue.interactive.300",
+      },
     },
     background: {
       base: background,

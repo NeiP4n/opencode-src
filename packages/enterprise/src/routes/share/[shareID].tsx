@@ -139,7 +139,7 @@ export default function () {
 
           return (
             <>
-              <Title>{title()} | OpenCode</Title>
+              <Title>{title()} | OpenMAMI</Title>
               <Meta name="description" content="opencode - The AI coding agent built for the terminal." />
               <Meta property="og:image" content={ogImage()} />
               <Meta name="twitter:image" content={ogImage()} />

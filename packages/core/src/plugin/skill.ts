@@ -11,14 +11,18 @@ import { Config } from "../config.js"
 import os from "os"
 import opencodeContent from "./skill/opencode.md" with { type: "text" }
 import reportContent from "./skill/report.md" with { type: "text" }
+import hubContent from "./skill/hub.md" with { type: "text" }
 
 export const OpencodeContent = opencodeContent
 export const ReportContent = reportContent
+export const HubContent = hubContent
 
 export const OpencodeDescription =
-  "Use this skill for any question about OpenCode itself, including how OpenCode works, using or configuring it, migrating from V1 to V2, troubleshooting it, developing plugins or integrations, using the OpenCode SDK, clients, server, or API, and contributing to the OpenCode codebase. Also use it for OpenCode agents, commands, skills, tools, permissions, MCP servers, providers, models, themes, keybinds, formatters, the CLI, TUI, desktop app, and web app."
+  "Use this skill for any question about OpenMAMI itself, including how OpenMAMI works, using or configuring it, migrating from V1 to V2, troubleshooting it, developing plugins or integrations, using the OpenMAMI SDK, clients, server, or API, and contributing to the OpenMAMI codebase. Also use it for OpenMAMI agents, commands, skills, tools, permissions, MCP servers, providers, models, themes, keybinds, formatters, the CLI, TUI, desktop app, and web app."
 const REPORT_DESCRIPTION =
   "Use when the user wants to report an opencode issue or bug. Collect standard diagnostics, add user-specific reproduction context, and publish the issue with GitHub CLI."
+export const HubDescription =
+  "Use when choosing how to run a search, file discovery, JSON or YAML, tabular data, git, docker, systemd, process or network inspection task. Covers picking a Universal Tool Hub catalog entry and its fast modern CLI over hand-written shell."
 
 export const Plugin = define({
   id: "opencode.skill",
@@ -28,7 +32,7 @@ export const Plugin = define({
       editor.add(
         Skill.Info.make({
           id: Skill.ID.make("opencode"),
-          name: Skill.Name.make("OpenCode"),
+          name: Skill.Name.make("OpenMAMI"),
           description: OpencodeDescription,
           path: AbsolutePath.make("/builtin/opencode.md"),
           content: OpencodeContent,
@@ -41,6 +45,15 @@ export const Plugin = define({
           description: REPORT_DESCRIPTION,
           path: AbsolutePath.make("/builtin/report.md"),
           content: reportContent,
+        }),
+      )
+      editor.add(
+        Skill.Info.make({
+          id: Skill.ID.make("hub"),
+          name: Skill.Name.make("Tool Hub"),
+          description: HubDescription,
+          path: AbsolutePath.make("/builtin/hub.md"),
+          content: HubContent,
         }),
       )
     })

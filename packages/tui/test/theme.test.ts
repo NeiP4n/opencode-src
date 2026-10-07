@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import type { TerminalColors } from "@opentui/core"
-import { allThemes, hasTheme, getOpenCodeTheme, parseTheme, resolveTheme } from "../src/theme"
+import { allThemes, hasTheme, getOpenCodeTheme, parseTheme, resolveTheme, resolveThemeDocument } from "../src/theme"
 import { discoverThemes } from "../src/theme/discovery"
 import { configDirectories } from "../src/util/config-directories"
 import { terminalMode } from "../src/theme/system"
@@ -127,6 +127,33 @@ test("custom theme precedence follows directory order", async () => {
   await writeFile(path.join(project, "themes", "custom.json"), JSON.stringify({ source: "project" }))
 
   await expect(discoverThemes([global, project])).resolves.toEqual({ custom: { source: "project" } })
+})
+
+test("built-in theme names a color for every execution backend in both modes", () => {
+  const document = getOpenCodeTheme()
+  for (const mode of ["light", "dark"] as const) {
+    const theme = resolveThemeDocument(document, mode)
+    expect(theme.text.backend?.bash).toBeDefined()
+    expect(theme.text.backend?.nu).toBeDefined()
+    expect(theme.text.backend?.pwsh).toBeDefined()
+    // a badge is only useful if the backends do not all look the same
+    expect(theme.text.backend?.nu).not.toEqual(theme.text.backend?.pwsh)
+    expect(theme.text.backend?.bash).not.toEqual(theme.text.backend?.nu)
+  }
+})
+
+test("a theme without the backend role resolves and leaves the fallback in charge", () => {
+  const source: Record<string, unknown> = { ...structuredClone(getOpenCodeTheme()) }
+  const base = { ...(source.base as Record<string, unknown>) }
+  const text = { ...(base.text as Record<string, unknown>) }
+  delete text.backend
+  base.text = text
+  source.base = base
+
+  const document = parseTheme(source, "no-backend")
+  const theme = resolveThemeDocument(document, "dark")
+  expect(theme.text.backend).toBeUndefined()
+  expect(theme.text.muted).toBeDefined()
 })
 
 test("theme directories include global config before project directories", async () => {

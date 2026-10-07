@@ -14,6 +14,8 @@ import { Keymap } from "../context/keymap"
 import { useTheme, useThemes } from "../context/theme"
 import { DevTools } from "../devtools"
 import { useDialog } from "../ui/dialog"
+import { PanelBox, PanelTitle, Row } from "./devtools-panel"
+import { RegistryPanel } from "./devtools-registry"
 import { DialogExperiments } from "./dialog-experiments"
 import { usePlugin } from "../plugin/context"
 import { errorMessage } from "../util/error"
@@ -22,7 +24,7 @@ const graphWidth = 23
 const sampleIntervalMilliseconds = 2_000
 const sampleRetentionMilliseconds = 30_000
 const statusWindowMilliseconds = 6_000
-type Panel = "server" | "theme" | "tools" | "ui"
+type Panel = "server" | "theme" | "tools" | "ui" | "registry"
 type ProcessSample = Readonly<{ cpu: number; memory: number; delay: number; time: number }>
 export type RuntimeStatus = "normal" | "medium" | "high"
 
@@ -426,6 +428,12 @@ export function DevToolsBar() {
           </PanelBox>
         </Show>
       </BarItem>
+      <BarItem active={panel() === "registry"} onClick={() => toggle("registry")}>
+        <text fg={panel() === "registry" ? theme.text.action.primary.focused : theme.text.muted}>Registry</text>
+        <Show when={panel() === "registry"}>
+          <RegistryPanel />
+        </Show>
+      </BarItem>
       <BarItem
         active={false}
         onClick={() => {
@@ -469,52 +477,6 @@ function BarItem(props: ParentProps<{ active: boolean; onClick: () => void }>) {
       }}
     >
       <box flexDirection="row">{props.children}</box>
-    </box>
-  )
-}
-
-function PanelBox(props: ParentProps) {
-  const theme = useTheme()
-  const renderer = useRenderer()
-  return (
-    <box
-      position="absolute"
-      zIndex={2600}
-      bottom={1}
-      left={-1}
-      width={42}
-      paddingLeft={2}
-      paddingRight={2}
-      paddingTop={1}
-      paddingBottom={1}
-      backgroundColor={theme.background.raised.base}
-      flexDirection="column"
-      onMouseUp={(event) => {
-        if (renderer.getSelection()?.getSelectedText()) return
-        event.stopPropagation()
-      }}
-    >
-      {props.children}
-    </box>
-  )
-}
-
-function PanelTitle(props: ParentProps) {
-  const theme = useTheme()
-  return (
-    <text fg={theme.text.base} attributes={TextAttributes.BOLD} marginBottom={1}>
-      {props.children}
-    </text>
-  )
-}
-
-function Row(props: { label: string; value: string }) {
-  const theme = useTheme()
-  return (
-    <box flexDirection="row">
-      <text fg={theme.text.muted}>{props.label}</text>
-      <box flexGrow={1} />
-      <text fg={theme.text.base}>{props.value}</text>
     </box>
   )
 }
