@@ -1,20 +1,28 @@
 export * as Hub from "./index.js"
 
 export type { Backend, Category, Entry, Platform } from "./types.js"
-export { placeholders } from "./types.js"
+export { placeholders, slotKey, optionalSlot } from "./types.js"
 export { all, categories, get } from "./catalog/index.js"
 export {
   available,
+  choose,
   chooseBackend,
+  machine,
   missingTools,
+  portable,
   prepare,
   render,
   supportsPlatform,
+  type Choice,
+  type Machine,
   type Rendered,
   MissingArgumentError,
   MissingToolError,
+  NoBackendError,
 } from "./resolve.js"
-export { planFor, removeCommand, detectManager, type Manager, type Plan } from "./install.js"
+export { InvalidArgumentError, quote } from "./quote.js"
+export { HubHost } from "./host.js"
+export { planFor, removeCommand, detectManager, type Elevation, type Manager, type Plan } from "./install.js"
 export { read, setEnabled, type State } from "./state.js"
 export * as HubActions from "./actions.js"
 export type { ActionResult } from "./actions.js"

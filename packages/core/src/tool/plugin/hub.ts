@@ -13,12 +13,11 @@ import { Permission } from "../../permission.js"
 import { Shell } from "../../shell.js"
 import { ShellParse } from "../../shell/parse.js"
 import { ShellResult } from "../../shell/result.js"
-import { ShellSelect } from "../../shell/select.js"
 import { Session } from "../../session.js"
 import { SessionSchema } from "../../session/schema.js"
 import { Config } from "../../config.js"
 import { Hub } from "../../hub/index.js"
-import { which } from "../../util/which.js"
+import { HubHost } from "../../hub/host.js"
 
 export const name = "hub"
 const DEFAULT_TIMEOUT_MS = 2 * 60 * 1_000
@@ -29,6 +28,7 @@ const description = (tools: string[]) =>
     "Prefer this tool over shell when a catalog entry covers the task: hub commands use fast modern CLIs (rg, fd, jq, yq, mlr) and pick the best available backend.",
     'Call with list or query to discover entries, id plus args to run one.',
     'With install plus id prints the package-manager command for missing tools. Use shell as fallback when no entry fits.',
+    `Entries are filtered to this machine (${process.platform}); the hub picks the shell itself (${HubHost.order().join(" > ")}) and quotes args for it, so pass raw values without shell quoting.`,
     tools.length > 0 ? `Tools already available: ${tools.join(", ")}.` : "No optional hub tools detected yet.",
   ].join(" ")
 
@@ -68,14 +68,22 @@ const Output = Schema.Struct({
 
 type Output = typeof Output.Type
 
+// PATH probe for the description, refreshed at most every few seconds: the
+// context hook fires on every model step and each probe walks PATH ~30 times.
+let probed: { at: number; tools: string[] } | undefined
+const availableTools = () => {
+  const now = Date.now()
+  if (!probed || now - probed.at > 5_000) probed = { at: now, tools: Hub.available() }
+  return probed.tools
+}
+
 const failure = (message: string, error?: unknown) => new ToolFailure({ message, error })
 
 const entryInfo = (entry: Hub.Entry) => {
-  // Lazy backend: entries for another platform (windows.* on linux) have no
-  // usable backend here. Show the first declared template instead of throwing,
-  // the run path still filters by platform before executing.
-  const key = (["bash", "nu", "pwsh"] as const).find((backend) => entry.templates[backend] !== undefined)
-  const template = key !== undefined ? (entry.templates[key] ?? "") : ""
+  // The template this platform would try first; the run path still resolves
+  // the backend against the shells actually installed.
+  const key = HubHost.order().find((backend) => entry.templates[backend] !== undefined)
+  const template = key !== undefined ? (entry.templates[key] ?? "") : (entry.templates.bash ?? "")
   return {
     id: entry.id,
     title: entry.title,
@@ -108,11 +116,8 @@ export const Plugin = {
     const environment = yield* Environment.Service
     const access = yield* FileAccess.Service
     const shell = yield* Shell.Service
-    const select = yield* ShellSelect.Service
-    const compatibleShell = select.resolve({ priority: "compat" })
     const permission = yield* Permission.Service
     const config = yield* Config.Service
-    const detected = Hub.available()
 
     const toolResult = (output: Output) => ({
       output,
@@ -195,7 +200,7 @@ export const Plugin = {
       editor.add({
         name,
         options: { codemode: false },
-        description: description(detected),
+        description: description(availableTools()),
         input: Input,
         output: Output,
         execute: (input, context) =>
@@ -209,15 +214,17 @@ export const Plugin = {
                 return { output: `All tools for ${input.id} are already installed.`, status: "completed" as const, hubID: input.id }
               const plan = Hub.planFor(lacking)
               if (!plan)
-                return { output: `No package manager detected. Install manually: ${lacking.join(", ")}.`, status: "planned" as const, hubID: input.id }
-              return { output: `Install with: ${plan.command}`, status: "planned" as const, hubID: input.id, command: plan.command }
+                return { output: `No package manager with these packages detected on ${process.platform}. Install manually: ${lacking.join(", ")}.`, status: "planned" as const, hubID: input.id }
+              const manual = plan.unsupported.length > 0 ? ` Install manually: ${plan.unsupported.join(", ")}.` : ""
+              return { output: `Install with: ${plan.command}${manual}`, status: "planned" as const, hubID: input.id, command: plan.command }
             }
             if (input.list === true || (input.query !== undefined && input.id === undefined)) {
               const state = yield* Effect.tryPromise(() => Hub.read()).pipe(
                 Effect.orElseSucceed(() => ({ version: 1 as const, enabled: {} }) as Hub.State),
               )
               const listing = Hub.all.filter(
-                (entry) => matches(entry, input.query ?? "", input.category) && Hub.discoverable(state, entry),
+                (entry) =>
+                  Hub.supportsPlatform(entry) && matches(entry, input.query ?? "", input.category) && Hub.discoverable(state, entry),
               )
               return {
                 output: listing.map((entry) => `${entry.id} [${entry.category}]${entry.danger === true ? " DANGER" : ""} - ${entry.title}`).join("\n"),
@@ -239,15 +246,20 @@ export const Plugin = {
               }
               if (error instanceof Hub.MissingArgumentError)
                 return yield* failure(`Missing arguments for ${input.id}: ${error.missing.join(", ")}`)
+              if (error instanceof Hub.NoBackendError || error instanceof Hub.InvalidArgumentError)
+                return yield* failure(`${error.message}. Use shell as fallback.`)
+              if (error instanceof Error) return yield* failure(error.message)
               throw error
             }
             const timeout = DEFAULT_TIMEOUT_MS
             const info = yield* shell.create(
               {
-                command: rendered.command,
+                command: HubHost.executable(rendered.command, rendered.backend),
                 cwd: input.workdir,
                 timeout,
-                shell: yield* compatibleShell,
+                // The backend's own shell: a bash template must not land in
+                // PowerShell, nor a nu template in bash.
+                shell: rendered.shell,
                 metadata: { sessionID: context.sessionID },
               },
               (invocation) =>
@@ -256,6 +268,10 @@ export const Plugin = {
                   invocation.env.OPENCODE = "1"
                   invocation.env.AI_AGENT ||= "opencode"
                   invocation.env.OPENCODE_SESSION_ID = context.sessionID
+                  // Tools installed by winget/scoop/cargo after startup are not on
+                  // the inherited PATH yet; the hub found them, so the shell must too.
+                  const searchPath = HubHost.spawnPath(invocation.env)
+                  invocation.env[searchPath.key] = searchPath.value
                   yield* prepare(invocation, context)
                 }),
             )
@@ -307,7 +323,9 @@ export const Plugin = {
       Effect.gen(function* () {
         const tool = event.tools[name]
         if (!tool) return
-        tool.description = description(detected)
+        // Re-probed per hook: a tool installed from the Registry panel shows
+        // up without restarting the server.
+        tool.description = description(availableTools())
       })
     yield* ctx.session.hook("context", hook)
     yield* ctx.session.hook("compaction", hook)

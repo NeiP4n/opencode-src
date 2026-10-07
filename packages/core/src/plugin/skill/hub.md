@@ -4,12 +4,16 @@ The `hub` tool runs a ready-made catalog command. Prefer it over `shell` wheneve
 
 ## Why the catalog wins
 
-Catalog commands are already written for the fast modern CLIs on this machine — `rg`, `fd`, `jq`, `yq`, `mlr`, `sd`, `lsd` — and the hub picks the best backend available for the entry: `nu` or `pwsh` when the entry ships a template for them, `bash` otherwise. A hand-written `grep -r` or `find -name` is slower and loses the exact flags that make the modern tool worth having.
+Catalog commands are already written for the fast modern CLIs on this machine — `rg`, `fd`, `jq`, `yq`, `mlr`, `sd`, `lsd` — and the hub detects the operating system and picks the shell itself: `bash` first on Linux and macOS, PowerShell first on Windows (bash there means Git Bash; a simple bash template also runs in PowerShell when Git Bash is absent). `nu` is used only when the entry has a nu template and nothing native fits, or when you ask for it with `backend`. Renamed binaries are handled too (`fdfind` on Debian/Ubuntu, `powershell.exe` when PowerShell 7 is not installed). A hand-written `grep -r` or `find -name` is slower and loses the exact flags that make the modern tool worth having.
+
+## Platforms
+
+The listing only shows entries for the current OS. Linux-only entries (`process.*`, `systemd.*`, `system.memory`, `network.ping`…) have Windows counterparts under `windows.*` (`windows.processes`, `windows.memory`, `windows.ping`, `windows.port-owner`…). Search by intent, not by a Linux command name.
 
 ## Workflow
 
 1. `hub` with `query` (and optionally `category`) to find an entry. The listing gives you the id, its category, and whether it is flagged `DANGER`.
-2. `hub` with `id` plus `args` to run it. Argument names come from the entry's `placeholders`; a `?` suffix means optional and renders as empty.
+2. `hub` with `id` plus `args` to run it. Argument names come from the entry's `placeholders`; a `?` suffix means optional and renders as empty, a `*` suffix is an optional list of words (`{flags*}` = `"-n -r"`). Pass raw values: the hub quotes them for the shell that runs the command, so do not add your own quotes or escapes.
 3. Read the result. Every run reports the `backend` that executed it, so you can see when a `nu` or `pwsh` template was used instead of `bash`.
 4. When a required tool is missing, `hub` with `install` and the entry `id` tells you the exact package-manager command, and the failure message names the missing binaries.
 

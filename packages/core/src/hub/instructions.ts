@@ -5,7 +5,7 @@ import { Instructions } from "../instructions/index.js"
 import { available } from "./resolve.js"
 import { HubState } from "./state.js"
 import { HubPrompt } from "./prompt.js"
-import { which } from "../util/which.js"
+import { HubHost } from "./host.js"
 
 const key = Instructions.Key.make("core/hub-hints")
 
@@ -53,6 +53,6 @@ export const make = (options: Options = {}): Instructions.List =>
     },
   })
 
-// bash is the guaranteed backend fallback (see hub/types.ts); nu and pwsh only
-// count when their binaries resolve right now.
-const terminalBackends = (): string[] => ["bash", ...(["nu", "pwsh"].filter((name) => which(name)))]
+// Backends with a working shell on this machine, in this platform's order:
+// on Windows bash only counts when Git Bash is installed.
+const terminalBackends = (): string[] => HubHost.backends()
