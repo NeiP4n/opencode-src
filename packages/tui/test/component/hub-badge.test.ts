@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { hubBadge, hubBadgeColor } from "../../src/routes/session/index"
-import { getOpenCodeTheme, parseTheme, resolveThemeDocument } from "../../src/theme"
+import { getOpenCodeTheme, parseTheme } from "../../src/theme"
+import { resolveThemeDocument } from "@opencode/theme/tui"
 
 const theme = resolveThemeDocument(getOpenCodeTheme(), "dark")
 

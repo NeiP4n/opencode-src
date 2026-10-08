@@ -31,6 +31,24 @@ const layer = Layer.effect(
               },
             }),
             Instructions.make({
+              key: Instructions.Key.make("core/notes"),
+              codec: Schema.toCodecJson(Schema.String),
+              read: Effect.succeed(
+                [
+                  "<notes>",
+                  "  Notes are markdown files in .opencode/notes/, one file per note; the file name is the note id.",
+                  "  Write a note when a plan, decision, spec or summary has to outlive this chat.",
+                  "  Do not write a note that only restates the chat or answers a trivial question.",
+                  "  A note can be bound to the current chat so the session opens it later.",
+                  "</notes>",
+                ].join("\n"),
+              ),
+              render: {
+                initial: (notes) => notes,
+                changed: (_previous, notes) => notes,
+              },
+            }),
+            Instructions.make({
               key: Instructions.Key.make("core/environment"),
               codec: Schema.toCodecJson(Schema.String),
               read: Effect.sync(() =>

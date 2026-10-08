@@ -386,3 +386,76 @@ stderr (по exit-коду), Remove в ДВА клика (без ввода те
   hub-actions.test.ts:112), 2 MINOR (мёртвый selected, параллельные записи hub.json) —
   все исправлены, повторный визит: «ЗАКРЫТА» ×3. dod-check → OK.
 - L-125 лид доделал сам: 5 запусков сабагентов подряд убиты рестартами сервера.
+
+# Задача TASK-NOTES-CANVAS (заметки-канвас в TUI, 07.10)
+
+## Цель
+Внутри opencode — экран «Заметки»: список markdown-файлов в `.opencode/notes/` папки проекта,
+просмотр и правка из TUI, инструмент агента, которым ИИ читает, создаёт, правит и помечает
+заметки, и связь «заметка ↔ чат». Из сессии заметки открываются кнопкой (чат заменяется),
+отдельной кнопкой возвращаются обратно к чату.
+
+## Ответы владельца (2026-10-07, инструмент question)
+- Хранилище: «файлы .md в папке проекта» — Obsidian-стиль, без сложной БД.
+- ИИ: читает, пишет, правит по запросу + «сам предлагает заметки» + «связь с чатом».
+- Навигация: «кнопка которая позволяет заменить чат, а также вернуться (отдельная кнопка)».
+
+## Критерии готовности (команда → ожидаемый результат)
+1. `sh -c "cd packages/core && bun typecheck && bun test test/note-schema.test.ts"` → код 0.
+2. `sh -c "cd packages/core && bun typecheck && bun test test/note.test.ts"` → код 0.
+3. `sh -c "cd packages/core && bun typecheck && bun test test/tool-note.test.ts"` → код 0.
+4. `sh -c "cd packages/tui && bun typecheck && bun test test/component/notes.test.tsx"` → код 0.
+5. `bun run check` из корня репозитория → код 0.
+6. `OPENCODE_STORY=notes bun run dev:live` → экран заметок на фикстуре, `esc` возвращает.
+7. Живой сценарий: агент создаёт заметку инструментом → файл появился в `.opencode/notes/`
+   → экран заметок её показывает → возврат к чату работает.
+
+## Факты (проверены в этой сессии, 07.10, чтением кода и лида, и разведчика)
+- Экран без sessionID регистрируется `ui.router.register({name, render})` + `ui.slot({append:"app"})`
+  с командой keymap; эталон целиком — `packages/tui/src/feature-plugins/system/stats.tsx:186-215`.
+  Повторная регистрация имени кидает (`packages/tui/src/plugin/api.tsx:211`).
+- «Полоски вкладок» в проде нет — её вытеснило дерево проекта (`packages/tui/src/app.tsx:578,1351-1353`).
+  Значит вкладка = отдельный маршрут плагина, а не элемент чужой вкладки.
+- Метаданные в YAML-движке репозитория нет — парсер frontmatter пишем свой, в одном модуле.
+- Есть готовый `client.file.{read,list,find,write}` (`packages/protocol/src/groups/fs.ts`,
+  обработчик `packages/server/src/handlers.ts:57`) — отдельный эндпоинт `/api/note` не нужен.
+- Инструменты агента: `packages/core/src/tool/plugin/*.ts`, подключение списком
+  `packages/core/src/plugin/internal.ts:240-255`; пример целиком `tool/plugin/skill.ts`.
+- Отображение вызова инструмента: whitelist имён в
+  `packages/tui/src/routes/session/message-parts.tsx:21-41`, иначе рисуется как `generic`.
+
+## Решение архитектора (07.10, принято лидом)
+- Хранилище: `<location.directory>/.opencode/notes/<slug>.md`, YAML-frontmatter в файле.
+  Поля: `title`, `status: inbox|active|done|archived`, `tags` (инлайн-список латинских слагов),
+  `session` (одна связь), `created`/`updated` (epoch ms, ставит сервис, не модель).
+  Имя файла — ASCII-слаг `[a-z0-9-]`, 2..60, коллизия → `-2`; идентичность = имя файла, поля `id` нет.
+  Отвергнуто: JSON-индекс (разъезжается с файлами), кодирование метаданных в имени файла.
+- Слой: `packages/schema/src/note.ts` (Schema + parse/serialize + правило имени) →
+  `packages/core/src/note.ts` (Location-скоупный сервис через `makeLocationNode`) →
+  `packages/core/src/tool/plugin/note.ts`. Серверный слой и `bun run generate` не трогаем.
+- Инструмент один: `note` с `action: list|read|create|edit|update|link`; `expectedMtime`
+  обязателен для мутирующих действий — сервис перечитывает файл и отдаёт отказ при расхождении.
+- Агент предлагает заметки через `description` инструмента + producer инструкций `core/notes`
+  + элемент `note` в whitelist отображения. Тосты/события — не делаем.
+- TUI: плагин `opencode.notes` (`feature-plugins/system/notes.tsx` + `notes-data.ts`),
+  команды `notes.open` (slash + palette) и `notes.back`, кнопка в слоте `session.composer.top`,
+  предыдущий маршрут хранится сигналом и возвращается `navigate(previous())` как в stats.tsx:187.
+
+## Границы (не делаем)
+Версионирование и diff заметок; совместное редактирование; синхронизация между процессами и ветками
+(git — источник истины); несколько чатов на заметку; поиск по заметкам; переименование из UI;
+бейджи «ИИ создал заметку»; произвольные поля frontmatter; отдельный `/api/note`.
+
+## Допущения (записаны явно, не как факт)
+- Владелец не ответил, коммитить ли `.opencode/notes/` в git проекта. По умолчанию не правим
+  `.gitignore` и не коммитим; решение владельца.
+- Заметки — общие для всех рабочих местств одного location (папки проекта), отдельного
+  уровня «общие на проект» нет.
+
+## Риски
+1. Три писателя в один файл (агент, человек, TUI) → mtime-guard в core, перечитывание перед
+   записью из TUI, предупреждение вместо перезаписи.
+2. Две копии парсинга frontmatter (core и TUI) разъедутся → один модуль `packages/schema/src/note.ts`,
+   общий фикстур в тесте этапа 10.
+3. Запись из TUI зависит от доступности `client.file.write` на живом сервере → проверяется вручную
+   в этапе 14; запасной путь — правка через агента.

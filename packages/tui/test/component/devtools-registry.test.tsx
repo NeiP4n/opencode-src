@@ -229,7 +229,7 @@ test("pager moves to the second page of tools", async () => {
 })
 
 test("every catalog tool gets exactly one row", async () => {
-  await using tmp = await tmpdir()
+  await using _tmp = await tmpdir()
   const status = hubRegistryStatus({ probe })
   const required = new Set(
     Hub.all.filter((entry) => Hub.supportsPlatform(entry)).flatMap((entry) => entry.requires ?? []),
