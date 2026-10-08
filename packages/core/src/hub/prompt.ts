@@ -3,6 +3,7 @@ export * as HubPrompt from "./prompt.js"
 import type { Entry } from "./types.js"
 import type { State } from "./state.js"
 import { all } from "./catalog/index.js"
+import { supportsPlatform } from "./resolve.js"
 import { hinted } from "./visibility.js"
 
 // The block must stay cheap per prompt build: hard caps on both lines and
@@ -48,7 +49,8 @@ export function renderHubHints(hints: Hints): string {
 // catalog (cheap: ~130 entries, and the catalog is an in-memory bundle).
 function entriesByTool(): Map<string, Entry[]> {
   const map = new Map<string, Entry[]>()
-  for (const entry of all) {
+  // Only entries this OS can run: a Windows template in the hints on Linux sends the model to a dead end.
+  for (const entry of all.filter((item) => supportsPlatform(item))) {
     for (const tool of entry.requires ?? []) map.set(tool, [...(map.get(tool) ?? []), entry])
   }
   return map

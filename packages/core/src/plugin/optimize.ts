@@ -12,6 +12,7 @@ import PROMPT_KIMI from "./system-prompt/kimi.txt"
 import PROMPT_META from "./system-prompt/meta.txt"
 import PROMPT_TRINITY from "./system-prompt/trinity.txt"
 import PROMPT_ANTHROPIC from "./system-prompt/anthropic.txt"
+import PROMPT_WORKSTYLE from "./system-prompt/workstyle.txt"
 
 export const OpenAIPlugin = make("opencode.prompt.openai", (model) => {
   const id = model.id.toLowerCase()
@@ -57,6 +58,22 @@ export const ArceePlugin = make("opencode.prompt.arcee", (model) =>
 export const MetaPlugin = make("opencode.prompt.meta", (model) => {
   if (!model.id.toLowerCase().includes("muse")) return undefined
   return PROMPT_META.replaceAll("{{MODEL_NAME}}", model.name)
+})
+
+// Models without a tuned prompt took several times the steps of Claude on the same task: long
+// shell chains instead of parallel reads, re-reading files, retrying a failed edit blind. This
+// short block reaches them even under an agent's own system prompt, which replaces the family one.
+export const WorkstylePlugin = define({
+  id: "opencode.prompt.workstyle",
+  effect: Effect.fn("OptimizePlugin.workstyle")(function* (ctx) {
+    yield* ctx.session.hook("context", (event) =>
+      Effect.sync(() => {
+        const id = event.model.id.toLowerCase()
+        if (id.includes("claude") || id.includes("gpt")) return
+        event.system.push({ type: "text", text: PROMPT_WORKSTYLE })
+      }),
+    )
+  }),
 })
 
 export const Plugins = [OpenAIPlugin, AnthropicPlugin, KimiPlugin, ArceePlugin, MetaPlugin] as const

@@ -232,8 +232,12 @@ export const Plugin = {
                 const state = yield* Effect.tryPromise(() => Hub.read()).pipe(
                   Effect.orElseSucceed(() => ({ version: 1 as const, enabled: {} }) as Hub.State),
                 )
+                // Entries for another OS (windows.* on Linux) only fail when run, so they are not offered.
                 const listing = Hub.all.filter(
-                  (entry) => matches(entry, input.query ?? "", input.category) && Hub.discoverable(state, entry),
+                  (entry) =>
+                    matches(entry, input.query ?? "", input.category) &&
+                    Hub.discoverable(state, entry) &&
+                    Hub.supportsPlatform(entry),
                 )
                 return {
                   output: listing

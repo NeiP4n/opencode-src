@@ -14,6 +14,8 @@ import { definition } from "../tool/runtime.js"
 // - Positional tuple: { pair: ["2", "false"] } -> { pair: [2, false] }
 // - Typed dictionary: { counts: { first: "2" } } -> { counts: { first: 2 } }
 // - Nested fields and local references: { items: [{ count: "2" }] } -> { items: [{ count: 2 }] }
+// - Renamed field: { file_path: "a", old_string: "x" } -> { path: "a", oldString: "x" } when the
+//   declared field is missing and exactly one undeclared key spells it differently
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
 const maxDepth = 6
@@ -98,8 +100,9 @@ function repairObject(
   const required = Array.isArray(schema.required) ? schema.required : []
   const patterned = Predicate.isObject(schema.patternProperties)
   const composed = Array.isArray(schema.allOf) || Array.isArray(schema.anyOf) || Array.isArray(schema.oneOf)
+  const renamed = patterned || composed ? parsed : rename(parsed, Object.keys(properties))
 
-  return Object.keys(parsed).reduce<Record<string, unknown>>((result, key) => {
+  return Object.keys(renamed).reduce<Record<string, unknown>>((result, key) => {
     const current = result[key]
     const declared = Object.hasOwn(properties, key)
     const property = declared ? properties[key] : !patterned ? schema.additionalProperties : undefined
@@ -127,7 +130,30 @@ function repairObject(
 
     const repaired = repair(current, property, root, depth + 1)
     return repaired === current ? result : { ...result, [key]: repaired }
-  }, parsed)
+  }, renamed)
+}
+
+// Weaker models often spell a field the way another tool does: file_path or filePath for path,
+// old_string for oldString. A missing declared field takes the one undeclared key that spells it
+// the same once case and separators are ignored, or a known synonym of a path field.
+const PATH_SYNONYMS = ["file", "filepath", "filename"]
+
+function rename(input: Record<string, unknown>, declared: ReadonlyArray<string>): Record<string, unknown> {
+  const loose = (key: string) => key.toLowerCase().replaceAll(/[_-]/g, "")
+  const spare = Object.keys(input).filter((key) => !declared.includes(key))
+  return declared
+    .filter((field) => !Object.hasOwn(input, field))
+    .reduce((result, field) => {
+      const matches = spare.filter(
+        (key) =>
+          Object.hasOwn(result, key) &&
+          (loose(key) === loose(field) || (loose(field) === "path" && PATH_SYNONYMS.includes(loose(key)))),
+      )
+      if (matches.length !== 1) return result
+      const next = { ...result, [field]: result[matches[0]] }
+      delete next[matches[0]]
+      return next
+    }, input)
 }
 
 function repairArray(

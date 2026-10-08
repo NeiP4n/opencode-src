@@ -452,4 +452,26 @@ describe("tool input repair plugin", () => {
       expect((yield* run(input, { allOf: [object({ numeric: { type: "integer" } })] })).input).toBe(input)
     }),
   )
+
+  it.effect("renames a missing field from its other spelling or a path synonym", () =>
+    Effect.gen(function* () {
+      const schema = object(
+        { path: { type: "string" }, oldString: { type: "string" }, replaceAll: { type: "boolean" } },
+        ["path", "oldString"],
+      )
+      const event = yield* run({ file_path: "a.ts", old_string: "x", replace_all: "true" }, schema)
+      expect(event.input).toEqual({ path: "a.ts", oldString: "x", replaceAll: true })
+      expect((yield* run({ filePath: "b.ts", oldString: "y" }, schema)).input).toEqual({ path: "b.ts", oldString: "y" })
+    }),
+  )
+
+  it.effect("leaves ambiguous or already present fields alone", () =>
+    Effect.gen(function* () {
+      const schema = object({ path: { type: "string" } }, ["path"])
+      // two candidates: no way to tell which one is meant
+      expect((yield* run({ file_path: "a", filePath: "b" }, schema)).input).toEqual({ file_path: "a", filePath: "b" })
+      // the declared field wins and the stray spelling stays for validation to report
+      expect((yield* run({ path: "a", file_path: "b" }, schema)).input).toEqual({ path: "a", file_path: "b" })
+    }),
+  )
 })

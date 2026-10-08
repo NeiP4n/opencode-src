@@ -101,6 +101,35 @@ const findLineOccurrences = (content: string, search: string) => {
   }, [])
 }
 
+// The file region that shares the most lines with oldString, numbered like Read output, so a
+// miss after reformatting is fixed by the next edit instead of a full re-read.
+const NEAR_CONTEXT = 2
+const NEAR_LIMIT = 40
+
+export const closestRegion = (source: string, search: string) => {
+  const wanted = search
+    .split("\n")
+    .map((line) => normalizeForMatch(line.trim()))
+    .filter(Boolean)
+  if (wanted.length === 0) return undefined
+  const lines = source.split("\n")
+  const trimmed = lines.map((line) => normalizeForMatch(line.trim()))
+  const span = Math.min(search.split("\n").length + 4, NEAR_LIMIT)
+  const scored = trimmed.map((_, start) => ({
+    start,
+    score: new Set(trimmed.slice(start, start + span).filter((line) => line && wanted.includes(line))).size,
+  }))
+  const best = scored.reduce((top, item) => (item.score > top.score ? item : top), { start: 0, score: 0 })
+  // A single shared line is too weak to point at (a lone "}" or "return" matches anywhere).
+  if (best.score < Math.min(2, wanted.length)) return undefined
+  const first = trimmed.slice(best.start).findIndex((line) => wanted.includes(line)) + best.start
+  const from = Math.max(0, first - NEAR_CONTEXT)
+  return lines
+    .slice(from, Math.min(lines.length, from + span + NEAR_CONTEXT))
+    .map((line, index) => `${from + index + 1}: ${line}`)
+    .join("\n")
+}
+
 /** Deferred edit behavior and UX integrations remain visible at the model-facing seam. */
 // TODO: Publish watcher/file-edit events after watcher integration exists.
 // TODO: Add snapshots / undo after design exists.
@@ -187,8 +216,9 @@ export const Plugin = {
                 source: permissionSource,
               })
               if (replacements === 0) {
+                const near = closestRegion(source, oldString)
                 return yield* new ToolFailure({
-                  message: `Could not find oldString in ${input.path}. It must match exactly, including whitespace and indentation.`,
+                  message: `Could not find oldString in ${input.path}. It must match exactly, including whitespace and indentation.${near ? `\nThe closest text in the file now (it may have been reformatted); copy oldString from it without the line numbers:\n${near}` : ""}`,
                 })
               }
               if (replacements > 1 && input.replaceAll !== true) {

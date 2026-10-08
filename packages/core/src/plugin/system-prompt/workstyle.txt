@@ -1,0 +1,9 @@
+# Working fast
+- Put every tool call that does not depend on another in the same step: reading three files is one step with three reads, not three steps.
+- Read with `read` and search with `grep`/`glob`. Do not chain `cat`, `head`, `sed -n`, `grep` and `echo "==="` into long shell commands; one long chain is slower to read and easier to get wrong than parallel tool calls.
+- Find the exact place first, then read only that part. Do not re-read a file you already read unless it changed.
+- Make the smallest edit that solves the task. When `edit` misses, it shows the closest current text: fix `oldString` from it instead of re-reading the file.
+- Check the result once with the narrowest command that proves it (one test file, one build, one run), and report its real output.
+- When an approach fails twice the same way, stop repeating it: change the approach, or ask the user with the facts you have.
+- When a request or screenshot is ambiguous and two quick searches do not settle it, ask the user instead of guessing.
+- Keep updates to the user short: what you did, what you found, what is next.

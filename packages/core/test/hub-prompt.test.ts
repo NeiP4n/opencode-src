@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { renderHubHints } from "@opencode/core/hub/prompt"
 import type { State } from "@opencode/core/hub/state"
+import { Hub } from "@opencode/core/hub/index"
 
 const stateOf = (enabled: Record<string, boolean>): State => ({ version: 1, enabled })
 
@@ -65,5 +66,11 @@ describe("renderHubHints", () => {
     expect(order[0]?.startsWith("- jq")).toBe(true)
     expect(order[1]?.startsWith("- mlr")).toBe(true)
     expect(order[2]?.startsWith("- rg")).toBe(true)
+  })
+
+  test.skipIf(process.platform === "win32")("entries for another OS stay out of the hints", () => {
+    const windows = Hub.get("windows.processes")!
+    const text = renderHubHints({ state: stateOf({ pwsh: true }), availability: ["pwsh"] })
+    expect(text).not.toContain(windows.description)
   })
 })
