@@ -16,6 +16,8 @@ import { useSessionTerminals } from "../context/session-terminals"
 import { usePromptRef } from "../context/prompt"
 import { usePanel } from "../context/panel"
 import { useStorage } from "../context/storage"
+import { useNotes } from "../context/notes"
+import { useTheme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
 import { Session } from "../routes/session"
 import { Sidebar } from "../routes/session/sidebar"
@@ -25,6 +27,7 @@ import { PaneResizeHandle } from "../ui/pane-resize-handle"
 import { useToast } from "../ui/toast"
 import { TerminalPane } from "./terminal-pane"
 import { PanelHost } from "./panel-host"
+import { NoteCanvas } from "./note-canvas"
 
 export function SessionFrame(props: { sessionID: string; verticalTabsWidth: number }) {
   const sessions = useSessionTerminals()
@@ -37,6 +40,8 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
   const dimensions = useTerminalDimensions()
   const panels = usePanel()
   const dialog = useDialog()
+  const notes = useNotes()
+  const theme = useTheme()
   const availableWidth = () => Math.max(0, dimensions().width - props.verticalTabsWidth)
   const defaultPaneWidth = () => Math.max(1, Math.floor(panels.width() / 2))
   const [layout, updateLayout] = useStorage().store<{ paneWidth?: number; terminalWidth?: number }>("layout", {
@@ -90,6 +95,10 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
     if (current?.sessionID === props.sessionID) return current
   })
   const fullscreen = () => activePanel() !== undefined && panels.presentation() === "fullscreen"
+  // A session bound to a note in Notes mode shows the note as its document, with the chat beside it.
+  const canvas = createMemo(() => (fullscreen() ? undefined : notes.canvas(props.sessionID)))
+  // Too narrow for side by side: the document goes on top of the chat.
+  const stacked = () => availableWidth() < 100
   createEffect(
     on([activePanel, () => selectedTerminal()?.id], ([panel, terminal], previous) => {
       if (panel && panel !== previous?.[0]) {
@@ -107,6 +116,8 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
   const sidebarVisible = createMemo(() => {
     if (data.session.get(props.sessionID)?.parentID) return false
     if (sidebarOpen()) return true
+    // The document and its chat need the room the automatic sidebar would take.
+    if (canvas()) return false
     return (config.data.session?.sidebar ?? "auto") === "auto" && wide()
   })
   const rightPane = createMemo(() => {
@@ -270,9 +281,36 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
       onMouseUp={finishPaneResize}
     >
       <box
+        flexGrow={1}
+        flexBasis={0}
+        minWidth={0}
+        minHeight={0}
+        flexDirection={stacked() ? "column" : "row"}
+        position="relative"
+      >
+      <Show when={canvas()}>
+        {(note) => (
+          <box
+            id="note-canvas"
+            flexGrow={3}
+            flexBasis={0}
+            minWidth={0}
+            minHeight={0}
+            border={[stacked() ? "bottom" : "right"]}
+            borderColor={theme.border.base}
+          >
+            <NoteCanvas
+              sessionID={props.sessionID}
+              note={note()}
+              directory={data.session.get(props.sessionID)?.location.directory ?? ""}
+            />
+          </box>
+        )}
+      </Show>
+      <box
         id="session-pane"
         ref={(value: BoxRenderable) => (sessionNode = value)}
-        flexGrow={1}
+        flexGrow={canvas() ? 2 : 1}
         flexBasis={0}
         minWidth={0}
         minHeight={0}
@@ -321,6 +359,7 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
             }}
           />
         </Show>
+      </box>
       </box>
       <Show when={rightPane() === "terminal" || rightPane() === "panel" || (rightPane() === "sidebar" && wide())}>
         <box

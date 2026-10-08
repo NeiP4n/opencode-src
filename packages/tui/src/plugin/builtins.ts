@@ -5,7 +5,6 @@ import SidebarContext from "../feature-plugins/sidebar/context"
 import SidebarFooter from "../feature-plugins/sidebar/footer"
 import SidebarMcp from "../feature-plugins/sidebar/mcp"
 import DiffViewer from "../feature-plugins/system/diff-viewer"
-import Notes from "../feature-plugins/system/notes"
 import Notifications from "../feature-plugins/system/notifications"
 import Plugins from "../feature-plugins/system/plugins"
 import Storybook from "../feature-plugins/system/storybook"
@@ -29,5 +28,4 @@ export const builtins = [
   // normal launches and register it only for OPENCODE_STORY runs.
   ...(process.env.OPENCODE_STORY ? [Storybook] : []),
   DiffViewer,
-  Notes,
 ]
