@@ -72,6 +72,7 @@ import { InstructionDiscovery } from "@opencode/core/instruction-discovery"
 import { SkillInstructions } from "@opencode/core/skill/instructions"
 import { ReferenceInstructions } from "@opencode/core/reference/instructions"
 import { McpInstructions } from "@opencode/core/mcp/instructions"
+import { NoteInstructions } from "@opencode/core/note-instructions"
 import { SessionSystemPrompt } from "@opencode/core/session/system-prompt"
 import { ID, Model } from "@opencode/core/model"
 import { Location } from "@opencode/core/location"
@@ -419,6 +420,10 @@ const layer = Layer.unwrap(
       Location.node.replace(Location.boundNode({ directory: AbsolutePath.make("/project") })),
       SkillInstructions.node.replace(skillInstructions),
       ReferenceInstructions.node.replace(referenceInstructions),
+      // The canvas reads the notes folder, which the fixture location does not have on disk.
+      NoteInstructions.node.replace(
+        Layer.mock(NoteInstructions.Service, { load: () => Effect.succeed(Instructions.empty) }),
+      ),
       Permission.node.replace(permission),
       Config.node.replace(config),
       PluginSupervisor.node.replace(Layer.empty),

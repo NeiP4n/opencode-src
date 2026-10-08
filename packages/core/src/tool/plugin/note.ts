@@ -15,9 +15,9 @@ export const name = "note"
 const FOLDER = ".opencode/notes"
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["list", "read", "create", "edit", "update", "link"]).annotate({
+  action: Schema.Literals(["list", "read", "create", "edit", "update", "link", "unlink"]).annotate({
     description:
-      "List notes, read one, create one, rewrite or append its body, change its metadata, or bind it to this chat",
+      "List notes, read one, create one, rewrite or append its body, change its metadata, bind it to this chat or unbind it",
   }),
   name: optional(
     Schema.String.annotate({
@@ -31,9 +31,14 @@ export const Input = Schema.Struct({
   ),
   status: optional(Note.Status.annotate({ description: "Note status" })),
   tags: optional(Schema.Array(Note.Tag).annotate({ description: "Lowercase latin tags" })),
+  length: optional(
+    Note.Length.annotate({
+      description: "How much to write into the note while it is bound to a chat: brief, balanced or detailed",
+    }),
+  ),
   expectedMtime: optional(
     Schema.Number.annotate({
-      description: "File mtime in epoch ms from an earlier read; required by edit, update and link",
+      description: "File mtime in epoch ms from an earlier read; required by edit, update, link and unlink",
     }),
   ),
 })
@@ -52,12 +57,13 @@ export const description = [
   "Actions:",
   "  list — every note with status, tags and last update, newest first.",
   "  read — one note with its full body; the updated value it reports is the file mtime to pass back as expectedMtime.",
-  "  create — a new note from title and body; pass a short latin name.",
+  "  create — a new note from title and body; pass a short latin name, or omit it to derive one from the title.",
   "  edit — rewrite or append the body; pass name, body, optional mode and expectedMtime from a read.",
-  "  update — change title, status or tags without touching the body; pass name and expectedMtime.",
+  "  update — change title, status, tags or length without touching the body; pass name and expectedMtime.",
   "  link — bind the note to this chat, so the session can open it later.",
+  "  unlink — unbind the note from whatever chat it is bound to.",
   "",
-  "Writing rules: edit, update and link refuse to write when expectedMtime does not match the file, which is what happens when the user or another agent changed the note. On that refusal read the note again and re-apply the change, never invent a fresh mtime.",
+  "Writing rules: edit, update, link and unlink refuse to write when expectedMtime does not match the file, which is what happens when the user or another agent changed the note. On that refusal read the note again and re-apply the change, never invent a fresh mtime.",
   "",
   "When to write a note: a plan, a decision, a spec or a summary that will still matter after this chat ends. Do not write a note that only restates the chat, and do not create one for a trivial answer.",
 ].join("\n")
@@ -72,7 +78,7 @@ export const Plugin = {
       const found = yield* notes.list()
       if (found.length === 0) return `No notes yet in ${FOLDER}.`
       return found
-        .map((note) => `- ${note.name} [${note.frontmatter.status}] ${note.frontmatter.title || "(без заголовка)"}`)
+        .map((note) => `- ${note.name} [${note.frontmatter.status}] ${note.frontmatter.title || "(untitled)"}`)
         .join("\n")
     })
 
@@ -90,11 +96,12 @@ export const Plugin = {
         case "create":
           return reported(
             yield* notes.create({
-              name: yield* needName(input),
+              name: input.name,
               title: input.title ?? "",
               body: input.body,
               status: input.status,
               tags: input.tags,
+              length: input.length,
             }),
           )
         case "edit":
@@ -113,6 +120,7 @@ export const Plugin = {
               title: input.title,
               status: input.status,
               tags: input.tags,
+              length: input.length,
               expectedMtime: yield* needStamp(input),
             }),
           )
@@ -123,6 +131,10 @@ export const Plugin = {
               session: sessionID,
               expectedMtime: yield* needStamp(input),
             }),
+          )
+        case "unlink":
+          return reported(
+            yield* notes.link({ name: yield* needName(input), expectedMtime: yield* needStamp(input) }),
           )
       }
     })
@@ -159,7 +171,7 @@ export const Plugin = {
 }
 
 function writes(action: Input["action"]) {
-  return action === "create" || action === "edit" || action === "update" || action === "link"
+  return action !== "list" && action !== "read"
 }
 
 const needName = (input: Input) =>
@@ -178,7 +190,12 @@ const needStamp = (input: Input) =>
  * checks; the frontmatter timestamp is shown in the text so the model can see both.
  */
 function reported(note: NoteStore.Info) {
-  const meta = [note.frontmatter.status, note.frontmatter.tags.join(", "), `written ${note.frontmatter.updated}`]
+  const meta = [
+    note.frontmatter.status,
+    note.frontmatter.tags.join(", "),
+    note.frontmatter.length ? `length ${note.frontmatter.length}` : "",
+    `written ${note.frontmatter.updated}`,
+  ]
     .filter((part) => part !== "")
     .join(" · ")
   return {

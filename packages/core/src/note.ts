@@ -14,8 +14,10 @@ import { SessionID } from "@opencode/schema/session-id"
 import { Context, Effect, Exit, Layer, Option, Result, Schema } from "effect"
 import path from "path"
 import { optional, RelativePath } from "@opencode/schema/schema"
+import { Bus } from "./bus.js"
 import { FileAccess } from "./file-access.js"
 import { FileSystem } from "./filesystem.js"
+import { Location } from "./location.js"
 
 const DIRECTORY = ".opencode/notes"
 const EXTENSION = ".md"
@@ -58,20 +60,17 @@ export class StorageError extends Schema.TaggedError<StorageError>()("NoteStore.
 
 export type Failure = NotFoundError | InvalidNameError | ConflictError | StorageError
 
-export interface Info {
-  readonly name: Note.Slug
-  readonly frontmatter: Note.Frontmatter
-  readonly body: string
-  /** File mtime in epoch ms, the value a writer has to echo back as `expectedMtime`. */
-  readonly mtime: number
-}
+/** `mtime` is the file mtime in epoch ms, the value a writer has to echo back as `expectedMtime`. */
+export type Info = Note.Info
 
 export const CreateInput = Schema.Struct({
-  name: Schema.String,
+  /** Omitted: the name is derived from the title, so a title in any language still gets a file. */
+  name: optional(Schema.String),
   title: Schema.String,
   body: optional(Schema.String),
   status: optional(Note.Status),
   tags: optional(Schema.Array(Note.Tag)),
+  length: optional(Note.Length),
   session: optional(SessionID),
 })
 export type CreateInput = typeof CreateInput.Type
@@ -89,16 +88,24 @@ export const UpdateInput = Schema.Struct({
   title: optional(Schema.String),
   status: optional(Note.Status),
   tags: optional(Schema.Array(Note.Tag)),
+  length: optional(Note.Length),
   expectedMtime: Schema.Number,
 })
 export type UpdateInput = typeof UpdateInput.Type
 
 export const LinkInput = Schema.Struct({
   name: Schema.String,
+  /** Omitted: the note is unbound from whatever chat it was bound to. */
   session: optional(SessionID),
   expectedMtime: Schema.Number,
 })
 export type LinkInput = typeof LinkInput.Type
+
+export const RemoveInput = Schema.Struct({
+  name: Schema.String,
+  expectedMtime: Schema.Number,
+})
+export type RemoveInput = typeof RemoveInput.Type
 
 export interface Interface {
   readonly list: () => Effect.Effect<readonly Info[], Failure>
@@ -107,6 +114,9 @@ export interface Interface {
   readonly edit: (input: EditInput) => Effect.Effect<Info, Failure>
   readonly update: (input: UpdateInput) => Effect.Effect<Info, Failure>
   readonly link: (input: LinkInput) => Effect.Effect<Info, Failure>
+  readonly remove: (input: RemoveInput) => Effect.Effect<void, Failure>
+  /** The note bound to a chat; the most recently updated one when several claim it. */
+  readonly bound: (sessionID: SessionID) => Effect.Effect<Info | undefined, Failure>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/NoteStore") {}
@@ -119,6 +129,13 @@ const layer = Layer.effect(
     const fs = yield* FSUtil.Service
     const access = yield* FileAccess.Service
     const filesystem = yield* FileSystem.Service
+    const bus = yield* Bus.Service
+    const location = yield* Location.Service
+    const ref = { directory: location.directory, workspaceID: location.workspaceID }
+
+    // The event only says which note to read again: clients showing a note refresh it live.
+    const announce = (name: Note.Slug, removed?: true) =>
+      bus.publish(Note.Event.Updated, removed ? { name, removed } : { name }, { location: ref })
 
     // The slug is validated before it gets here and resolve() refuses targets outside
     // the location, so a note can never leave `.opencode/notes`.
@@ -140,7 +157,9 @@ const layer = Layer.effect(
     const write = Effect.fn("NoteStore.write")(function* (name: Note.Slug, file: Note.File) {
       const resolved = yield* target(name)
       yield* fs.writeWithDirs(resolved.absolute, Note.serialize(file)).pipe(Effect.catch(storage(resolved.absolute)))
-      return yield* read(name)
+      const written = yield* read(name)
+      yield* announce(name)
+      return written
     })
 
     const names = Effect.fn("NoteStore.names")(function* () {
@@ -161,9 +180,9 @@ const layer = Layer.effect(
 
     const slug = (input: string) => fromResult(Note.name(input))
 
-    const free = Effect.fn("NoteStore.free")(function* (input: string) {
-      const taken = yield* names()
-      return yield* fromResult(Note.unique(yield* slug(input), taken))
+    const free = Effect.fn("NoteStore.free")(function* (input: CreateInput) {
+      const base = input.name === undefined ? Note.slugify(input.title) : yield* slug(input.name)
+      return yield* fromResult(Note.unique(base, yield* names()))
     })
 
     const list = Effect.fn("NoteStore.list")(function* () {
@@ -178,13 +197,14 @@ const layer = Layer.effect(
     })
 
     const create = Effect.fn("NoteStore.create")(function* (input: CreateInput) {
-      const name = yield* free(input.name)
+      const name = yield* free(input)
       const now = Date.now()
       return yield* write(name, {
         frontmatter: {
           title: input.title,
           status: input.status ?? Note.FallbackStatus,
           tags: input.tags ?? [],
+          length: input.length,
           session: input.session,
           created: now,
           updated: now,
@@ -210,6 +230,7 @@ const layer = Layer.effect(
           title: input.title,
           status: input.status,
           tags: input.tags,
+          length: input.length,
           updated: Date.now(),
         }),
         body: current.body,
@@ -221,19 +242,34 @@ const layer = Layer.effect(
       const current = yield* read(name)
       yield* guard(name, input.expectedMtime, current.mtime)
       return yield* write(name, {
-        frontmatter: stamp_frontmatter(current, { session: input.session, updated: Date.now() }),
+        // An absent session is the unbind, so it replaces the field instead of being skipped like a patch.
+        frontmatter: { ...stamp_frontmatter(current, { updated: Date.now() }), session: input.session },
         body: current.body,
       })
     })
 
-    return Service.of({ list, get, create, edit, update, link })
+    const remove = Effect.fn("NoteStore.remove")(function* (input: RemoveInput) {
+      const name = yield* slug(input.name)
+      const current = yield* read(name)
+      yield* guard(name, input.expectedMtime, current.mtime)
+      const resolved = yield* target(name)
+      yield* fs.remove(resolved.absolute).pipe(Effect.catch(storage(resolved.absolute)))
+      yield* announce(name, true)
+    })
+
+    const bound = Effect.fn("NoteStore.bound")(function* (sessionID: SessionID) {
+      // list() is ordered by updated descending, so the first claim is the newest one.
+      return (yield* list()).find((note) => note.frontmatter.session === sessionID)
+    })
+
+    return Service.of({ list, get, create, edit, update, link, remove, bound })
   }),
 )
 
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [FSUtil.node, FileAccess.node, FileSystem.node],
+  deps: [FSUtil.node, FileAccess.node, FileSystem.node, Bus.node, Location.node],
 })
 
 /** Only defined fields of a metadata patch replace the current ones. */

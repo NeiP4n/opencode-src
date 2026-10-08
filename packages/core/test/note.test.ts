@@ -1,10 +1,12 @@
 import fs from "fs/promises"
 import path from "path"
 import { describe, expect } from "bun:test"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Ref, Stream } from "effect"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
+import { Bus } from "@opencode/core/bus"
 import { NoteStore } from "@opencode/core/note"
+import { Note } from "@opencode/schema/note"
 import { Location } from "@opencode/core/location"
 import { Permission } from "@opencode/core/permission"
 import { AbsolutePath } from "@opencode/core/schema"
@@ -20,7 +22,7 @@ function provide(directory: string) {
     Location.Service.of(location({ directory: AbsolutePath.make(directory) })),
   )
   return Effect.provide(
-    AppNodeBuilder.build(LayerNode.group([NoteStore.node]), [
+    AppNodeBuilder.build(LayerNode.group([NoteStore.node, Bus.node]), [
       Location.node.replace(activeLocation),
       Permission.node.replace(permissionLayer()),
     ]),
@@ -257,6 +259,118 @@ describe("NoteStore", () => {
         expect(missing._tag).toBe("NoteStore.NotFoundError")
         expect(yield* Effect.promise(() => fs.readdir(directory))).toEqual([])
       }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("derives a latin file name from a title in any language when no name is given", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const notes = yield* NoteStore.Service
+
+        const first = yield* notes.create({ title: "План по комнатам" })
+        const second = yield* notes.create({ title: "План по комнатам" })
+        const fallback = yield* notes.create({ title: "日本語" })
+
+        expect(first.name).toBe("plan-po-komnatam")
+        expect(first.frontmatter.title).toBe("План по комнатам")
+        expect(second.name).toBe("plan-po-komnatam-2")
+        expect(fallback.name).toBe("note")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("stores the length set on create and update and keeps it across other writes", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const notes = yield* NoteStore.Service
+        const note = yield* notes.create({ title: "Plan", name: "room-plan", length: "brief" })
+        expect(note.frontmatter.length).toBe("brief")
+
+        const updated = yield* notes.update({ name: "room-plan", expectedMtime: note.mtime, length: "detailed" })
+        const edited = yield* notes.edit({ name: "room-plan", expectedMtime: updated.mtime, body: "text" })
+
+        expect(updated.frontmatter.length).toBe("detailed")
+        expect(edited.frontmatter.length).toBe("detailed")
+        expect(yield* text(file(directory, "room-plan"))).toContain("tags: []\nlength: detailed\n")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("unlinks a note when link is called without a session", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const notes = yield* NoteStore.Service
+        const note = yield* notes.create({ title: "Plan", name: "room-plan", session: SessionID.make("ses_42") })
+
+        const unlinked = yield* notes.link({ name: "room-plan", expectedMtime: note.mtime })
+
+        expect(unlinked.frontmatter.session).toBeUndefined()
+        expect(yield* text(file(directory, "room-plan"))).not.toContain("session:")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("finds the note bound to a session, the newest one when several claim it", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const notes = yield* NoteStore.Service
+        const session = SessionID.make("ses_bound")
+        const older = yield* notes.create({ title: "Older", name: "older-note", session })
+        yield* notes.create({ title: "Other", name: "other-note", session: SessionID.make("ses_other") })
+        // Push the older note back in time so the order does not depend on the clock resolution.
+        yield* write(
+          file(directory, "older-note"),
+          (yield* text(file(directory, "older-note"))).replace(`updated: ${older.frontmatter.updated}`, "updated: 1"),
+        )
+        yield* notes.create({ title: "Newer", name: "newer-note", session })
+
+        expect((yield* notes.bound(session))?.name).toBe("newer-note")
+        expect(yield* notes.bound(SessionID.make("ses_nobody"))).toBeUndefined()
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("removes a note only when the caller saw its current version", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const notes = yield* NoteStore.Service
+        const note = yield* notes.create({ title: "Plan", name: "room-plan" })
+
+        const stale = yield* Effect.flip(notes.remove({ name: "room-plan", expectedMtime: note.mtime - 1000 }))
+        expect(stale._tag).toBe("NoteStore.ConflictError")
+        expect((yield* notes.get("room-plan")).name).toBe("room-plan")
+
+        yield* notes.remove({ name: "room-plan", expectedMtime: note.mtime })
+        expect((yield* Effect.flip(notes.get("room-plan")))._tag).toBe("NoteStore.NotFoundError")
+        const missing = yield* Effect.flip(notes.remove({ name: "room-plan", expectedMtime: note.mtime }))
+        expect(missing._tag).toBe("NoteStore.NotFoundError")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("announces every write and removal on the bus", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const notes = yield* NoteStore.Service
+        const bus = yield* Bus.Service
+        const seen = yield* Ref.make<ReadonlyArray<{ name: string; removed?: boolean; directory?: string }>>([])
+        yield* bus.subscribe(Note.Event.Updated).pipe(
+          Stream.runForEach((event) =>
+            Ref.update(seen, (list) => [...list, { ...event.data, directory: event.location?.directory }]),
+          ),
+          Effect.forkScoped({ startImmediately: true }),
+        )
+        yield* Effect.yieldNow
+
+        const note = yield* notes.create({ title: "Plan", name: "room-plan" })
+        yield* notes.remove({ name: "room-plan", expectedMtime: note.mtime })
+        yield* Effect.yieldNow
+
+        expect(yield* Ref.get(seen)).toEqual([
+          { name: "room-plan", directory },
+          { name: "room-plan", removed: true, directory },
+        ])
+      }).pipe(Effect.scoped, provide(directory)),
     ),
   )
 })

@@ -218,6 +218,51 @@ describe("NoteTool", () => {
     ),
   )
 
+  it.live("derives a name from the title, sets the length and unbinds the note again", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const tools = yield* Tool.Service
+        const created = yield* run(tools, "call-create", { action: "create", title: "План сети", length: "brief" })
+        const linked = yield* run(tools, "call-link", {
+          action: "link",
+          name: "plan-seti",
+          expectedMtime: (created.output as { updated: number }).updated,
+        })
+        const updated = yield* run(tools, "call-update", {
+          action: "update",
+          name: "plan-seti",
+          length: "detailed",
+          expectedMtime: (linked.output as { updated: number }).updated,
+        })
+
+        yield* run(tools, "call-unlink", {
+          action: "unlink",
+          name: "plan-seti",
+          expectedMtime: (updated.output as { updated: number }).updated,
+        })
+
+        expect((created.output as { name: string }).name).toBe("plan-seti")
+        expect(JSON.stringify(updated.output)).toContain("length detailed")
+        const text = yield* read(onDisk(directory, "plan-seti"))
+        expect(text).toContain("length: detailed")
+        expect(text).not.toContain("session:")
+      }).pipe(Effect.provide(harness(directory))),
+    ),
+  )
+
+  it.live("lists an untitled note with an English placeholder", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const tools = yield* Tool.Service
+        yield* run(tools, "call-create", { action: "create", name: "blank-note", title: "" })
+
+        const listed = yield* run(tools, "call-list", { action: "list" })
+
+        expect(JSON.stringify(listed.output)).toContain("blank-note [inbox] (untitled)")
+      }).pipe(Effect.provide(harness(directory))),
+    ),
+  )
+
   it.live("refuses a name that is not a slug and writes nothing", () =>
     withTempDir(({ path: directory }) =>
       Effect.gen(function* () {
