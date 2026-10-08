@@ -57,7 +57,7 @@ test("Host lists reachable addresses and hands out a join code", async () => {
 
   const button = cell(frame, "Get join code")
   await setup.mockMouse.click(button.x + 2, button.y)
-  const issued = await setup.waitForFrame((frame) => frame.includes("ABCD-EFGH  valid until"))
+  const issued = await setup.waitForFrame((frame) => frame.includes("ABCD-EFGH  expires in"))
   expect(issued).toContain("On the other device open Connect")
 })
 
@@ -73,4 +73,89 @@ test("Connect searches the network in its own window and offers manual entry", a
   expect(frame).toContain("Your name")
   expect(frame).not.toContain("VPN")
   expect(frame).not.toContain("Get join code")
+})
+
+const session = {
+  id: room.sessionID,
+  projectID: "proj_test",
+  title: "Lab",
+  location: { directory },
+  cost: 0,
+  tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+  time: { created: 0, updated: 0 },
+}
+
+const guestPrompt = (id: string, name: string, text: string) => ({
+  id,
+  type: "user",
+  text,
+  time: { created: 1 },
+  metadata: { room: { id: room.id, guest: { id: `guest_${id}`, name } } },
+})
+
+async function renderSession(state: string, input: { rooms: () => unknown[]; onCreate?: () => void }) {
+  return createAppFixture({
+    width: 130,
+    height: 40,
+    state,
+    args: { sessionID: room.sessionID },
+    config: { animations: false, debug: { devtools: true } },
+    fetch: (url, request) => {
+      if (url.pathname === "/api/info")
+        return json({ version: "test", pid: 1, urls: ["http://192.168.1.5:4096"], paths: { tmp: "/tmp" } })
+      if (url.pathname === "/api/room" && request.method === "POST") {
+        input.onCreate?.()
+        return json({ data: room })
+      }
+      if (url.pathname === "/api/room") return json({ data: input.rooms() })
+      if (url.pathname === `/api/room/${room.id}/code` && request.method === "POST")
+        return json({ code: "ABCD-EFGH", expires_in: 600 })
+      if (url.pathname === `/api/session/${room.sessionID}`) return json({ data: session })
+      if (url.pathname === `/api/session/${room.sessionID}/message`)
+        return json({
+          data: [
+            guestPrompt("msg_1", "Alex", "Can you check the tests?"),
+            guestPrompt("msg_2", "Sam", "And the docs please"),
+            guestPrompt("msg_3", "Alex", "Thanks"),
+            { id: "msg_4", type: "user", text: "Host speaking", time: { created: 2 } },
+          ],
+          cursor: {},
+        })
+      if (url.pathname === `/api/session/${room.sessionID}/inbox`) return json({ data: [] })
+    },
+  })
+}
+
+test("a hosted session names guest authors and shows a multiplayer indicator that opens Host", async () => {
+  await using state = await tmpdir()
+  await using setup = await renderSession(state.path, { rooms: () => [room] })
+  const frame = await setup.waitForFrame((frame) => frame.includes("⇄ Multiplayer"))
+  expect(frame).toContain("⇄ Multiplayer · Lab · 2 guests")
+  expect(frame).toContain("Alex · via room")
+  expect(frame).toContain("Sam · via room")
+
+  const indicator = cell(frame, "⇄ Multiplayer")
+  await setup.mockMouse.click(indicator.x + 2, indicator.y)
+  const host = await setup.waitForFrame((frame) => frame.includes("Get join code"))
+  expect(host).toContain("Only me")
+  expect(host).toContain("Who may allow or deny the AI")
+  expect(host).toContain("Linked rooms only")
+})
+
+test("hosting a session issues a join code at once and shows the indicator", async () => {
+  await using state = await tmpdir()
+  const rooms: unknown[] = []
+  await using setup = await renderSession(state.path, { rooms: () => rooms, onCreate: () => rooms.push(room) })
+  const bar = await setup.waitForFrame((frame) => frame.includes("Host") && frame.includes("Connect"))
+  expect(bar).not.toContain("⇄ Multiplayer")
+  const entry = cell(bar, "Host")
+  await setup.mockMouse.click(entry.x, entry.y)
+  const dialog = await setup.waitForFrame((frame) => frame.includes("Host this session"))
+  const button = cell(dialog, "Host this session")
+  await setup.mockMouse.click(button.x + 2, button.y)
+  const issued = await setup.waitForFrame((frame) => /ABCD-EFGH {2}expires in (10:00|9:5\d)/.test(frame))
+  expect(issued).toContain("New join code")
+  setup.mockInput.pressEscape()
+  const closed = await setup.waitForFrame((frame) => !frame.includes("New join code"))
+  expect(closed).toContain("⇄ Multiplayer · Lab · 2 guests")
 })
