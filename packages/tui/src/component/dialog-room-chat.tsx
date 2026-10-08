@@ -1,8 +1,8 @@
 import type { InputRenderable, ScrollBoxRenderable } from "@opentui/core"
 import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js"
-import { OpenCode, type RoomMessage } from "@opencode/client"
+import { OpenCode, type NoteInfo, type RoomMessage } from "@opencode/client"
 import { useConfig } from "../config"
-import { useTheme } from "../context/theme"
+import { useTheme, useThemes } from "../context/theme"
 import { errorMessage } from "../util/error"
 
 // A room this device joined on another host. The token only opens that room.
@@ -30,6 +30,12 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
   const [running, setRunning] = createSignal(false)
   const [error, setError] = createSignal<string>()
   const [sending, setSending] = createSignal(0)
+  // The note the host bound to this room's chat: the host's AI writes into it.
+  const [note, setNote] = createSignal<{ name: string; title: string }>()
+  const [reading, setReading] = createSignal(false)
+  const [document, setDocument] = createSignal<NoteInfo | null>()
+  const [hovered, setHovered] = createSignal(false)
+  const { currentSyntax: syntax } = useThemes()
   // The host's machine name; the address stands in until it answers.
   const [host] = createResource(() =>
     client.room.public().then(
@@ -55,10 +61,25 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
         const grew = result.data.length !== messages().length
         setMessages(result.data)
         setRunning(result.running)
+        setNote(result.note)
         setError()
-        if (grew) setTimeout(() => scroll?.scrollTo(scroll.scrollHeight), 1)
+        if (!result.note) setReading(false)
+        if (reading() && result.note) void readNote()
+        if (grew && !reading()) setTimeout(() => scroll?.scrollTo(scroll.scrollHeight), 1)
       })
       .catch((cause: unknown) => setError(errorMessage(cause)))
+
+  const readNote = () =>
+    client.room.guest
+      .note({ roomID: props.room.roomID })
+      .then(setDocument)
+      .catch((cause: unknown) => setError(errorMessage(cause)))
+
+  const toggleNote = () => {
+    const next = !reading()
+    setReading(next)
+    if (next) void readNote()
+  }
 
   onMount(() => {
     void refresh()
@@ -104,8 +125,56 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
           esc
         </text>
       </box>
+      <Show when={note()}>
+        {(bound) => (
+          <box flexDirection="row" gap={2}>
+            <text fg={theme.text.base} wrapMode="none" truncate>
+              {`✎ Note: ${bound().title}`}
+              <span style={{ fg: theme.text.muted }}> · the host's AI writes your requests into it</span>
+            </text>
+            <box flexGrow={1} />
+            <box
+              flexShrink={0}
+              onMouseOver={() => setHovered(true)}
+              onMouseOut={() => setHovered(false)}
+              onMouseUp={toggleNote}
+            >
+              <text fg={hovered() ? theme.text.action.primary.hovered : theme.text.action.primary.base}>
+                {reading() ? "Back to chat" : "Read note"}
+              </text>
+            </box>
+          </box>
+        )}
+      </Show>
+      <Show when={reading()}>
+        <scrollbox height={18}>
+          <Show
+            when={document()}
+            fallback={
+              <text fg={theme.text.muted}>
+                {document() === null ? "The note is no longer bound." : "Reading the note…"}
+              </text>
+            }
+          >
+            {(current) => (
+              <Show when={current().body.trim()} fallback={<text fg={theme.text.muted}>The note is empty so far.</text>}>
+                <markdown
+                  syntaxStyle={syntax()}
+                  content={current().body}
+                  conceal
+                  internalBlockMode="top-level"
+                  tableOptions={{ style: "grid", cellPaddingX: 1 }}
+                  fg={theme.markdown.text}
+                  bg={theme.background.base}
+                />
+              </Show>
+            )}
+          </Show>
+        </scrollbox>
+      </Show>
       <scrollbox
-        height={18}
+        visible={!reading()}
+        height={reading() ? 0 : 18}
         ref={(element: ScrollBoxRenderable) => {
           scroll = element
         }}
