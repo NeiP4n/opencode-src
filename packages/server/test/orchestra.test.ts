@@ -51,7 +51,7 @@ it.live("operator projects own the sessions under their directory and one main s
     yield* session(other, "Elsewhere")
 
     const main = (yield* call(`/api/orchestra/project/${project.id}/main`, "POST")).body
-    expect(main.title).toBe("App · Orchestra")
+    expect(main.title).toBe("App · Orchestrator")
     expect((yield* call(`/api/orchestra/project/${project.id}/main`, "POST")).body.id).toBe(main.id)
 
     expect((yield* call(`/api/orchestra/access/${deep.id}`, "PUT", { access: "write" })).status).toBe(204)
@@ -95,11 +95,13 @@ it.live("a team template opens the orchestra and its role sessions, and the orch
 
     const templates = (yield* call("/api/orchestra/template")).body
     const feature = templates.find((item: { id: string }) => item.id === "feature")
-    expect(feature.members.map((member: { agent: string }) => member.agent)).toEqual([
-      "architect",
-      "developer",
-      "tester",
-      "reviewer",
+    expect(
+      feature.members.map((member: { agent: string; category: string }) => [member.agent, member.category]),
+    ).toEqual([
+      ["team-architect", "Planning"],
+      ["team-developer", "Build"],
+      ["team-tester", "Quality"],
+      ["team-reviewer", "Quality"],
     ])
 
     expect(
@@ -116,25 +118,33 @@ it.live("a team template opens the orchestra and its role sessions, and the orch
     expect(project.main).toBeDefined()
 
     const main = (yield* call(`/api/session/${project.main}`)).body.data
-    expect(main.agent).toBe("orchestra")
+    expect(main.agent).toBe("orchestrator")
     const listed = (yield* call(`/api/orchestra/project/${project.id}/session`)).body
     const members = listed.data
       .map((item: { title: string; agent: string }) => [item.title, item.agent])
       .toSorted(([a]: string[], [b]: string[]) => a.localeCompare(b))
     expect(members).toEqual([
-      ["Architect", "architect"],
-      ["Developer", "developer"],
-      ["Reviewer", "reviewer"],
-      ["Tester", "tester"],
+      ["Architect", "team-architect"],
+      ["Developer", "team-developer"],
+      ["Reviewer", "team-reviewer"],
+      ["Tester", "team-tester"],
     ])
     expect(Object.values(listed.access)).toEqual(["full", "full", "full", "full"])
+    expect(Object.values(listed.category).toSorted()).toEqual(["Build", "Planning", "Quality", "Quality"])
+
+    // the operator regroups a session; an empty category removes it
+    const developer = listed.data.find((item: { title: string }) => item.title === "Developer")
+    expect((yield* call(`/api/orchestra/category/${developer.id}`, "PUT", { category: "Core" })).status).toBe(204)
+    expect((yield* call(`/api/orchestra/project/${project.id}/session`)).body.category[developer.id]).toBe("Core")
+    expect((yield* call(`/api/orchestra/category/${developer.id}`, "PUT", { category: " " })).status).toBe(204)
+    expect((yield* call(`/api/orchestra/project/${project.id}/session`)).body.category[developer.id]).toBeUndefined()
 
     // switching the orchestra to another agent is ignored
     expect((yield* call(`/api/session/${main.id}/agent`, "POST", { agent: "build" })).status).toBe(204)
-    expect((yield* call(`/api/session/${main.id}`)).body.data.agent).toBe("orchestra")
+    expect((yield* call(`/api/session/${main.id}`)).body.data.agent).toBe("orchestrator")
 
     // role agents are registered by plugin activation, which finishes in the background
-    const roles = ["orchestra", "architect", "developer", "tester", "reviewer", "debugger", "devops"]
+    const roles = ["orchestrator", "team-architect", "team-developer", "team-tester", "team-reviewer", "team-devops"]
     yield* call("/api/agent").pipe(
       Effect.map((response) => response.body.data.map((agent: { id: string }) => agent.id)),
       Effect.filterOrFail((ids: string[]) => roles.every((role) => ids.includes(role))),

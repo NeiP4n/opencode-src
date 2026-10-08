@@ -66,7 +66,16 @@ export const OrchestraHandler = HttpApiBuilder.group(Api, "server.orchestra", (h
           const data = yield* orchestra
             .sessions(ctx.params.projectID)
             .pipe(Effect.catchTag("Orchestra.ProjectNotFoundError", missingProject))
-          return { data, access: yield* orchestra.accessMany(data.map((session) => session.id)) }
+          const ids = data.map((session) => session.id)
+          return { data, access: yield* orchestra.accessMany(ids), category: yield* orchestra.categories(ids) }
+        }),
+      )
+      .handle(
+        "orchestra.category",
+        Effect.fn(function* (ctx) {
+          yield* sessions.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* orchestra.setCategory(ctx.params.sessionID, ctx.payload.category)
+          return HttpApiSchema.NoContent.make()
         }),
       )
       .handle(

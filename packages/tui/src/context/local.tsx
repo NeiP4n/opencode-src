@@ -61,7 +61,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const visibleAgents = createMemo(() =>
         (data.location.agent.list(location.ref) ?? []).filter((agent) => !agent.hidden),
       )
-      // A project's main session always runs the hidden Orchestra agent; the composer shows it and cannot change it.
+      // A project's main session always runs the hidden Orchestrator agent; the composer shows it and cannot change it.
       const fixed = () =>
         route.data.type === "session" && data.session.get(route.data.sessionID)?.agent === Orchestra.agent
           ? data.location.agent.list(location.ref)?.find((agent) => agent.id === Orchestra.agent)
@@ -104,7 +104,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         },
         set(id: string) {
           if (fixed())
-            return toast.show({ variant: "info", message: "The Orchestra session's role is fixed", duration: 3000 })
+            return toast.show({ variant: "info", message: "The Orchestrator session's role is fixed", duration: 3000 })
           if (!agents().some((agent) => agent.id === id))
             return toast.show({
               variant: "warning",

@@ -487,7 +487,7 @@ export type OrchestraProject = {
   created: number
 }
 
-export type OrchestraMember = { agent: string; title: string }
+export type OrchestraMember = { agent: string; title: string; category: string }
 
 export type OrchestraAccess = "hidden" | "read" | "write" | "full"
 
@@ -6921,7 +6921,11 @@ export type OrchestraProjectMainOutput = SessionInfo1
 
 export type OrchestraProjectSessionsInput = { readonly projectID: { readonly projectID: string }["projectID"] }
 
-export type OrchestraProjectSessionsOutput = { data: Array<SessionInfo1>; access: { [x: string]: OrchestraAccess } }
+export type OrchestraProjectSessionsOutput = {
+  data: Array<SessionInfo1>
+  access: { [x: string]: OrchestraAccess }
+  category: { [x: string]: string }
+}
 
 export type OrchestraAccessInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]
@@ -6929,3 +6933,10 @@ export type OrchestraAccessInput = {
 }
 
 export type OrchestraAccessOutput = void
+
+export type OrchestraCategoryInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly category: { readonly category: string }["category"]
+}
+
+export type OrchestraCategoryOutput = void

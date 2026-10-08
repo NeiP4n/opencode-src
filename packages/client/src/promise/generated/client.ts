@@ -305,6 +305,8 @@ import type {
   OrchestraProjectSessionsOutput,
   OrchestraAccessInput,
   OrchestraAccessOutput,
+  OrchestraCategoryInput,
+  OrchestraCategoryOutput,
 } from "./types.js"
 import { ClientError } from "./client-error.js"
 
@@ -2514,6 +2516,18 @@ export function make(options: ClientOptions) {
             method: "PUT",
             path: `/api/orchestra/access/${encodeURIComponent(input.sessionID)}`,
             body: { access: input["access"] },
+            successStatus: 204,
+            declaredStatuses: [400, 401, 404],
+            empty: true,
+          },
+          requestOptions,
+        ),
+      category: (input: OrchestraCategoryInput, requestOptions?: RequestOptions) =>
+        request<OrchestraCategoryOutput>(
+          {
+            method: "PUT",
+            path: `/api/orchestra/category/${encodeURIComponent(input.sessionID)}`,
+            body: { category: input["category"] },
             successStatus: 204,
             declaredStatuses: [400, 401, 404],
             empty: true,

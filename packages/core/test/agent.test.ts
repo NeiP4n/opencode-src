@@ -178,22 +178,22 @@ describe("Agent", () => {
 
       const agents = yield* agent.list()
       expect(agents.map((item) => String(item.id)).sort()).toEqual([
-        "architect",
         "build",
         "compaction",
-        "debugger",
-        "designer",
-        "developer",
-        "devops",
         "explore",
         "general",
-        "orchestra",
-        "researcher",
-        "reviewer",
+        "orchestrator",
         "summary",
-        "tester",
+        "team-architect",
+        "team-debugger",
+        "team-designer",
+        "team-developer",
+        "team-devops",
+        "team-researcher",
+        "team-reviewer",
+        "team-tester",
+        "team-writer",
         "title",
-        "writer",
       ])
       expect((yield* agent.get(Agent.defaultID))?.system).toBeUndefined()
       const permissions = (yield* agent.get(Agent.defaultID))?.permissions ?? []

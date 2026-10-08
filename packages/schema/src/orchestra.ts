@@ -24,8 +24,12 @@ export function allows(access: Access, required: Access) {
 export const defaultAccess: Access = "read"
 
 // The agent of every project's main session. A session running it keeps it:
-// switching it to another agent is ignored, so the orchestra stays an orchestra.
-export const agent = Agent.ID.make("orchestra")
+// switching it to another agent is ignored, so the orchestrator stays one.
+export const agent = Agent.ID.make("orchestrator")
+
+// Team roles are built-in agents with a "team-" prefix, so an operator's own
+// agents of the same name (often subagents) never replace them.
+export const role = (name: string) => Agent.ID.make(`team-${name}`)
 
 export const ProjectID = Schema.String.check(Schema.isStartsWith("prj")).pipe(
   Schema.brand("OrchestraProjectID"),
@@ -53,10 +57,12 @@ export function contains(project: string, directory: string) {
   return directory.startsWith(root)
 }
 
-// One session a team template opens: the role agent it runs and its title.
+// One session a team template opens: the role agent it runs, its title and
+// the category it is grouped under in the project.
 export const Member = Schema.Struct({
   agent: Agent.ID,
   title: Schema.String,
+  category: Schema.String,
 }).annotate({ identifier: "Orchestra.Member" })
 export interface Member extends Schema.Schema.Type<typeof Member> {}
 
@@ -70,7 +76,24 @@ export const Template = Schema.Struct({
 }).annotate({ identifier: "Orchestra.Template" })
 export interface Template extends Schema.Schema.Type<typeof Template> {}
 
-const member = (agent: string, title: string): Member => ({ agent: Agent.ID.make(agent), title })
+// Where each role sits in a team: planning before building, quality after it.
+const categoryOf: Record<string, string> = {
+  architect: "Planning",
+  researcher: "Planning",
+  designer: "Planning",
+  developer: "Build",
+  devops: "Build",
+  writer: "Build",
+  tester: "Quality",
+  reviewer: "Quality",
+  debugger: "Quality",
+}
+
+const member = (name: string, title: string): Member => ({
+  agent: role(name),
+  title,
+  category: categoryOf[name] ?? "Team",
+})
 
 export const templates: readonly Template[] = [
   {

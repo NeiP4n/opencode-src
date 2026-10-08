@@ -17,7 +17,7 @@ const session = (id: string, title: string) => ({
   time: { created: 0, updated: 0 },
 })
 const worker = session("ses_worker", "Worker task")
-const main = session("ses_main", "Demo · Orchestra")
+const main = session("ses_main", "Demo · Orchestrator")
 
 type Call = { method: string; path: string; body?: unknown }
 
@@ -50,9 +50,10 @@ function render(state: string, calls: Call[], projects: (typeof project)[]) {
       if (url.pathname === "/api/orchestra/project") return json(projects)
       if (url.pathname === "/api/orchestra/template") return json([team])
       if (url.pathname === `/api/orchestra/project/${project.id}/session`)
-        return json({ data: [worker], access: { [worker.id]: "write" } })
+        return json({ data: [worker], access: { [worker.id]: "write" }, category: { [worker.id]: "Build" } })
       if (url.pathname === `/api/orchestra/project/${project.id}/main`) return json(main)
       if (url.pathname.startsWith("/api/orchestra/access/")) return new Response(null, { status: 204 })
+      if (url.pathname.startsWith("/api/orchestra/category/")) return new Response(null, { status: 204 })
       if (url.pathname === "/api/session") return json({ data: [worker], cursor: {} })
       if (url.pathname === `/api/session/${worker.id}` && request.method === "DELETE") {
         calls.push({ method: "DELETE", path: url.pathname })
@@ -78,7 +79,7 @@ function cell(frame: string, needle: string) {
   return { x: lines[y].indexOf(needle), y }
 }
 
-test("the left panel lists the operator's projects with the orchestra and sessions at their access level", async () => {
+test("the left panel lists the operator's projects with the orchestrator and sessions by category at their access level", async () => {
   await using state = await tmpdir()
   const calls: Call[] = []
   await using setup = await render(state.path, calls, [project])
@@ -87,8 +88,12 @@ test("the left panel lists the operator's projects with the orchestra and sessio
   const frame = await setup.waitForFrame(
     (frame) => frame.includes("Projects") && frame.includes("Demo") && frame.includes("[write]"),
   )
-  expect(frame).toContain("Orchestra")
-  expect(frame).toContain("Worker task")
+  expect(frame).toContain("★ Orchestrator")
+  // sessions sit under their category
+  const lines = frame.split("\n")
+  expect(lines.findIndex((line) => line.includes("Build"))).toBeLessThan(
+    lines.findIndex((line) => line.includes("Worker task")),
+  )
 
   // clicking the chip steps to the next level and stores it
   const chip = cell(frame, "[write]")
@@ -102,7 +107,7 @@ test("the left panel lists the operator's projects with the orchestra and sessio
   })
 
   // the orchestra row opens the project's main session
-  const orchestra = cell(setup.captureCharFrame(), "★ Orchestra")
+  const orchestra = cell(setup.captureCharFrame(), "★ Orchestrator")
   await setup.mockMouse.click(orchestra.x + 2, orchestra.y)
   await setup.waitFor(() => calls.some((call) => call.path === `/api/orchestra/project/${project.id}/main`))
 })
@@ -158,4 +163,25 @@ test("a new project can start with an AI team from a template", async () => {
   await setup.mockInput.pressEnter()
   await setup.waitFor(() => calls.some((call) => call.method === "POST" && call.path === "/api/orchestra/project"))
   expect(calls.find((call) => call.method === "POST")?.body).toEqual({ name: "Team", directory, template: "feature" })
+})
+
+test("a session is moved to another category from the tree", async () => {
+  await using state = await tmpdir()
+  const calls: Call[] = []
+  await using setup = await render(state.path, calls, [project])
+
+  const frame = await setup.waitForFrame((frame) => frame.includes("Build") && frame.includes("Worker task"))
+  const row = frame.split("\n").findIndex((line) => line.includes("Worker task"))
+  const hash = frame.split("\n")[row].indexOf("# ")
+  await setup.mockMouse.click(hash, row)
+  // the dialog starts from the current category
+  await setup.waitForFrame((frame) => frame.includes("Session category"))
+  for (const _ of "Build") await setup.mockInput.pressBackspace()
+  await setup.mockInput.typeText("Quality")
+  await setup.mockInput.pressEnter()
+  await setup.waitFor(() => calls.some((call) => call.path === `/api/orchestra/category/${worker.id}`))
+  expect(calls.find((call) => call.path === `/api/orchestra/category/${worker.id}`)?.body).toEqual({
+    category: "Quality",
+  })
+  await setup.waitForFrame((frame) => frame.split("\n").some((line) => line.trim() === "Quality"))
 })

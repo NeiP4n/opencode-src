@@ -307,6 +307,8 @@ import type {
   OrchestraProjectSessionsOutput,
   OrchestraAccessInput,
   OrchestraAccessOutput,
+  OrchestraCategoryInput,
+  OrchestraCategoryOutput,
 } from "../api/api.js"
 import { ClientError } from "./client-error.js"
 
@@ -1798,6 +1800,14 @@ const EndpointOrchestraAccess = (raw: RawClient["server.orchestra"]) => (input: 
     ),
   )
 
+const EndpointOrchestraCategory = (raw: RawClient["server.orchestra"]) => (input: OrchestraCategoryInput) =>
+  preserveEffect<OrchestraCategoryOutput>()(
+    raw["orchestra.category"]({
+      params: { sessionID: input["sessionID"] },
+      payload: { category: input["category"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const adaptGroupOrchestra = (raw: RawClient["server.orchestra"]) => ({
   project: {
     list: EndpointOrchestraProjectList(raw),
@@ -1809,6 +1819,7 @@ const adaptGroupOrchestra = (raw: RawClient["server.orchestra"]) => ({
   },
   template: { list: EndpointOrchestraTemplateList(raw) },
   access: EndpointOrchestraAccess(raw),
+  category: EndpointOrchestraCategory(raw),
 })
 
 const adaptClient = (raw: RawClient) => ({

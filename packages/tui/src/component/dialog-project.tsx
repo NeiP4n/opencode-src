@@ -13,7 +13,7 @@ import { Button } from "./devtools-registry"
 // Create a project, or rename it, move it to another directory or forget it.
 // Projects are the operator's own: a name and a directory, nothing discovered.
 // A new project may start with an AI team: the template opens its role
-// sessions next to the Orchestra; "No team" opens nothing.
+// sessions next to the Orchestrator; "No team" opens nothing.
 export function DialogProject(props: { project?: OrchestraProject; onDone: () => void; onClose: () => void }) {
   const client = useClient()
   const location = useLocation()
@@ -153,7 +153,7 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
               selected={team() === 0}
               focused={teamFocused()}
               name="No team"
-              detail="only the Orchestra"
+              detail="only the Orchestrator"
               onClick={() => {
                 setTeam(0)
                 focusTeam()

@@ -3491,6 +3491,7 @@ export type OrchestraProjectSessionsInput = { readonly projectID: Orchestra.Proj
 export type OrchestraProjectSessionsOutput = {
   readonly data: ReadonlyArray<Session.Info>
   readonly access: { readonly [x: string]: Orchestra.Access }
+  readonly category: { readonly [x: string]: string }
 }
 export type OrchestraProjectSessionsOperation<E = never> = (
   input: OrchestraProjectSessionsInput,
@@ -3501,6 +3502,12 @@ export type OrchestraAccessOutput = void
 export type OrchestraAccessOperation<E = never> = (
   input: OrchestraAccessInput,
 ) => Effect.Effect<OrchestraAccessOutput, E>
+
+export type OrchestraCategoryInput = { readonly sessionID: Session.ID; readonly category: string }
+export type OrchestraCategoryOutput = void
+export type OrchestraCategoryOperation<E = never> = (
+  input: OrchestraCategoryInput,
+) => Effect.Effect<OrchestraCategoryOutput, E>
 
 export interface OrchestraApi<E = never> {
   readonly project: {
@@ -3513,6 +3520,7 @@ export interface OrchestraApi<E = never> {
   }
   readonly template: { readonly list: OrchestraTemplateListOperation<E> }
   readonly access: OrchestraAccessOperation<E>
+  readonly category: OrchestraCategoryOperation<E>
 }
 
 export interface AppApi<E = never> {

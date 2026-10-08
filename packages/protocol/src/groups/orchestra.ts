@@ -96,13 +96,15 @@ export const OrchestraGroup = HttpApiGroup.make("server.orchestra")
       success: Schema.Struct({
         data: Schema.Array(Session.Info),
         access: Schema.Record(Schema.String, Orchestra.Access),
+        category: Schema.Record(Schema.String, Schema.String),
       }),
       error: ProjectNotFoundError,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "orchestra.project.sessions",
         summary: "List project sessions",
-        description: "Recent top-level sessions in the project directory and the main session's access to each.",
+        description:
+          "Recent top-level sessions in the project directory, the main session's access to each and the categories they are grouped under.",
       }),
     ),
   )
@@ -117,6 +119,20 @@ export const OrchestraGroup = HttpApiGroup.make("server.orchestra")
         identifier: "orchestra.access",
         summary: "Set session access",
         description: "Set what the project's main session may do with this session.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.put("orchestra.category", "/api/orchestra/category/:sessionID", {
+      params: { sessionID: Session.ID },
+      payload: Schema.Struct({ category: Schema.String }),
+      success: HttpApiSchema.NoContent,
+      error: SessionNotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.category",
+        summary: "Set session category",
+        description: "Group a project session under a category; an empty category removes it.",
       }),
     ),
   )

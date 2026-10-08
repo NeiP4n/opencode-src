@@ -12,11 +12,13 @@ import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
 import { openProjectDialog } from "./dialog-project"
 import { useProjects } from "../context/projects"
+import { DialogPrompt } from "../ui/dialog-prompt"
 
 // The left panel: the operator's own projects, each a name and a directory,
-// with its main session (the orchestra) and the sessions opened in that
-// directory under it. The chip after a session is the access the orchestra
-// has to it; clicking it steps through the levels.
+// with its main session (the orchestrator) and the sessions opened in that
+// directory under it, grouped by category. "#" sets a session's category; the
+// chip after it is the access the orchestrator has to it, and clicking it steps
+// through the levels.
 
 const ACCESS_ORDER: readonly OrchestraAccess[] = ["hidden", "read", "write", "full"]
 
@@ -32,6 +34,7 @@ export function ProjectTree(props: { width: number }) {
   const [rooms] = createResource(() => client.api.room.list().catch(() => []))
   const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
   const [access, setAccess] = createStore<Record<string, OrchestraAccess>>({})
+  const [category, setCategory] = createStore<Record<string, string | undefined>>({})
   const [hover, setHover] = createSignal<string>()
   // Deleting is permanent, so the first click only arms the button and the second deletes.
   const [armed, setArmed] = createSignal<string>()
@@ -62,6 +65,7 @@ export function ProjectTree(props: { width: number }) {
       .then((result) => {
         result.data.forEach((session) => data.session.remember(session))
         setAccess(result.access)
+        setCategory(result.category)
       })
       .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
   }
@@ -95,6 +99,25 @@ export function ProjectTree(props: { width: number }) {
     })
   }
 
+  const categorize = (sessionID: string) =>
+    dialog.replace(() => (
+      <DialogPrompt
+        title="Session category"
+        placeholder="Planning, Build, Quality… (empty removes it)"
+        value={category[sessionID] ?? ""}
+        onCancel={() => dialog.clear()}
+        onConfirm={(value) => {
+          dialog.clear()
+          const previous = category[sessionID]
+          setCategory(sessionID, value.trim() || undefined)
+          void client.api.orchestra.category({ sessionID, category: value.trim() }).catch((error: unknown) => {
+            setCategory(sessionID, previous)
+            toast.show({ message: errorMessage(error), variant: "error" })
+          })
+        }}
+      />
+    ))
+
   const remove = (sessionID: string) => {
     if (armed() !== sessionID) return setArmed(sessionID)
     setArmed()
@@ -118,6 +141,18 @@ export function ProjectTree(props: { width: number }) {
           session.id !== project.main &&
           owner(session.location.directory)?.id === project.id,
       )
+
+  // Categories in first-seen order; sessions without one come last, under "Other"
+  // only when the project uses categories at all.
+  const groupsOf = (project: OrchestraProject) => {
+    const sessions = sessionsOf(project)
+    const names = [...new Set(sessions.flatMap((session) => category[session.id] ?? []))]
+    const rest = sessions.filter((session) => !category[session.id])
+    return [
+      ...names.map((name) => ({ name, sessions: sessions.filter((session) => category[session.id] === name) })),
+      ...(rest.length > 0 ? [{ name: names.length > 0 ? "Other" : "", sessions: rest }] : []),
+    ]
+  }
 
   return (
     <box width={props.width} height="100%" flexShrink={0} backgroundColor={theme.background.raised.base} paddingTop={1}>
@@ -160,54 +195,77 @@ export function ProjectTree(props: { width: number }) {
                 >
                   <text fg={theme.text.action.primary.base}>{"  ★ "}</text>
                   <text fg={theme.text.base} wrapMode="none">
-                    Orchestra
+                    Orchestrator
                   </text>
                 </Row>
-                <For each={sessionsOf(project)}>
-                  {(session) => (
-                    <Row
-                      id={session.id}
-                      hover={hover}
-                      setHover={setHover}
-                      selected={session.id === current()?.id}
-                      onClick={() => route.navigate({ type: "session", sessionID: session.id })}
-                    >
-                      <text
-                        fg={
-                          data.session.status(session.id) === "running"
-                            ? theme.text.feedback.success.base
-                            : theme.text.muted
-                        }
-                      >
-                        {data.session.status(session.id) === "running" ? "  ● " : "  ○ "}
-                      </text>
-                      <box flexGrow={1} minWidth={0}>
-                        <text fg={theme.text.base} wrapMode="none" truncate>
-                          {`${shared().has(session.id) ? "⇄ " : ""}${session.title || "Untitled"}`}
-                        </text>
-                      </box>
-                      <box
-                        onMouseUp={(event) => {
-                          event.stopPropagation()
-                          cycle(session.id)
-                        }}
-                      >
-                        <text
-                          fg={theme.text.formfield.base}
-                        >{`[${access[session.id] ?? Orchestra.defaultAccess}]`}</text>
-                      </box>
-                      <box
-                        onMouseOut={() => setArmed()}
-                        onMouseUp={(event) => {
-                          event.stopPropagation()
-                          remove(session.id)
-                        }}
-                      >
-                        <text fg={armed() === session.id ? theme.text.feedback.error.base : theme.text.muted}>
-                          {armed() === session.id ? " delete?" : " ×"}
-                        </text>
-                      </box>
-                    </Row>
+                <For each={groupsOf(project)}>
+                  {(group) => (
+                    <>
+                      <Show when={group.name}>
+                        <box paddingLeft={4}>
+                          <text fg={theme.text.muted} attributes={TextAttributes.BOLD} wrapMode="none" truncate>
+                            {group.name}
+                          </text>
+                        </box>
+                      </Show>
+                      <For each={group.sessions}>
+                        {(session) => (
+                          <Row
+                            id={session.id}
+                            hover={hover}
+                            setHover={setHover}
+                            selected={session.id === current()?.id}
+                            onClick={() => route.navigate({ type: "session", sessionID: session.id })}
+                          >
+                            <text
+                              fg={
+                                data.session.status(session.id) === "running"
+                                  ? theme.text.feedback.success.base
+                                  : theme.text.muted
+                              }
+                            >
+                              {data.session.status(session.id) === "running" ? "  ● " : "  ○ "}
+                            </text>
+                            <box flexGrow={1} minWidth={0}>
+                              <text fg={theme.text.base} wrapMode="none" truncate>
+                                {`${shared().has(session.id) ? "⇄ " : ""}${session.title || "Untitled"}`}
+                              </text>
+                            </box>
+                            <box
+                              onMouseUp={(event) => {
+                                event.stopPropagation()
+                                categorize(session.id)
+                              }}
+                            >
+                              <text fg={hover() === session.id ? theme.text.action.primary.base : theme.text.muted}>
+                                #{" "}
+                              </text>
+                            </box>
+                            <box
+                              onMouseUp={(event) => {
+                                event.stopPropagation()
+                                cycle(session.id)
+                              }}
+                            >
+                              <text
+                                fg={theme.text.formfield.base}
+                              >{`[${access[session.id] ?? Orchestra.defaultAccess}]`}</text>
+                            </box>
+                            <box
+                              onMouseOut={() => setArmed()}
+                              onMouseUp={(event) => {
+                                event.stopPropagation()
+                                remove(session.id)
+                              }}
+                            >
+                              <text fg={armed() === session.id ? theme.text.feedback.error.base : theme.text.muted}>
+                                {armed() === session.id ? " delete?" : " ×"}
+                              </text>
+                            </box>
+                          </Row>
+                        )}
+                      </For>
+                    </>
                   )}
                 </For>
                 <Row
