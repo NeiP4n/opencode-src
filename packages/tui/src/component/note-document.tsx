@@ -177,7 +177,7 @@ export function NoteDocument(props: {
         </box>
         <box flexDirection="row" flexWrap="wrap" columnGap={1} paddingTop={1}>
           <text fg={theme.text.muted} wrapMode="none">
-            AI writes
+            Length
           </text>
           <For each={NOTE_LENGTHS}>
             {(length) => (

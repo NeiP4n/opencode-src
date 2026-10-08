@@ -62,14 +62,14 @@ const QUICK_ACTIONS = [
 
 // Prompts that write into the bound note. They only fill the composer; nothing
 // is sent until the user submits, so they are safe to click.
-export function NoteQuickActions(props: { note: NoteInfo }) {
+export function NoteQuickActions() {
   const theme = useTheme()
   const prompt = usePromptRef()
   const [hovered, setHovered] = createSignal<string>()
   return (
     <box flexDirection="row" flexWrap="wrap" columnGap={2} paddingLeft={2} paddingRight={1}>
       <text fg={theme.text.muted} wrapMode="none">
-        {`✎ ${noteTitle(props.note)}:`}
+        ✎ Note
       </text>
       <For each={QUICK_ACTIONS}>
         {(action) => (

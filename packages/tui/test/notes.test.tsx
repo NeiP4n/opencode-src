@@ -64,6 +64,7 @@ const ideas = (): Note => ({
 type Call = { method: string; path: string; body?: unknown }
 
 function render(state: string, input: { notes: Note[]; calls: Call[]; conflict?: () => boolean }) {
+  let created: ReturnType<typeof session> | undefined
   return createAppFixture({
     width: 150,
     height: 40,
@@ -74,6 +75,21 @@ function render(state: string, input: { notes: Note[]; calls: Call[]; conflict?:
       if (url.pathname.startsWith("/api/note")) {
         const body = request.method === "GET" ? undefined : await request.json().catch(() => undefined)
         input.calls.push({ method: request.method, path: url.pathname, body })
+        if (url.pathname === "/api/note" && request.method === "POST") {
+          const payload = body as { title: string; session?: string }
+          const created: Note = {
+            name: "new-idea",
+            frontmatter: { title: payload.title, status: "inbox", tags: [], session: payload.session, created: now, updated: now },
+            body: "",
+            mtime: 1,
+          }
+          input.notes.unshift(created)
+          return json({ location, data: created })
+        }
+        if (url.pathname === "/api/note/ideas" && request.method === "DELETE") {
+          input.notes.splice(input.notes.findIndex((item) => item.name === "ideas"), 1)
+          return new Response(null, { status: 204 })
+        }
         if (url.pathname === "/api/note" && request.method === "GET")
           return json({ location, data: url.search.includes("empty-project") ? [] : input.notes })
         const name = url.pathname.split("/")[3]
@@ -96,6 +112,13 @@ function render(state: string, input: { notes: Note[]; calls: Call[]; conflict?:
       if (url.pathname === `/api/orchestra/project/${project.id}/session`)
         return json({ data: [worker], access: { [worker.id]: "write" } })
       if (url.pathname === `/api/orchestra/project/${other.id}/session`) return json({ data: [], access: {} })
+      if (url.pathname === "/api/session" && request.method === "POST") {
+        const payload = (await request.json()) as { id: string; title?: string }
+        input.calls.push({ method: "POST", path: url.pathname, body: payload })
+        created = { ...worker, id: payload.id, title: payload.title ?? "" }
+        return json({ data: created })
+      }
+      if (created && url.pathname === `/api/session/${created.id}`) return json({ data: created })
       if (url.pathname === "/api/session") return json({ data: [worker], cursor: {} })
       if (url.pathname === `/api/session/${worker.id}`) return json({ data: worker })
       if (/^\/api\/session\/[^/]+\/(message|inbox|permission)$/.test(url.pathname))
@@ -138,7 +161,7 @@ test("the Notes tab lists the project's notes, filters them and shows an empty p
   expect(frame).toContain("2m")
   expect(frame).toContain("2d")
   // Notes mode of a bound chat shows the note as its document.
-  expect(frame).toContain("AI writes")
+  expect(frame).toContain("Length")
   expect(frame).toContain("Ship the notes canvas.")
 
   await click(setup, "Filter by title", 1)
@@ -231,5 +254,41 @@ test("a note written elsewhere updates live from note.updated", async () => {
 
   // The chat toggle puts the note aside for the full chat, and the chip brings it back.
   await click(setup, "⇤ Chat", 1)
-  await setup.waitForFrame((frame) => !frame.includes("AI writes") && frame.includes("Note: Release plan"))
+  await setup.waitForFrame((frame) => !frame.includes("Brief & useful") && frame.includes("Note: Release plan"))
+})
+
+test("a new note starts with its own bound chat, and deleting one takes two clicks", async () => {
+  await using state = await tmpdir()
+  const calls: Call[] = []
+  await using setup = await render(state.path, { notes: [plan(), ideas()], calls })
+  await setup.waitForFrame((frame) => frame.includes("Projects │ Notes"))
+  await click(setup, "Notes", 1)
+  await setup.waitForFrame((frame) => frame.includes("Onboarding ideas"))
+
+  const row = cell(setup.captureCharFrame(), "Onboarding ideas")
+  const line = setup.captureCharFrame().split("\n")[row.y]
+  await setup.mockMouse.click(line.indexOf("×", row.x), row.y)
+  await setup.waitForFrame((frame) => frame.includes("delete?"))
+  expect(calls.some((call) => call.method === "DELETE")).toBe(false)
+  await click(setup, "delete?", 1)
+  await setup.waitFor(() => calls.some((call) => call.method === "DELETE"))
+  await setup.waitForFrame((frame) => !frame.includes("Onboarding ideas"))
+
+  await click(setup, "+ New", 1)
+  await setup.waitForFrame((frame) => frame.includes("Note title, enter to create"))
+  await Bun.sleep(50)
+  await setup.mockInput.typeText("New idea")
+  setup.mockInput.pressEnter()
+  await setup.waitFor(() => calls.some((call) => call.method === "POST" && call.path === "/api/note"))
+  const createdSession = calls.find((call) => call.method === "POST" && call.path === "/api/session")?.body as {
+    id: string
+    title: string
+  }
+  expect(createdSession.title).toBe("New idea")
+  expect(calls.find((call) => call.method === "POST" && call.path === "/api/note")?.body).toEqual({
+    title: "New idea",
+    session: createdSession.id,
+  })
+  // The new note opens as the document of its new chat.
+  await setup.waitForFrame((frame) => frame.includes("This note is empty.") && frame.includes("New idea"))
 })

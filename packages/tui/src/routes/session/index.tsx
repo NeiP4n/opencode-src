@@ -1432,7 +1432,10 @@ export function Session(props: {
                 <Show when={!notes.canvas(route.sessionID) && notes.bound(route.sessionID)}>
                   {(note) => <NoteChip sessionID={route.sessionID} note={note()} />}
                 </Show>
-                <RoomIndicator sessionID={route.sessionID} />
+                {/* The note document carries the indicator while it is shown. */}
+                <Show when={!notes.canvas(route.sessionID)}>
+                  <RoomIndicator sessionID={route.sessionID} />
+                </Show>
               </box>
               <Show when={firstJump()}>
                 <text fg={theme.text.feedback.info.base}>Loading session history…</text>
@@ -1458,7 +1461,9 @@ export function Session(props: {
                 <QueuedPromptDock prompts={queuedPrompts()} onOpen={openQueuedPrompts} />
               </Show>
               <Slot path="session.composer.top" input={{ sessionID: route.sessionID }} />
-              <Show when={notes.canvas(route.sessionID)}>{(note) => <NoteQuickActions note={note()} />}</Show>
+              <Show when={notes.canvas(route.sessionID)}>
+                <NoteQuickActions />
+              </Show>
               <Composer
                 sessionID={route.sessionID}
                 open={composer.open || (!!session()?.parentID && forms().length === 0)}
