@@ -5,6 +5,7 @@ import type { Context } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
 import { Effect, Schema } from "effect"
 import { Orchestra } from "../../orchestra.js"
+import { AbsolutePath } from "../../schema.js"
 import { Session } from "../../session.js"
 import { SessionSchema } from "../../session/schema.js"
 import type { SessionMessage } from "../../session/message.js"
@@ -44,7 +45,7 @@ export const Plugin = {
     // Every action runs on behalf of the project's main session and only
     // reaches sessions of the same project at the level the operator granted.
     const target = Effect.fnUntraced(function* (
-      main: SessionSchema.Info,
+      project: Orchestra.Project,
       sessionID: SessionSchema.ID | undefined,
       required: Orchestra.Access,
     ) {
@@ -53,7 +54,11 @@ export const Plugin = {
         .get(sessionID)
         .pipe(Effect.mapError(() => new ToolFailure({ message: `Session not found: ${sessionID}` })))
       const access = yield* orchestra.access(session.id)
-      if (session.projectID !== main.projectID || session.id === main.id || access === "hidden")
+      if (
+        session.id === project.main ||
+        access === "hidden" ||
+        !Orchestra.contains(project.directory, session.location.directory)
+      )
         return yield* new ToolFailure({ message: `Session not found: ${sessionID}` })
       if (!Orchestra.allows(access, required))
         return yield* new ToolFailure({
@@ -62,12 +67,11 @@ export const Plugin = {
       return session
     })
 
-    const list = Effect.fnUntraced(function* (main: SessionSchema.Info) {
-      const project = (yield* sessions.list({ project: main.projectID, parentID: null })).data
+    const list = Effect.fnUntraced(function* (project: Orchestra.Project) {
+      const members = yield* orchestra.sessions(project.id).pipe(Effect.orDie)
       const active = yield* sessions.active
-      const rows = yield* Effect.forEach(
-        project.filter((session) => session.id !== main.id),
-        (session) => orchestra.access(session.id).pipe(Effect.map((access) => ({ session, access }))),
+      const rows = yield* Effect.forEach(members, (session) =>
+        orchestra.access(session.id).pipe(Effect.map((access) => ({ session, access }))),
       )
       const visible = rows.filter((row) => row.access !== "hidden")
       if (visible.length === 0) return "No other sessions in this project."
@@ -89,17 +93,16 @@ export const Plugin = {
           output: Output,
           execute: (input, context) =>
             Effect.gen(function* () {
-              const main = yield* sessions
-                .get(context.sessionID)
-                .pipe(Effect.mapError(() => new ToolFailure({ message: `Session not found: ${context.sessionID}` })))
-              if (!(yield* orchestra.isMain(main)))
-                return yield* new ToolFailure({ message: "Only the project's main session can manage sessions" })
+              const project = yield* orchestra.mainOf(context.sessionID)
+              if (!project)
+                return yield* new ToolFailure({ message: "Only a project's main session can manage sessions" })
+              const from = { orchestra: { project: project.id, from: context.sessionID } }
 
               switch (input.action) {
                 case "list":
-                  return { output: yield* list(main) }
+                  return { output: yield* list(project) }
                 case "read": {
-                  const session = yield* target(main, input.sessionID, "read")
+                  const session = yield* target(project, input.sessionID, "read")
                   const messages = yield* sessions
                     .messages({ sessionID: session.id, limit: input.limit ?? 10, order: "desc" })
                     .pipe(Effect.mapError((error) => new ToolFailure({ message: "Could not read the session", error })))
@@ -107,10 +110,10 @@ export const Plugin = {
                   return { sessionID: session.id, output: text || "The session has no messages yet." }
                 }
                 case "send": {
-                  const session = yield* target(main, input.sessionID, "write")
+                  const session = yield* target(project, input.sessionID, "write")
                   if (!input.text?.trim()) return yield* new ToolFailure({ message: "Pass the message as text" })
                   yield* sessions
-                    .prompt({ sessionID: session.id, text: input.text, metadata: { orchestra: { from: main.id } } })
+                    .prompt({ sessionID: session.id, text: input.text, metadata: from })
                     .pipe(Effect.mapError((error) => new ToolFailure({ message: "Could not send the message", error })))
                   return {
                     sessionID: session.id,
@@ -119,12 +122,15 @@ export const Plugin = {
                 }
                 case "create": {
                   const created = yield* sessions
-                    .create({ location: main.location, title: input.title?.trim() || undefined })
+                    .create({
+                      location: { directory: AbsolutePath.make(project.directory) },
+                      title: input.title?.trim() || undefined,
+                    })
                     .pipe(Effect.mapError((error) => new ToolFailure({ message: "Could not create a session", error })))
                   yield* orchestra.setAccess(created.id, "full")
                   if (input.text?.trim())
                     yield* sessions
-                      .prompt({ sessionID: created.id, text: input.text, metadata: { orchestra: { from: main.id } } })
+                      .prompt({ sessionID: created.id, text: input.text, metadata: from })
                       .pipe(
                         Effect.mapError((error) => new ToolFailure({ message: "Could not start the session", error })),
                       )
@@ -134,7 +140,7 @@ export const Plugin = {
                   }
                 }
                 case "stop": {
-                  const session = yield* target(main, input.sessionID, "full")
+                  const session = yield* target(project, input.sessionID, "full")
                   const stopped = yield* sessions.interrupt(session.id)
                   return { sessionID: session.id, output: stopped ? "Stopped." : "The session was not running." }
                 }
@@ -155,9 +161,7 @@ export const Plugin = {
     const hook = (event: SessionHooks["context"]) =>
       Effect.gen(function* () {
         if (!event.tools[name]) return
-        const session = yield* sessions.get(event.sessionID).pipe(Effect.option)
-        const main = session._tag === "Some" && (yield* orchestra.isMain(session.value))
-        if (!main) delete event.tools[name]
+        if (!(yield* orchestra.mainOf(event.sessionID))) delete event.tools[name]
       })
     yield* ctx.session.hook("context", hook)
     yield* ctx.session.hook("compaction", hook)

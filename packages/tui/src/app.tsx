@@ -70,6 +70,7 @@ import { DialogAgent } from "./component/dialog-agent"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogOpen, DialogOpenKey, moveOpenSession } from "./component/dialog-open"
 import { ProjectTree } from "./component/project-tree"
+import { ProjectsProvider, useProjects } from "./context/projects"
 import { clampSessionTabsWidth, sessionTabsFitVertically, SESSION_SIDEBAR_WIDTH } from "./ui/layout"
 import { createPaneResize } from "./ui/pane-resize"
 import { PaneResizeHandle } from "./ui/pane-resize-handle"
@@ -374,44 +375,46 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                               <PermissionProvider>
                                                 <DataProvider directory={directory}>
                                                   <LocationProvider>
-                                                    <SessionTabsProvider>
-                                                      <SessionTerminalsProvider>
-                                                        <ThemeProvider
-                                                          mode={mode}
-                                                          source={createThemeSource(global.config)}
-                                                        >
-                                                          <ThemeErrorToast />
-                                                          <LocalProvider>
-                                                            <PromptStashProvider>
-                                                              <DialogProvider>
-                                                                <FrecencyProvider>
-                                                                  <PromptHistoryProvider>
-                                                                    <PromptRefProvider>
-                                                                      <EditorContextProvider>
-                                                                        <AttentionProvider>
-                                                                          <UpdateNotificationProvider
-                                                                            updater={input.updater}
-                                                                          >
-                                                                            <PanelProvider>
-                                                                              <PluginProvider
-                                                                                packages={input.packages}
-                                                                                directories={pluginDirectories}
-                                                                              >
-                                                                                <App />
-                                                                              </PluginProvider>
-                                                                            </PanelProvider>
-                                                                          </UpdateNotificationProvider>
-                                                                        </AttentionProvider>
-                                                                      </EditorContextProvider>
-                                                                    </PromptRefProvider>
-                                                                  </PromptHistoryProvider>
-                                                                </FrecencyProvider>
-                                                              </DialogProvider>
-                                                            </PromptStashProvider>
-                                                          </LocalProvider>
-                                                        </ThemeProvider>
-                                                      </SessionTerminalsProvider>
-                                                    </SessionTabsProvider>
+                                                    <ProjectsProvider>
+                                                      <SessionTabsProvider>
+                                                        <SessionTerminalsProvider>
+                                                          <ThemeProvider
+                                                            mode={mode}
+                                                            source={createThemeSource(global.config)}
+                                                          >
+                                                            <ThemeErrorToast />
+                                                            <LocalProvider>
+                                                              <PromptStashProvider>
+                                                                <DialogProvider>
+                                                                  <FrecencyProvider>
+                                                                    <PromptHistoryProvider>
+                                                                      <PromptRefProvider>
+                                                                        <EditorContextProvider>
+                                                                          <AttentionProvider>
+                                                                            <UpdateNotificationProvider
+                                                                              updater={input.updater}
+                                                                            >
+                                                                              <PanelProvider>
+                                                                                <PluginProvider
+                                                                                  packages={input.packages}
+                                                                                  directories={pluginDirectories}
+                                                                                >
+                                                                                  <App />
+                                                                                </PluginProvider>
+                                                                              </PanelProvider>
+                                                                            </UpdateNotificationProvider>
+                                                                          </AttentionProvider>
+                                                                        </EditorContextProvider>
+                                                                      </PromptRefProvider>
+                                                                    </PromptHistoryProvider>
+                                                                  </FrecencyProvider>
+                                                                </DialogProvider>
+                                                              </PromptStashProvider>
+                                                            </LocalProvider>
+                                                          </ThemeProvider>
+                                                        </SessionTerminalsProvider>
+                                                      </SessionTabsProvider>
+                                                    </ProjectsProvider>
                                                   </LocationProvider>
                                                 </DataProvider>
                                               </PermissionProvider>
@@ -461,6 +464,7 @@ function App() {
   const dialog = useDialog()
   const local = useLocal()
   const sessionTabs = useSessionTabs()
+  const projects = useProjects()
   const panels = usePanel()
   const keymap = Keymap.use()
   const event = useEvent()
@@ -573,7 +577,7 @@ function App() {
   const pasteSummaryEnabled = () => config.data.prompt?.paste !== "full"
   // The project tree replaces the session tabs and always sits on the left when the terminal is wide enough.
   const tabsVertical = () => sessionTabsFitVertically(dimensions().width, tabsResize.size())
-  const tabsAvailable = () => route.data.type !== "plugin" && data.project.list().length > 0
+  const tabsAvailable = () => route.data.type !== "plugin" && projects.list().length > 0
   const fullscreenPanel = () =>
     route.data.type === "session" &&
     panels.current()?.sessionID === route.data.sessionID &&

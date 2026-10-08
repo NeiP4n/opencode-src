@@ -3435,13 +3435,45 @@ export interface RoomApi<E = never> {
   }
 }
 
-export type OrchestraGetInput = { readonly projectID: Project.ID }
-export type OrchestraGetOutput = Orchestra.State
-export type OrchestraGetOperation<E = never> = (input: OrchestraGetInput) => Effect.Effect<OrchestraGetOutput, E>
+export type OrchestraProjectListOutput = ReadonlyArray<Orchestra.Project>
+export type OrchestraProjectListOperation<E = never> = () => Effect.Effect<OrchestraProjectListOutput, E>
 
-export type OrchestraMainInput = { readonly projectID: Project.ID }
-export type OrchestraMainOutput = Session.Info
-export type OrchestraMainOperation<E = never> = (input: OrchestraMainInput) => Effect.Effect<OrchestraMainOutput, E>
+export type OrchestraProjectCreateInput = { readonly name: string; readonly directory: string }
+export type OrchestraProjectCreateOutput = Orchestra.Project
+export type OrchestraProjectCreateOperation<E = never> = (
+  input: OrchestraProjectCreateInput,
+) => Effect.Effect<OrchestraProjectCreateOutput, E>
+
+export type OrchestraProjectUpdateInput = {
+  readonly projectID: Orchestra.ProjectID
+  readonly name?: string | undefined
+  readonly directory?: string | undefined
+}
+export type OrchestraProjectUpdateOutput = Orchestra.Project
+export type OrchestraProjectUpdateOperation<E = never> = (
+  input: OrchestraProjectUpdateInput,
+) => Effect.Effect<OrchestraProjectUpdateOutput, E>
+
+export type OrchestraProjectRemoveInput = { readonly projectID: Orchestra.ProjectID }
+export type OrchestraProjectRemoveOutput = void
+export type OrchestraProjectRemoveOperation<E = never> = (
+  input: OrchestraProjectRemoveInput,
+) => Effect.Effect<OrchestraProjectRemoveOutput, E>
+
+export type OrchestraProjectMainInput = { readonly projectID: Orchestra.ProjectID }
+export type OrchestraProjectMainOutput = Session.Info
+export type OrchestraProjectMainOperation<E = never> = (
+  input: OrchestraProjectMainInput,
+) => Effect.Effect<OrchestraProjectMainOutput, E>
+
+export type OrchestraProjectSessionsInput = { readonly projectID: Orchestra.ProjectID }
+export type OrchestraProjectSessionsOutput = {
+  readonly data: ReadonlyArray<Session.Info>
+  readonly access: { readonly [x: string]: Orchestra.Access }
+}
+export type OrchestraProjectSessionsOperation<E = never> = (
+  input: OrchestraProjectSessionsInput,
+) => Effect.Effect<OrchestraProjectSessionsOutput, E>
 
 export type OrchestraAccessInput = { readonly sessionID: Session.ID; readonly access: Orchestra.Access }
 export type OrchestraAccessOutput = void
@@ -3450,8 +3482,14 @@ export type OrchestraAccessOperation<E = never> = (
 ) => Effect.Effect<OrchestraAccessOutput, E>
 
 export interface OrchestraApi<E = never> {
-  readonly get: OrchestraGetOperation<E>
-  readonly main: OrchestraMainOperation<E>
+  readonly project: {
+    readonly list: OrchestraProjectListOperation<E>
+    readonly create: OrchestraProjectCreateOperation<E>
+    readonly update: OrchestraProjectUpdateOperation<E>
+    readonly remove: OrchestraProjectRemoveOperation<E>
+    readonly main: OrchestraProjectMainOperation<E>
+    readonly sessions: OrchestraProjectSessionsOperation<E>
+  }
   readonly access: OrchestraAccessOperation<E>
 }
 

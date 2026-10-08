@@ -290,10 +290,17 @@ import type {
   RoomGuestPermissionListOutput,
   RoomGuestPermissionReplyInput,
   RoomGuestPermissionReplyOutput,
-  OrchestraGetInput,
-  OrchestraGetOutput,
-  OrchestraMainInput,
-  OrchestraMainOutput,
+  OrchestraProjectListOutput,
+  OrchestraProjectCreateInput,
+  OrchestraProjectCreateOutput,
+  OrchestraProjectUpdateInput,
+  OrchestraProjectUpdateOutput,
+  OrchestraProjectRemoveInput,
+  OrchestraProjectRemoveOutput,
+  OrchestraProjectMainInput,
+  OrchestraProjectMainOutput,
+  OrchestraProjectSessionsInput,
+  OrchestraProjectSessionsOutput,
   OrchestraAccessInput,
   OrchestraAccessOutput,
 } from "../api/api.js"
@@ -1727,15 +1734,43 @@ const adaptGroupRoom = (raw: RawClient["server.room"]) => ({
   },
 })
 
-const EndpointOrchestraGet = (raw: RawClient["server.orchestra"]) => (input: OrchestraGetInput) =>
-  preserveEffect<OrchestraGetOutput>()(
-    raw["orchestra.get"]({ params: { projectID: input["projectID"] } }).pipe(Effect.mapError(mapClientError)),
+const EndpointOrchestraProjectList = (raw: RawClient["server.orchestra"]) => () =>
+  preserveEffect<OrchestraProjectListOutput>()(raw["orchestra.project.list"]({}).pipe(Effect.mapError(mapClientError)))
+
+const EndpointOrchestraProjectCreate = (raw: RawClient["server.orchestra"]) => (input: OrchestraProjectCreateInput) =>
+  preserveEffect<OrchestraProjectCreateOutput>()(
+    raw["orchestra.project.create"]({ payload: { name: input["name"], directory: input["directory"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
   )
 
-const EndpointOrchestraMain = (raw: RawClient["server.orchestra"]) => (input: OrchestraMainInput) =>
-  preserveEffect<OrchestraMainOutput>()(
-    raw["orchestra.main"]({ params: { projectID: input["projectID"] } }).pipe(Effect.mapError(mapClientError)),
+const EndpointOrchestraProjectUpdate = (raw: RawClient["server.orchestra"]) => (input: OrchestraProjectUpdateInput) =>
+  preserveEffect<OrchestraProjectUpdateOutput>()(
+    raw["orchestra.project.update"]({
+      params: { projectID: input["projectID"] },
+      payload: { name: input["name"], directory: input["directory"] },
+    }).pipe(Effect.mapError(mapClientError)),
   )
+
+const EndpointOrchestraProjectRemove = (raw: RawClient["server.orchestra"]) => (input: OrchestraProjectRemoveInput) =>
+  preserveEffect<OrchestraProjectRemoveOutput>()(
+    raw["orchestra.project.remove"]({ params: { projectID: input["projectID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointOrchestraProjectMain = (raw: RawClient["server.orchestra"]) => (input: OrchestraProjectMainInput) =>
+  preserveEffect<OrchestraProjectMainOutput>()(
+    raw["orchestra.project.main"]({ params: { projectID: input["projectID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointOrchestraProjectSessions =
+  (raw: RawClient["server.orchestra"]) => (input: OrchestraProjectSessionsInput) =>
+    preserveEffect<OrchestraProjectSessionsOutput>()(
+      raw["orchestra.project.sessions"]({ params: { projectID: input["projectID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
 
 const EndpointOrchestraAccess = (raw: RawClient["server.orchestra"]) => (input: OrchestraAccessInput) =>
   preserveEffect<OrchestraAccessOutput>()(
@@ -1745,8 +1780,14 @@ const EndpointOrchestraAccess = (raw: RawClient["server.orchestra"]) => (input: 
   )
 
 const adaptGroupOrchestra = (raw: RawClient["server.orchestra"]) => ({
-  get: EndpointOrchestraGet(raw),
-  main: EndpointOrchestraMain(raw),
+  project: {
+    list: EndpointOrchestraProjectList(raw),
+    create: EndpointOrchestraProjectCreate(raw),
+    update: EndpointOrchestraProjectUpdate(raw),
+    remove: EndpointOrchestraProjectRemove(raw),
+    main: EndpointOrchestraProjectMain(raw),
+    sessions: EndpointOrchestraProjectSessions(raw),
+  },
   access: EndpointOrchestraAccess(raw),
 })
 

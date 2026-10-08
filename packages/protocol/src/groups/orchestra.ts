@@ -1,33 +1,92 @@
 import { Orchestra } from "@opencode/schema/orchestra"
-import { Project } from "@opencode/schema/project"
 import { Session } from "@opencode/schema/session"
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
-import { ProjectNotFoundError, SessionNotFoundError } from "../errors.js"
+import { InvalidRequestError, ProjectNotFoundError, SessionNotFoundError } from "../errors.js"
+
+const root = "/api/orchestra/project"
 
 export const OrchestraGroup = HttpApiGroup.make("server.orchestra")
   .add(
-    HttpApiEndpoint.get("orchestra.get", "/api/orchestra/:projectID", {
-      params: { projectID: Project.ID },
-      success: Orchestra.State,
+    HttpApiEndpoint.get("orchestra.project.list", root, {
+      success: Schema.Array(Orchestra.Project),
     }).annotateMerge(
       OpenApi.annotations({
-        identifier: "orchestra.get",
-        summary: "Get project orchestra",
-        description: "The project's main session, if opened, and the access it has to each session of the project.",
+        identifier: "orchestra.project.list",
+        summary: "List projects",
+        description: "List the projects the operator created, oldest first.",
       }),
     ),
   )
   .add(
-    HttpApiEndpoint.post("orchestra.main", "/api/orchestra/:projectID/main", {
-      params: { projectID: Project.ID },
+    HttpApiEndpoint.post("orchestra.project.create", root, {
+      payload: Schema.Struct({ name: Schema.String, directory: Schema.String }),
+      success: Orchestra.Project,
+      error: InvalidRequestError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.project.create",
+        summary: "Create project",
+        description: "Create a named project for an existing directory; its sessions are those opened in or below it.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.patch("orchestra.project.update", `${root}/:projectID`, {
+      params: { projectID: Orchestra.ProjectID },
+      payload: Schema.Struct({
+        name: Schema.String.pipe(Schema.optional),
+        directory: Schema.String.pipe(Schema.optional),
+      }),
+      success: Orchestra.Project,
+      error: [ProjectNotFoundError, InvalidRequestError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.project.update",
+        summary: "Update project",
+        description: "Rename a project or point it at another directory.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.delete("orchestra.project.remove", `${root}/:projectID`, {
+      params: { projectID: Orchestra.ProjectID },
+      success: HttpApiSchema.NoContent,
+      error: ProjectNotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.project.remove",
+        summary: "Remove project",
+        description: "Forget a project. Its sessions, including its main session, are kept.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("orchestra.project.main", `${root}/:projectID/main`, {
+      params: { projectID: Orchestra.ProjectID },
       success: Session.Info,
       error: ProjectNotFoundError,
     }).annotateMerge(
       OpenApi.annotations({
-        identifier: "orchestra.main",
+        identifier: "orchestra.project.main",
         summary: "Open project main session",
         description: "Return the project's main session, creating it in the project directory on first use.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("orchestra.project.sessions", `${root}/:projectID/session`, {
+      params: { projectID: Orchestra.ProjectID },
+      success: Schema.Struct({
+        data: Schema.Array(Session.Info),
+        access: Schema.Record(Schema.String, Orchestra.Access),
+      }),
+      error: ProjectNotFoundError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.project.sessions",
+        summary: "List project sessions",
+        description: "Recent top-level sessions in the project directory and the main session's access to each.",
       }),
     ),
   )
@@ -45,4 +104,4 @@ export const OrchestraGroup = HttpApiGroup.make("server.orchestra")
       }),
     ),
   )
-  .annotateMerge(OpenApi.annotations({ title: "orchestra", description: "Project main sessions and their access." }))
+  .annotateMerge(OpenApi.annotations({ title: "orchestra", description: "Operator projects and their main sessions." }))

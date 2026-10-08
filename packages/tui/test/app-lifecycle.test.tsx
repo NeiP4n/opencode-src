@@ -495,10 +495,9 @@ test("automatic rename refreshes the displayed title before settling, even witho
     fetch: async (url, request) => {
       if (url.pathname === "/api/location") return json(location)
       // The project tree on the left shows the session title.
-      if (url.pathname === "/api/project")
-        return json([
-          { id: "project", canonical: directory, time: { created: 0, updated: 0, active: 0 }, sandboxes: [] },
-        ])
+      if (url.pathname === "/api/orchestra/project")
+        return json([{ id: "prj_test", name: "Test", directory, created: 0 }])
+      if (url.pathname === "/api/orchestra/project/prj_test/session") return json({ data: [session], access: {} })
       if (url.pathname === "/api/agent")
         return json({ location, data: [{ id: "build", mode: "primary", hidden: false, permissions: [] }] })
       if (url.pathname === "/api/model")

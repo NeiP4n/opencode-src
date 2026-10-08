@@ -471,6 +471,14 @@ export type RoomInfo1 = {
   created: number | "Infinity" | "-Infinity" | "NaN"
 }
 
+export type OrchestraProject = {
+  id: string
+  name: string
+  directory: string
+  main?: string | undefined
+  created: number
+}
+
 export type OrchestraAccess = "hidden" | "read" | "write" | "full"
 
 export type SessionMessageLocationSwitched = {
@@ -1721,8 +1729,6 @@ export type WorktreeList = Array<WorktreeDirectory>
 export type VcsInfo = { provider?: string; branch: VcsBranch }
 
 export type RoomJoined = { token: string; guest: RoomGuest; room: RoomInfo }
-
-export type OrchestraState = { main?: string | undefined; access: { [x: string]: OrchestraAccess } }
 
 export type SessionInboxMove = {
   id: string
@@ -6859,13 +6865,34 @@ export type RoomGuestPermissionReplyInput = {
 
 export type RoomGuestPermissionReplyOutput = void
 
-export type OrchestraGetInput = { readonly projectID: { readonly projectID: string }["projectID"] }
+export type OrchestraProjectListOutput = Array<OrchestraProject>
 
-export type OrchestraGetOutput = OrchestraState
+export type OrchestraProjectCreateInput = {
+  readonly name: { readonly name: string; readonly directory: string }["name"]
+  readonly directory: { readonly name: string; readonly directory: string }["directory"]
+}
 
-export type OrchestraMainInput = { readonly projectID: { readonly projectID: string }["projectID"] }
+export type OrchestraProjectCreateOutput = OrchestraProject
 
-export type OrchestraMainOutput = SessionInfo1
+export type OrchestraProjectUpdateInput = {
+  readonly projectID: { readonly projectID: string }["projectID"]
+  readonly name?: { readonly name?: string | undefined; readonly directory?: string | undefined }["name"]
+  readonly directory?: { readonly name?: string | undefined; readonly directory?: string | undefined }["directory"]
+}
+
+export type OrchestraProjectUpdateOutput = OrchestraProject
+
+export type OrchestraProjectRemoveInput = { readonly projectID: { readonly projectID: string }["projectID"] }
+
+export type OrchestraProjectRemoveOutput = void
+
+export type OrchestraProjectMainInput = { readonly projectID: { readonly projectID: string }["projectID"] }
+
+export type OrchestraProjectMainOutput = SessionInfo1
+
+export type OrchestraProjectSessionsInput = { readonly projectID: { readonly projectID: string }["projectID"] }
+
+export type OrchestraProjectSessionsOutput = { data: Array<SessionInfo1>; access: { [x: string]: OrchestraAccess } }
 
 export type OrchestraAccessInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]

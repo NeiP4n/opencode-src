@@ -1,11 +1,22 @@
 import { Orchestra } from "@opencode/core/orchestra"
-import { Project } from "@opencode/core/project"
 import { Session } from "@opencode/core/session"
-import { ProjectNotFoundError } from "@opencode/protocol/errors"
+import { InvalidRequestError, ProjectNotFoundError } from "@opencode/protocol/errors"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
 import { missingSession } from "./session-error"
+
+function missingProject(error: Orchestra.ProjectNotFoundError) {
+  return Effect.fail(
+    new ProjectNotFoundError({ projectID: error.projectID, message: `Project not found: ${error.projectID}` }),
+  )
+}
+
+function badDirectory(error: Orchestra.DirectoryError) {
+  return Effect.fail(
+    new InvalidRequestError({ message: `Not an existing directory: ${error.directory}`, field: "directory" }),
+  )
+}
 
 export const OrchestraHandler = HttpApiBuilder.group(Api, "server.orchestra", (handlers) =>
   Effect.gen(function* () {
@@ -13,18 +24,37 @@ export const OrchestraHandler = HttpApiBuilder.group(Api, "server.orchestra", (h
     const sessions = yield* Session.Service
 
     return handlers
-      .handle("orchestra.get", (ctx) => orchestra.state(ctx.params.projectID))
+      .handle("orchestra.project.list", () => orchestra.projects())
+      .handle("orchestra.project.create", (ctx) =>
+        orchestra.create(ctx.payload).pipe(Effect.catchTag("Orchestra.DirectoryError", badDirectory)),
+      )
+      .handle("orchestra.project.update", (ctx) =>
+        orchestra
+          .update(ctx.params.projectID, ctx.payload)
+          .pipe(
+            Effect.catchTag("Orchestra.ProjectNotFoundError", missingProject),
+            Effect.catchTag("Orchestra.DirectoryError", badDirectory),
+          ),
+      )
       .handle(
-        "orchestra.main",
+        "orchestra.project.remove",
         Effect.fn(function* (ctx) {
-          const projects = yield* Project.Service
-          const project = (yield* projects.list()).find((item) => item.id === ctx.params.projectID)
-          if (!project)
-            return yield* new ProjectNotFoundError({
-              projectID: ctx.params.projectID,
-              message: `Project not found: ${ctx.params.projectID}`,
-            })
-          return yield* orchestra.main(project)
+          yield* orchestra
+            .remove(ctx.params.projectID)
+            .pipe(Effect.catchTag("Orchestra.ProjectNotFoundError", missingProject))
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle("orchestra.project.main", (ctx) =>
+        orchestra.main(ctx.params.projectID).pipe(Effect.catchTag("Orchestra.ProjectNotFoundError", missingProject)),
+      )
+      .handle(
+        "orchestra.project.sessions",
+        Effect.fn(function* (ctx) {
+          const data = yield* orchestra
+            .sessions(ctx.params.projectID)
+            .pipe(Effect.catchTag("Orchestra.ProjectNotFoundError", missingProject))
+          return { data, access: yield* orchestra.accessMany(data.map((session) => session.id)) }
         }),
       )
       .handle(

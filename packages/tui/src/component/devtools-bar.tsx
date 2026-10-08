@@ -17,6 +17,8 @@ import { useDialog } from "../ui/dialog"
 import { PanelBox, PanelTitle, Row } from "./devtools-panel"
 import { RegistryPanel } from "./devtools-registry"
 import { DialogRooms } from "./dialog-rooms"
+import { openProjectDialog } from "./dialog-project"
+import { useProjects } from "../context/projects"
 import { DialogExperiments } from "./dialog-experiments"
 import { usePlugin } from "../plugin/context"
 import { errorMessage } from "../util/error"
@@ -33,6 +35,7 @@ export function DevToolsBar() {
   const client = useClient()
   const config = useConfig()
   const dialog = useDialog()
+  const projects = useProjects()
   const data = useData()
   const location = useLocation()
   const route = useRoute()
@@ -445,6 +448,17 @@ export function DevToolsBar() {
       >
         <text fg={theme.text.muted}>Rooms</text>
       </BarItem>
+      <Show when={projects.loaded() && projects.list().length === 0}>
+        <BarItem
+          active={false}
+          onClick={() => {
+            close()
+            openProjectDialog(dialog, projects.refetch)
+          }}
+        >
+          <text fg={theme.text.action.primary.base}>+ Project</text>
+        </BarItem>
+      </Show>
       <BarItem
         active={false}
         onClick={() => {

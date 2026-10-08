@@ -1,21 +1,24 @@
 import { TextAttributes } from "@opentui/core"
-import { createEffect, createMemo, createResource, createSignal, For, onMount, Show, type JSX } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, For, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
-import type { OrchestraAccess, OrchestraState, Project } from "@opencode/client/promise"
-import path from "node:path"
+import type { OrchestraAccess, OrchestraProject } from "@opencode/client/promise"
+import { Orchestra } from "@opencode/schema/orchestra"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
 import { useRoute } from "../context/route"
 import { useTheme } from "../context/theme"
+import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
+import { openProjectDialog } from "./dialog-project"
+import { useProjects } from "../context/projects"
 
-// The left panel: projects first, each with its main session (the orchestra)
-// and the project's sessions under it. The chip after a session is the access
-// the orchestra has to it; clicking it steps through the levels.
+// The left panel: the operator's own projects, each a name and a directory,
+// with its main session (the orchestra) and the sessions opened in that
+// directory under it. The chip after a session is the access the orchestra
+// has to it; clicking it steps through the levels.
 
 const ACCESS_ORDER: readonly OrchestraAccess[] = ["hidden", "read", "write", "full"]
-const SESSION_LIMIT = 30
 
 export function ProjectTree(props: { width: number }) {
   const client = useClient()
@@ -23,30 +26,40 @@ export function ProjectTree(props: { width: number }) {
   const route = useRoute()
   const theme = useTheme()
   const toast = useToast()
-  const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
-  const [states, setStates] = createStore<Record<string, OrchestraState>>({})
+  const dialog = useDialog()
+  const projectList = useProjects()
+  const projects = projectList.list
   const [rooms] = createResource(() => client.api.room.list().catch(() => []))
+  const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
+  const [access, setAccess] = createStore<Record<string, OrchestraAccess>>({})
   const [hover, setHover] = createSignal<string>()
-
-  onMount(() => void data.project.sync())
 
   const current = () => (route.data.type === "session" ? data.session.get(route.data.sessionID) : undefined)
   const shared = createMemo(() => new Set((rooms() ?? []).map((room) => room.sessionID)))
+  const owner = (directory: string) =>
+    // The deepest project wins when one project directory sits inside another.
+    projects()
+      .filter((project) => Orchestra.contains(project.directory, directory))
+      .toSorted((a, b) => b.directory.length - a.directory.length)[0]
 
   // The project of the open session starts expanded so the tree shows where you are.
   createEffect(() => {
-    const projectID = current()?.projectID
-    if (projectID && expanded[projectID] === undefined) void expand(projectID)
+    const session = current()
+    const project =
+      session &&
+      projects().find((item) => item.main === session.id || owner(session.location.directory)?.id === item.id)
+    if (project && expanded[project.id] === undefined) void expand(project.id)
   })
 
   const expand = async (projectID: string) => {
     setExpanded(projectID, true)
-    await Promise.all([
-      client.api.orchestra.get({ projectID }).then((state) => setStates(projectID, state)),
-      client.api.session
-        .list({ project: projectID, parentID: null, limit: SESSION_LIMIT, order: "desc" })
-        .then((response) => response.data.forEach((session) => data.session.remember(session))),
-    ]).catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
+    await client.api.orchestra.project
+      .sessions({ projectID })
+      .then((result) => {
+        result.data.forEach((session) => data.session.remember(session))
+        setAccess(result.access)
+      })
+      .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
   }
 
   const toggle = (projectID: string) => {
@@ -54,53 +67,67 @@ export function ProjectTree(props: { width: number }) {
     void expand(projectID)
   }
 
-  const openMain = (project: Project) =>
-    client.api.orchestra
+  const edit = (project?: OrchestraProject) => openProjectDialog(dialog, projectList.refetch, project)
+
+  const openMain = (project: OrchestraProject) =>
+    client.api.orchestra.project
       .main({ projectID: project.id })
       .then((session) => {
         data.session.remember(session)
-        setStates(project.id, "main", session.id)
+        projectList.mutate((list) =>
+          list?.map((item) => (item.id === project.id ? { ...item, main: session.id } : item)),
+        )
         route.navigate({ type: "session", sessionID: session.id })
       })
       .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
 
-  const cycle = (projectID: string, sessionID: string) => {
-    const now = access(projectID, sessionID)
+  const cycle = (sessionID: string) => {
+    const now = access[sessionID] ?? Orchestra.defaultAccess
     const next = ACCESS_ORDER[(ACCESS_ORDER.indexOf(now) + 1) % ACCESS_ORDER.length]
-    setStates(projectID, "access", sessionID, next)
+    setAccess(sessionID, next)
     void client.api.orchestra.access({ sessionID, access: next }).catch((error: unknown) => {
-      setStates(projectID, "access", sessionID, now)
+      setAccess(sessionID, now)
       toast.show({ message: errorMessage(error), variant: "error" })
     })
   }
 
-  const access = (projectID: string, sessionID: string): OrchestraAccess =>
-    states[projectID]?.access[sessionID] ?? "read"
-
-  const sessionsOf = (projectID: string) =>
+  const sessionsOf = (project: OrchestraProject) =>
     data.session
       .list()
       .filter(
-        (session) => session.projectID === projectID && !session.parentID && session.id !== states[projectID]?.main,
+        (session) =>
+          !session.parentID && session.id !== project.main && owner(session.location.directory)?.id === project.id,
       )
 
   return (
     <box width={props.width} height="100%" flexShrink={0} backgroundColor={theme.background.raised.base} paddingTop={1}>
-      <box paddingLeft={2} paddingBottom={1}>
+      <box flexDirection="row" paddingLeft={2} paddingRight={1} paddingBottom={1}>
         <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
           Projects
         </text>
+        <box flexGrow={1} />
+        <Row id="new-project" hover={hover} setHover={setHover} onClick={() => edit()}>
+          <text fg={theme.text.action.primary.base}>+ New</text>
+        </Row>
       </box>
       <scrollbox flexGrow={1} minHeight={0} horizontalScrollbarOptions={{ visible: false }}>
-        <For each={data.project.list()}>
+        <For each={projects()}>
           {(project) => (
             <box>
               <Row id={project.id} hover={hover} setHover={setHover} onClick={() => toggle(project.id)}>
                 <text fg={theme.text.muted}>{expanded[project.id] ? "▾ " : "▸ "}</text>
                 <box flexGrow={1} minWidth={0}>
                   <text fg={theme.text.base} attributes={TextAttributes.BOLD} wrapMode="none" truncate>
-                    {project.name || path.basename(project.canonical) || project.canonical}
+                    {project.name}
                   </text>
+                </box>
+                <box
+                  onMouseUp={(event) => {
+                    event.stopPropagation()
+                    edit(project)
+                  }}
+                >
+                  <text fg={hover() === project.id ? theme.text.action.primary.base : theme.text.muted}> ⚙</text>
                 </box>
               </Row>
               <Show when={expanded[project.id]}>
@@ -108,7 +135,7 @@ export function ProjectTree(props: { width: number }) {
                   id={`${project.id}:main`}
                   hover={hover}
                   setHover={setHover}
-                  selected={states[project.id]?.main !== undefined && states[project.id]?.main === current()?.id}
+                  selected={project.main !== undefined && project.main === current()?.id}
                   onClick={() => void openMain(project)}
                 >
                   <text fg={theme.text.action.primary.base}>{"  ★ "}</text>
@@ -116,7 +143,7 @@ export function ProjectTree(props: { width: number }) {
                     Orchestra
                   </text>
                 </Row>
-                <For each={sessionsOf(project.id)}>
+                <For each={sessionsOf(project)}>
                   {(session) => (
                     <Row
                       id={session.id}
@@ -142,10 +169,12 @@ export function ProjectTree(props: { width: number }) {
                       <box
                         onMouseUp={(event) => {
                           event.stopPropagation()
-                          cycle(project.id, session.id)
+                          cycle(session.id)
                         }}
                       >
-                        <text fg={theme.text.formfield.base}>{`[${access(project.id, session.id)}]`}</text>
+                        <text
+                          fg={theme.text.formfield.base}
+                        >{`[${access[session.id] ?? Orchestra.defaultAccess}]`}</text>
                       </box>
                     </Row>
                   )}
@@ -154,7 +183,7 @@ export function ProjectTree(props: { width: number }) {
                   id={`${project.id}:new`}
                   hover={hover}
                   setHover={setHover}
-                  onClick={() => route.navigate({ type: "home", location: { directory: project.canonical } })}
+                  onClick={() => route.navigate({ type: "home", location: { directory: project.directory } })}
                 >
                   <text fg={theme.text.muted}>{"  + New session"}</text>
                 </Row>
