@@ -7,7 +7,14 @@ export function selfCommand() {
   if (runtime !== "bun" && runtime !== "node" && runtime !== "nodejs") return [process.execPath]
   if (!entrypoint) throw new Error("Failed to resolve CLI entrypoint")
   if (runtime === "node" || runtime === "nodejs") return [process.execPath, ...nodeFlags(), entrypoint]
-  return [process.execPath, entrypoint]
+  return [process.execPath, ...bunFlags(), entrypoint]
+}
+
+// A source checkout started from another directory finds its bunfig (and the JSX
+// preload in it) only through --config; children start in the caller's directory
+// too, so they need the same flag.
+function bunFlags() {
+  return process.execArgv.filter((arg) => arg.startsWith("--config="))
 }
 
 function nodeFlags() {
