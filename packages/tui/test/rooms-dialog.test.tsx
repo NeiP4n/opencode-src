@@ -8,17 +8,16 @@ const room = { id: "room_lab", sessionID: "ses_lab", name: "Lab", ai: "linked", 
 
 function cell(frame: string, needle: string) {
   const lines = frame.split("\n")
-  const y = lines.findIndex((line) => line.includes(needle))
+  const y = lines.findLastIndex((line) => line.includes(needle))
   if (y < 0) throw new Error(`no ${needle} on screen`)
   return { x: lines[y].indexOf(needle), y }
 }
 
-test("the rooms dialog separates sharing from joining and shows where to enter a code", async () => {
-  await using state = await tmpdir()
-  await using setup = await createAppFixture({
+async function render(state: string) {
+  return createAppFixture({
     width: 130,
     height: 40,
-    state: state.path,
+    state,
     config: { animations: false, debug: { devtools: true } },
     fetch: (url, request) => {
       if (url.pathname === "/api/location") return json(location)
@@ -40,23 +39,38 @@ test("the rooms dialog separates sharing from joining and shows where to enter a
         return json({ code: "ABCD-EFGH", expires_in: 600 })
     },
   })
+}
 
-  const bar = await setup.waitForFrame((frame) => frame.includes("Rooms"))
-  const entry = cell(bar.split("\n").slice(-3).join("\n"), "Rooms")
-  await setup.mockMouse.click(entry.x, bar.split("\n").length - 3 + entry.y)
-  const frame = await setup.waitForFrame(
-    (frame) => frame.includes("Join a room on another computer") && frame.includes("Get join code"),
-  )
-  expect(frame).toContain("Shared from this computer")
-  // only addresses other devices can reach: Wi-Fi and VPN, not loopback or container bridges
+test("Host lists reachable addresses and hands out a join code", async () => {
+  await using state = await tmpdir()
+  await using setup = await render(state.path)
+  const bar = await setup.waitForFrame((frame) => frame.includes("Host") && frame.includes("Connect"))
+  const entry = cell(bar, "Host")
+  await setup.mockMouse.click(entry.x, entry.y)
+  const frame = await setup.waitForFrame((frame) => frame.includes("Get join code"))
+  // only addresses other devices can reach, not loopback or container bridges
   expect(frame).toContain("192.168.1.5:4096")
   expect(frame).toContain("26.10.0.2:4096")
   expect(frame).not.toContain("172.17.0.1")
   expect(frame).not.toContain("198.18.0.1")
-  expect(frame).toContain("Your name")
+  expect(frame).not.toContain("Join with address")
 
   const button = cell(frame, "Get join code")
   await setup.mockMouse.click(button.x + 2, button.y)
   const issued = await setup.waitForFrame((frame) => frame.includes("ABCD-EFGH  valid until"))
-  expect(issued).toContain("On the other device open Rooms and enter the address and the join code.")
+  expect(issued).toContain("On the other device open Connect")
+})
+
+test("Connect searches the network in its own window and offers manual entry", async () => {
+  await using state = await tmpdir()
+  await using setup = await render(state.path)
+  const bar = await setup.waitForFrame((frame) => frame.includes("Connect"))
+  const entry = cell(bar, "Connect")
+  await setup.mockMouse.click(entry.x, entry.y)
+  const frame = await setup.waitForFrame((frame) => frame.includes("Join with address and code"))
+  expect(frame).toContain("Rooms on this network")
+  expect(frame).toContain("[ Search again ]")
+  expect(frame).toContain("Your name")
+  expect(frame).not.toContain("VPN")
+  expect(frame).not.toContain("Get join code")
 })

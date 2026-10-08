@@ -468,8 +468,8 @@ function ToolRow(props: {
   )
 }
 
-// A filled chip so it reads as a button on any surface. Primary is for the main
-// action of a section; secondary for toggles and less important actions.
+// Primary is a filled chip for the main action of a section. Secondary keeps the
+// theme's transparent background, so brackets mark it as clickable.
 export function Button(props: {
   children: string
   onClick: () => void
@@ -479,17 +479,20 @@ export function Button(props: {
 }) {
   const theme = useTheme().surface("dialog")
   const [hovered, setHovered] = createSignal(false)
-  const variant = () => props.variant ?? "secondary"
+  const primary = () => props.variant === "primary"
+  const state = () => (props.disabled ? "disabled" : hovered() ? "hovered" : primary() ? "focused" : "base")
   return (
     <box
-      paddingLeft={1}
-      paddingRight={1}
+      paddingLeft={primary() ? 1 : 0}
+      paddingRight={primary() ? 1 : 0}
       backgroundColor={
         props.disabled
           ? undefined
-          : hovered()
-            ? theme.background.action[variant()].hovered
-            : theme.background.action[variant()].focused
+          : primary()
+            ? theme.background.action.primary[hovered() ? "hovered" : "focused"]
+            : hovered()
+              ? theme.background.action.primary.hovered
+              : undefined
       }
       onMouseOver={() => setHovered(true)}
       onMouseOut={() => {
@@ -501,17 +504,7 @@ export function Button(props: {
         if (!props.disabled) props.onClick()
       }}
     >
-      <text
-        fg={
-          props.disabled
-            ? theme.text.action[variant()].disabled
-            : hovered()
-              ? theme.text.action[variant()].hovered
-              : theme.text.action[variant()].focused
-        }
-      >
-        {props.children}
-      </text>
+      <text fg={theme.text.action.primary[state()]}>{primary() ? props.children : `[ ${props.children} ]`}</text>
     </box>
   )
 }
