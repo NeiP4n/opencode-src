@@ -208,6 +208,15 @@ test("the length control and the editor write through the note API once", async 
   expect(edits).toHaveLength(1)
   expect(edits[0].body).toEqual({ body: "Draft # Goals\n\nShip the notes canvas.", expectedMtime: 101 })
   await setup.waitForFrame((frame) => !frame.includes("ctrl+s save"))
+
+  // Escape leaves the editor without writing.
+  await click(setup, "✎ Edit", 1)
+  await setup.waitForFrame((frame) => frame.includes("ctrl+s save"))
+  await Bun.sleep(50)
+  await setup.mockInput.typeText("discard me ")
+  setup.mockInput.pressEscape()
+  await setup.waitForFrame((frame) => !frame.includes("ctrl+s save") && !frame.includes("discard me"))
+  expect(calls.filter((call) => call.path.endsWith("/edit"))).toHaveLength(1)
 })
 
 test("a save that lost a race keeps the text and offers the latest version", async () => {
@@ -273,6 +282,13 @@ test("a new note starts with its own bound chat, and deleting one takes two clic
   await click(setup, "delete?", 1)
   await setup.waitFor(() => calls.some((call) => call.method === "DELETE"))
   await setup.waitForFrame((frame) => !frame.includes("Onboarding ideas"))
+
+  // Escape closes the field without creating anything.
+  await click(setup, "+ New", 1)
+  await setup.waitForFrame((frame) => frame.includes("Note title, enter to create"))
+  await Bun.sleep(50)
+  setup.mockInput.pressEscape()
+  await setup.waitForFrame((frame) => !frame.includes("Note title, enter to create"))
 
   await click(setup, "+ New", 1)
   await setup.waitForFrame((frame) => frame.includes("Note title, enter to create"))
