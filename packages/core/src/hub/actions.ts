@@ -30,7 +30,8 @@ const NO_COMMAND_EXIT = 1
 // Tool names are spliced into shell commands verbatim, so only names that the
 // fixed catalog declares as `requires` may reach planFor: an arbitrary caller
 // string would otherwise travel into `sh -c` unchanged (review 07.10, MAJOR).
-const KNOWN: ReadonlySet<string> = new Set(all.flatMap((entry) => entry.requires ?? []))
+// The terminals hub commands can run in are installable too.
+const KNOWN: ReadonlySet<string> = new Set([...all.flatMap((entry) => entry.requires ?? []), "nu", "pwsh"])
 
 export async function installTool(tool: string, options: ActionOptions = {}): Promise<ActionResult> {
   if (!KNOWN.has(tool)) return unknownTool(tool)
@@ -56,7 +57,10 @@ export function failureReason(output: string) {
   if (output.includes("/var/lib/pacman/db.lck"))
     return "pacman database is locked: wait for the running pacman, or remove /var/lib/pacman/db.lck if none is running"
   if (/Could not get lock .*dpkg/.test(output)) return "dpkg is locked by another apt or dpkg process"
-  const lines = output.split("\n").map((line) => line.trim()).filter((line) => line.length > 0)
+  const lines = output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
   return lines.find((line) => /^(error|ошибка|E:)/i.test(line)) ?? lines.at(-1) ?? "failed"
 }
 

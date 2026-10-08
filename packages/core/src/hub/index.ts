@@ -14,8 +14,8 @@ export {
   MissingArgumentError,
   MissingToolError,
 } from "./resolve.js"
-export { planFor, removeCommand, detectManager, installable, type Manager, type Plan } from "./install.js"
-export { read, setEnabled, type State } from "./state.js"
+export { planFor, removeCommand, detectManager, installable, manualInstall, type Manager, type Plan } from "./install.js"
+export { read, setEnabled, setTerminal, type State } from "./state.js"
 export * as HubActions from "./actions.js"
 export type { ActionResult } from "./actions.js"
 export { renderHubHints, type Hints } from "./prompt.js"

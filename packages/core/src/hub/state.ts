@@ -8,6 +8,8 @@ import { Path } from "@opencode/util/global"
 const StateSchema = Schema.Struct({
   version: Schema.Literal(1),
   enabled: Schema.Record(Schema.String, Schema.Boolean),
+  // The terminal hub commands run in; absent means the first installed of nu, pwsh, bash.
+  terminal: Schema.optional(Schema.Literals(["bash", "nu", "pwsh"])),
 })
 
 const decodeState = Schema.decodeUnknownOption(Schema.fromJsonString(StateSchema))
@@ -29,9 +31,16 @@ export async function read(options: Options = {}): Promise<State> {
 
 export async function setEnabled(id: string, enabled: boolean, options: Options = {}): Promise<void> {
   const state = await read(options)
+  await write({ ...state, enabled: { ...state.enabled, [id]: enabled } }, options)
+}
+
+export async function setTerminal(terminal: NonNullable<State["terminal"]>, options: Options = {}): Promise<void> {
+  await write({ ...(await read(options)), terminal }, options)
+}
+
+async function write(next: State, options: Options) {
   const destination = file(options)
   await fs.mkdir(path.dirname(destination), { recursive: true })
-  const next: State = { version: 1, enabled: { ...state.enabled, [id]: enabled } }
   const temporary = `${destination}.${process.pid}.${crypto.randomUUID()}.tmp`
   // temp+rename in the same directory: a crash between write and rename leaves the previous
   // file intact, whereas a half-written hub.json would read back as "nothing enabled".

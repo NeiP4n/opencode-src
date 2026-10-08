@@ -11,7 +11,15 @@ const PACKAGE: Record<string, Partial<Record<Manager, string>>> = {
   // The catalog uses mikefarah's yq syntax; Arch ships it as go-yq, while its `yq` is the Python wrapper.
   yq: { apt: "yq", dnf: "yq", pacman: "go-yq", brew: "yq", winget: "mikefarah.yq" },
   mlr: { apt: "miller", dnf: "miller", pacman: "miller", brew: "miller", winget: "johnkerl.miller" },
-  nu: { apt: "nushell", brew: "nushell", winget: "nushell.nushell" },
+  nu: { apt: "nushell", dnf: "nushell", pacman: "nushell", brew: "nushell", winget: "nushell.nushell" },
+  pwsh: {
+    apt: "powershell",
+    dnf: "powershell",
+    brew: "powershell",
+    winget: "Microsoft.PowerShell",
+    scoop: "pwsh",
+    choco: "powershell-core",
+  },
   lsd: { apt: "lsd", brew: "lsd", winget: "Chemadic.lsd" },
   sd: { apt: "sd", brew: "sd" },
   watchexec: { apt: "watchexec", brew: "watchexec" },
@@ -26,6 +34,17 @@ const PACKAGE: Record<string, Partial<Record<Manager, string>>> = {
 const ONLY: Record<string, readonly Manager[]> = {
   "apt-cache": ["apt"],
   "dpkg-query": ["apt"],
+  // Arch ships PowerShell only through the AUR, which pacman cannot install.
+  pwsh: ["apt", "dnf", "brew", "winget", "choco", "scoop"],
+}
+
+// What to tell the operator when the manager cannot install a tool itself.
+const MANUAL: Record<string, Partial<Record<Manager, string>>> = {
+  pwsh: { pacman: "from the AUR: yay -S powershell-bin" },
+}
+
+export function manualInstall(tool: string, manager: Manager | undefined) {
+  return manager ? MANUAL[tool]?.[manager] : undefined
 }
 
 export function installable(tool: string, manager: Manager | undefined) {
@@ -45,7 +64,15 @@ function candidates(platform: NodeJS.Platform): Manager[] {
 }
 
 export function detectManager(platform: NodeJS.Platform = process.platform, bin?: string): Manager | undefined {
-  const names: Record<Manager, string> = { apt: "apt-get", dnf: "dnf", pacman: "pacman", brew: "brew", winget: "winget", choco: "choco", scoop: "scoop" }
+  const names: Record<Manager, string> = {
+    apt: "apt-get",
+    dnf: "dnf",
+    pacman: "pacman",
+    brew: "brew",
+    winget: "winget",
+    choco: "choco",
+    scoop: "scoop",
+  }
   return candidates(platform).find((manager) => which(names[manager], undefined, bin))
 }
 
@@ -105,10 +132,13 @@ export type Plan = {
 
 // Builds the install command for tools an entry is missing. Returns undefined
 // when no manager is detected: the caller then falls back to plain bash.
-export function planFor(tools: readonly string[], platform: NodeJS.Platform = process.platform, bin?: string): Plan | undefined {
+export function planFor(
+  tools: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+  bin?: string,
+): Plan | undefined {
   if (tools.length === 0) return undefined
   const manager = detectManager(platform, bin)
   if (!manager) return undefined
   return { manager, command: installCommand(manager, packagesFor(manager, tools)), tools }
 }
-

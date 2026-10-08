@@ -14,6 +14,7 @@ import { Keymap } from "../context/keymap"
 import { useTheme, useThemes } from "../context/theme"
 import { DevTools } from "../devtools"
 import { useDialog } from "../ui/dialog"
+import { useToast } from "../ui/toast"
 import { PanelBox, PanelTitle, Row } from "./devtools-panel"
 import { RegistryPanel } from "./devtools-registry"
 import { DialogRooms } from "./dialog-rooms"
@@ -35,6 +36,7 @@ export function DevToolsBar() {
   const client = useClient()
   const config = useConfig()
   const dialog = useDialog()
+  const toast = useToast()
   const projects = useProjects()
   const data = useData()
   const location = useLocation()
@@ -432,7 +434,16 @@ export function DevToolsBar() {
         active={false}
         onClick={() => {
           close()
-          dialog.replace(() => <RegistryPanel onClose={() => dialog.clear()} />, undefined, { size: "large" })
+          dialog.replace(
+            () => (
+              <RegistryPanel
+                onClose={() => dialog.clear()}
+                onShell={(shell) => void client.api.config.update({ shell }).catch(toast.error)}
+              />
+            ),
+            undefined,
+            { size: "large" },
+          )
           dialog.setCentered(true)
         }}
       >

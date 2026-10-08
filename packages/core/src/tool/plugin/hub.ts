@@ -27,8 +27,8 @@ const description = (tools: string[]) =>
   [
     "Run a ready-made fast command from the Universal Tool Hub instead of hand-writing shell.",
     "Prefer this tool over shell when a catalog entry covers the task: hub commands use fast modern CLIs (rg, fd, jq, yq, mlr) and pick the best available backend.",
-    'Call with list or query to discover entries, id plus args to run one.',
-    'With install plus id prints the package-manager command for missing tools. Use shell as fallback when no entry fits.',
+    "Call with list or query to discover entries, id plus args to run one.",
+    "With install plus id prints the package-manager command for missing tools. Use shell as fallback when no entry fits.",
     tools.length > 0 ? `Tools already available: ${tools.join(", ")}.` : "No optional hub tools detected yet.",
   ].join(" ")
 
@@ -154,7 +154,9 @@ export const Plugin = {
             command,
             state: info.status,
             text,
-            output: output ? { output: output.output, truncated: output.truncated ?? false, exit: output.exit } : undefined,
+            output: output
+              ? { output: output.output, truncated: output.truncated ?? false, exit: output.exit }
+              : undefined,
           }),
         })
         if (info.notificationID) yield* jobs.completeBackground(info.notificationID)
@@ -191,117 +193,148 @@ export const Plugin = {
         return yield* Effect.fail(new Error(`Working directory is not a directory: ${target.absolute}`))
       return timeout
     })
-    yield* ctx.tool.transform((editor) =>
-      editor.add({
-        name,
-        options: { codemode: false },
-        description: description(detected),
-        input: Input,
-        output: Output,
-        execute: (input, context) =>
-          Effect.gen(function* () {
-            if (input.install === true) {
-              if (!input.id) return yield* failure("Pass an entry id to get its install command")
-              const found = Hub.get(input.id)
-              if (!found) return yield* failure(`Unknown hub command: ${input.id}`)
-              const lacking = Hub.missingTools(found)
-              if (lacking.length === 0)
-                return { output: `All tools for ${input.id} are already installed.`, status: "completed" as const, hubID: input.id }
-              const plan = Hub.planFor(lacking)
-              if (!plan)
-                return { output: `No package manager detected. Install manually: ${lacking.join(", ")}.`, status: "planned" as const, hubID: input.id }
-              return { output: `Install with: ${plan.command}`, status: "planned" as const, hubID: input.id, command: plan.command }
-            }
-            if (input.list === true || (input.query !== undefined && input.id === undefined)) {
-              const state = yield* Effect.tryPromise(() => Hub.read()).pipe(
-                Effect.orElseSucceed(() => ({ version: 1 as const, enabled: {} }) as Hub.State),
+    yield* ctx.tool
+      .transform((editor) =>
+        editor.add({
+          name,
+          options: { codemode: false },
+          description: description(detected),
+          input: Input,
+          output: Output,
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              if (input.install === true) {
+                if (!input.id) return yield* failure("Pass an entry id to get its install command")
+                const found = Hub.get(input.id)
+                if (!found) return yield* failure(`Unknown hub command: ${input.id}`)
+                const lacking = Hub.missingTools(found)
+                if (lacking.length === 0)
+                  return {
+                    output: `All tools for ${input.id} are already installed.`,
+                    status: "completed" as const,
+                    hubID: input.id,
+                  }
+                const plan = Hub.planFor(lacking)
+                if (!plan)
+                  return {
+                    output: `No package manager detected. Install manually: ${lacking.join(", ")}.`,
+                    status: "planned" as const,
+                    hubID: input.id,
+                  }
+                return {
+                  output: `Install with: ${plan.command}`,
+                  status: "planned" as const,
+                  hubID: input.id,
+                  command: plan.command,
+                }
+              }
+              if (input.list === true || (input.query !== undefined && input.id === undefined)) {
+                const state = yield* Effect.tryPromise(() => Hub.read()).pipe(
+                  Effect.orElseSucceed(() => ({ version: 1 as const, enabled: {} }) as Hub.State),
+                )
+                const listing = Hub.all.filter(
+                  (entry) => matches(entry, input.query ?? "", input.category) && Hub.discoverable(state, entry),
+                )
+                return {
+                  output: listing
+                    .map(
+                      (entry) =>
+                        `${entry.id} [${entry.category}]${entry.danger === true ? " DANGER" : ""} - ${entry.title}`,
+                    )
+                    .join("\n"),
+                  status: "completed" as const,
+                  entries: listing.map(entryInfo),
+                }
+              }
+              if (!input.id) return yield* failure("Pass an entry id, or use list/query to discover one")
+              const entry = Hub.get(input.id)
+              if (!entry) return yield* failure(`Unknown hub command: ${input.id}`)
+              // The operator's terminal choice applies unless the model asks for one explicitly.
+              const preferred = input.backend ?? (yield* Effect.promise(() => Hub.read())).terminal
+              let rendered: Hub.Rendered
+              try {
+                rendered = Hub.prepare(entry, input.args ?? {}, { backend: preferred })
+              } catch (error) {
+                if (error instanceof Hub.MissingToolError) {
+                  const plan = Hub.planFor(error.missing)
+                  const hint = plan
+                    ? ` Install with: ${plan.command}.`
+                    : " No package manager detected; use shell as fallback."
+                  return yield* failure(`Missing tools for ${input.id}: ${error.missing.join(", ")}.${hint}`)
+                }
+                if (error instanceof Hub.MissingArgumentError)
+                  return yield* failure(`Missing arguments for ${input.id}: ${error.missing.join(", ")}`)
+                throw error
+              }
+              const timeout = DEFAULT_TIMEOUT_MS
+              const info = yield* shell.create(
+                {
+                  command: rendered.command,
+                  cwd: input.workdir,
+                  timeout,
+                  // A nu or pwsh template only works in its own terminal; bash templates use the usual shell.
+                  shell:
+                    rendered.backend === "bash"
+                      ? yield* compatibleShell
+                      : (which(rendered.backend) ?? (yield* compatibleShell)),
+                  metadata: { sessionID: context.sessionID },
+                },
+                (invocation) =>
+                  Effect.gen(function* () {
+                    invocation.env.AGENT = "1"
+                    invocation.env.OPENCODE = "1"
+                    invocation.env.AI_AGENT ||= "opencode"
+                    invocation.env.OPENCODE_SESSION_ID = context.sessionID
+                    yield* prepare(invocation, context)
+                  }),
               )
-              const listing = Hub.all.filter(
-                (entry) => matches(entry, input.query ?? "", input.category) && Hub.discoverable(state, entry),
+              yield* context.progress({ shellID: info.id })
+              const settled = yield* Deferred.make<Output>()
+              const run = Effect.gen(function* () {
+                const result = yield* shell.result(info)
+                if (!result.capture) return yield* new Shell.NotFoundError({ id: info.id })
+                const out = ShellResult.output(result)
+                return {
+                  ...out,
+                  status: "completed" as const,
+                  hubID: entry.id,
+                  backend: rendered.backend,
+                  command: rendered.command,
+                }
+              }).pipe(
+                Effect.tap((output) => Deferred.succeed(settled, output)),
+                Effect.map((output) => output.output),
+                Effect.onInterrupt(() => shell.remove(info.id).pipe(Effect.ignore)),
               )
-              return {
-                output: listing.map((entry) => `${entry.id} [${entry.category}]${entry.danger === true ? " DANGER" : ""} - ${entry.title}`).join("\n"),
-                status: "completed" as const,
-                entries: listing.map(entryInfo),
+              const job = yield* jobs.start({
+                id: info.id,
+                type: name,
+                title: rendered.command,
+                metadata: { sessionID: context.sessionID, shellID: info.id },
+                recovery: { kind: "shell", sessionID: context.sessionID, shellID: info.id, command: info.command },
+                run,
+              })
+              const result = yield* jobs
+                .block({ id: job.id, sessionID: context.sessionID })
+                .pipe(Effect.onInterrupt(() => jobs.cancel(job.id).pipe(Effect.ignore)))
+              if (result?.type === "backgrounded") {
+                yield* shell.timeout(info.id, 0)
+                yield* notifyWhenDone(context.sessionID, job.id, info.id, info.command, settled)
+                return backgroundResult(info.id, info.file)
               }
-            }
-            if (!input.id) return yield* failure("Pass an entry id, or use list/query to discover one")
-            const entry = Hub.get(input.id)
-            if (!entry) return yield* failure(`Unknown hub command: ${input.id}`)
-            let rendered: Hub.Rendered
-            try {
-              rendered = Hub.prepare(entry, input.args ?? {}, { backend: input.backend })
-            } catch (error) {
-              if (error instanceof Hub.MissingToolError) {
-                const plan = Hub.planFor(error.missing)
-                const hint = plan ? ` Install with: ${plan.command}.` : " No package manager detected; use shell as fallback."
-                return yield* failure(`Missing tools for ${input.id}: ${error.missing.join(", ")}.${hint}`)
-              }
-              if (error instanceof Hub.MissingArgumentError)
-                return yield* failure(`Missing arguments for ${input.id}: ${error.missing.join(", ")}`)
-              throw error
-            }
-            const timeout = DEFAULT_TIMEOUT_MS
-            const info = yield* shell.create(
-              {
-                command: rendered.command,
-                cwd: input.workdir,
-                timeout,
-                shell: yield* compatibleShell,
-                metadata: { sessionID: context.sessionID },
-              },
-              (invocation) =>
-                Effect.gen(function* () {
-                  invocation.env.AGENT = "1"
-                  invocation.env.OPENCODE = "1"
-                  invocation.env.AI_AGENT ||= "opencode"
-                  invocation.env.OPENCODE_SESSION_ID = context.sessionID
-                  yield* prepare(invocation, context)
-                }),
-            )
-            yield* context.progress({ shellID: info.id })
-            const settled = yield* Deferred.make<Output>()
-            const run = Effect.gen(function* () {
-              const result = yield* shell.result(info)
-              if (!result.capture) return yield* new Shell.NotFoundError({ id: info.id })
-              const out = ShellResult.output(result)
-              return {
-                ...out,
-                status: "completed" as const,
-                hubID: entry.id,
-                backend: rendered.backend,
-                command: rendered.command,
-              }
+              if (result?.info.status === "error")
+                return yield* Effect.fail(new Error(result.info.error ?? "Command failed"))
+              if (result?.info.status === "cancelled") return yield* Effect.fail(new Error("Command cancelled"))
+              return yield* Deferred.await(settled)
             }).pipe(
-              Effect.tap((output) => Deferred.succeed(settled, output)),
-              Effect.map((output) => output.output),
-              Effect.onInterrupt(() => shell.remove(info.id).pipe(Effect.ignore)),
-            )
-            const job = yield* jobs.start({
-              id: info.id,
-              type: name,
-              title: rendered.command,
-              metadata: { sessionID: context.sessionID, shellID: info.id },
-              recovery: { kind: "shell", sessionID: context.sessionID, shellID: info.id, command: info.command },
-              run,
-            })
-            const result = yield* jobs
-              .block({ id: job.id, sessionID: context.sessionID })
-              .pipe(Effect.onInterrupt(() => jobs.cancel(job.id).pipe(Effect.ignore)))
-            if (result?.type === "backgrounded") {
-              yield* shell.timeout(info.id, 0)
-              yield* notifyWhenDone(context.sessionID, job.id, info.id, info.command, settled)
-              return backgroundResult(info.id, info.file)
-            }
-            if (result?.info.status === "error") return yield* Effect.fail(new Error(result.info.error ?? "Command failed"))
-            if (result?.info.status === "cancelled") return yield* Effect.fail(new Error("Command cancelled"))
-            return yield* Deferred.await(settled)
-          }).pipe(
-            Effect.map(toolResult),
-            Effect.mapError((error) => new ToolFailure({ message: `Unable to run hub command: ${input.id ?? "?"}`, error })),
-          ),
-      }),
-    ).pipe(Effect.orDie)
+              Effect.map(toolResult),
+              Effect.mapError(
+                (error) => new ToolFailure({ message: `Unable to run hub command: ${input.id ?? "?"}`, error }),
+              ),
+            ),
+        }),
+      )
+      .pipe(Effect.orDie)
 
     const hook = (event: SessionHooks["context"]) =>
       Effect.gen(function* () {

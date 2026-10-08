@@ -19,7 +19,8 @@ export type RegistryStatus = {
   installed: string[]
   // Absent tools with the number of entries each one blocks
   missing: { tool: string; entries: number }[]
-  terminals: { name: Hub.Backend; present: boolean }[]
+  // Terminals hub commands can run in; `manual` says how to install one the manager cannot.
+  terminals: { name: Hub.Backend; present: boolean; installable: boolean; manual?: string }[]
   categories: { name: string; ready: number; total: number }[]
   tools: RegistryTool[]
   install?: string
@@ -67,7 +68,12 @@ export function hubRegistryStatus(options?: RegistryOptions): RegistryStatus {
     total: entries.length,
     installed: tools.filter((tool) => present.has(tool)),
     missing,
-    terminals: TERMINALS.map((name) => ({ name, present: probe(name) })),
+    terminals: TERMINALS.map((name) => ({
+      name,
+      present: probe(name),
+      installable: name !== "bash" && Hub.installable(name, manager) && manager !== undefined,
+      manual: Hub.manualInstall(name, manager),
+    })),
     categories: categoryCounts(entries, present),
     tools: toolRows(entries, present, enabled),
     install: plan?.command,
@@ -95,9 +101,7 @@ function toolRows(
     entries: count,
     installed: present.has(tool),
     enabled: Hub.hinted(state, tool),
-  })).sort(
-    (a, b) => Number(a.installed) - Number(b.installed) || b.entries - a.entries || a.tool.localeCompare(b.tool),
-  )
+  })).sort((a, b) => Number(a.installed) - Number(b.installed) || b.entries - a.entries || a.tool.localeCompare(b.tool))
 }
 
 // Absent tool with the number of platform entries it keeps from running.

@@ -1,5 +1,5 @@
 import { TextAttributes, type InputRenderable, type RGBA } from "@opentui/core"
-import { createMemo, createSignal, For, onMount, Show, type JSX } from "solid-js"
+import { createMemo, createSignal, For, Match, onMount, Show, Switch, type JSX } from "solid-js"
 import { Hub } from "@opencode/core/hub/index"
 import { HubState } from "@opencode/core/hub/state"
 import { useConfig } from "../config"
@@ -37,7 +37,12 @@ export type RegistryPanelOptions = RegistryOptions & {
   remove?: (tool: string) => Promise<Hub.ActionResult>
 }
 
-export function RegistryPanel(props: { options?: RegistryPanelOptions; onClose?: () => void }) {
+export function RegistryPanel(props: {
+  options?: RegistryPanelOptions
+  onClose?: () => void
+  // Makes the chosen terminal the shell tool's shell too, where that shell can be permission-checked.
+  onShell?: (shell: string) => void
+}) {
   const theme = useTheme().surface("dialog")
   const toast = useToast()
   const options = props.options ?? {}
@@ -53,6 +58,7 @@ export function RegistryPanel(props: { options?: RegistryPanelOptions; onClose?:
   const [page, setPage] = createSignal(0)
   const [cursor, setCursor] = createSignal(0)
   const [query, setQuery] = createSignal("")
+  const [terminal, setTerminal] = createSignal<Hub.Backend>()
   const config = useConfig().data
 
   // A click that lands before the state file resolves is the operator's newest
@@ -62,11 +68,9 @@ export function RegistryPanel(props: { options?: RegistryPanelOptions; onClose?:
   // otherwise read-modify-write the file concurrently and lose an update.
   let writes: Promise<void> = Promise.resolve()
   onMount(async () => {
-    const state = await HubState.read({ directory: options.directory }).catch(() => ({
-      version: 1 as const,
-      enabled: {},
-    }))
+    const state = await HubState.read({ directory: options.directory })
     if (!interacted) setEnabled(state.enabled)
+    setTerminal(state.terminal)
     setRevision((value) => value + 1)
   })
 
@@ -101,6 +105,21 @@ export function RegistryPanel(props: { options?: RegistryPanelOptions; onClose?:
   const selected = () => rows()[Math.min(cursor(), rows().length - 1)]
   const missing = createMemo(() => status().tools.filter((row) => !row.installed))
   const isOn = (tool: string) => enabled()[tool] === true
+  // Without a choice the hub prefers nu, then pwsh, then bash, whichever is installed.
+  const aiTerminal = () =>
+    terminal() ??
+    (["nu", "pwsh", "bash"] as const).find((name) =>
+      status().terminals.some((item) => item.name === name && item.present),
+    )
+
+  const chooseTerminal = (name: Hub.Backend) => {
+    setTerminal(name)
+    void HubState.setTerminal(name, { directory: options.directory }).catch((error: unknown) =>
+      toast.show({ message: error instanceof Error ? error.message : String(error), variant: "error" }),
+    )
+    // nu cannot be permission-checked as a general shell, so the shell tool keeps bash then.
+    if (name !== "nu") props.onShell?.(name)
+  }
 
   const runAction = async (
     tool: string,
@@ -232,17 +251,42 @@ export function RegistryPanel(props: { options?: RegistryPanelOptions; onClose?:
           label="For the model"
           value={`${status().tools.filter((row) => isOn(row.tool)).length}/${status().tools.length}`}
         />
-        <box flexDirection="row" gap={1}>
-          <text fg={theme.text.muted}>Terminals</text>
-          <For each={status().terminals}>
-            {(terminal) => (
-              <text fg={terminal.present ? theme.text.base : theme.text.muted}>
-                {`${terminal.name} ${terminal.present ? "✓" : "×"}`}
-              </text>
-            )}
-          </For>
-        </box>
       </box>
+
+      <box flexDirection="row" gap={1}>
+        <text fg={theme.text.muted}>AI terminal</text>
+        <For each={status().terminals}>
+          {(item) => (
+            <Switch>
+              <Match when={item.present}>
+                <Button
+                  variant={aiTerminal() === item.name ? "primary" : "secondary"}
+                  disabled={busy() !== undefined}
+                  onClick={() => chooseTerminal(item.name)}
+                >
+                  {`${aiTerminal() === item.name ? "●" : "○"} ${item.name}`}
+                </Button>
+              </Match>
+              <Match when={busy() === item.name}>
+                <text fg={theme.text.muted}>{`${item.name} …`}</text>
+              </Match>
+              <Match when={item.installable}>
+                <Button disabled={busy() !== undefined} onClick={() => onInstall(item.name)}>
+                  {`Install ${item.name}`}
+                </Button>
+              </Match>
+              <Match when={true}>
+                <text fg={theme.text.muted}>{`${item.name}: ${item.manual ?? "no installer here"}`}</text>
+              </Match>
+            </Switch>
+          )}
+        </For>
+      </box>
+      <Show when={aiTerminal() === "nu"}>
+        <text fg={theme.text.muted} wrapMode="word">
+          Hub commands run in nu. Other shell commands stay in bash, where they can be permission-checked.
+        </text>
+      </Show>
 
       <text fg={theme.text.muted} wrapMode="word">
         {status()

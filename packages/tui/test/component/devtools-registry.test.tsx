@@ -17,7 +17,7 @@ import { createTuiResolvedConfig } from "../fixture/tui-runtime"
 // tool resolves, so the rest of the page carries remove buttons.
 const probe = (tool: string) => tool !== "rg"
 
-async function render(options: RegistryPanelOptions) {
+async function render(options: RegistryPanelOptions & { onShell?: (shell: string) => void }) {
   const app = await testRender(
     () => (
       <TestTuiContexts>
@@ -25,7 +25,7 @@ async function render(options: RegistryPanelOptions) {
           <ThemeProvider mode="dark" source={emptyThemeSource}>
             <Keymap.Provider>
               <ToastProvider>
-                <RegistryPanel options={options} />
+                <RegistryPanel options={options} onShell={options.onShell} />
                 <Toast />
               </ToastProvider>
             </Keymap.Provider>
@@ -75,9 +75,9 @@ test("registry panel shows readiness, terminals and a paged tool list", async ()
     expect(frame).toContain("Registry")
     expect(frame).toContain("Ready")
     expect(frame).toContain(`${status.ready}/${status.total}`)
-    expect(frame).toContain("Terminals")
+    expect(frame).toContain("AI terminal")
     expect(frame).toContain("bash")
-        expect(frame).toContain(`${status.categories[0].name} `)
+    expect(frame).toContain(`${status.categories[0].name} `)
     expect(frame).toContain("Tools")
     // the hint block is opt-in: a fresh state file advertises nothing
     expect(rowValue(frame, "For the model")).toBe(`0/${status.tools.length}`)
@@ -231,7 +231,9 @@ test("pager moves to the second page of tools", async () => {
 test("every catalog tool gets exactly one row", async () => {
   await using tmp = await tmpdir()
   const status = hubRegistryStatus({ probe })
-  const required = new Set(Hub.all.filter((entry) => Hub.supportsPlatform(entry)).flatMap((entry) => entry.requires ?? []))
+  const required = new Set(
+    Hub.all.filter((entry) => Hub.supportsPlatform(entry)).flatMap((entry) => entry.requires ?? []),
+  )
   expect(status.tools.map((row) => row.tool).sort()).toEqual([...required].sort())
   expect(new Set(status.tools.map((row) => row.tool)).size).toBe(status.tools.length)
   // installed/missing stays a partition of the same set
@@ -245,6 +247,42 @@ test("search narrows the tool list by name or by what a recipe does", async () =
     await app.mockInput.typeText("yaml")
     await app.waitForFrame((frame) => frame.includes("[off] yq") && !frame.includes("[off] rg"))
     expect(app.captureCharFrame()).not.toContain("[off] git")
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
+test("the AI terminal can be installed and chosen", async () => {
+  await using tmp = await tmpdir()
+  const installed: string[] = []
+  const shells: string[] = []
+  // pwsh is installed, nu is not; apt can install it
+  const terminals = (tool: string) => tool !== "nu"
+  const app = await render({
+    probe: terminals,
+    manager: "apt",
+    directory: tmp.path,
+    install: async (tool) => {
+      installed.push(tool)
+      return { ok: true, exit: 0, output: "", command: `install ${tool}` }
+    },
+    onShell: (shell) => shells.push(shell),
+  })
+  try {
+    const frame = await app.waitForFrame((frame) => frame.includes("Install nu"))
+    expect(frame).toContain("● pwsh")
+
+    const install = frame.split("\n").findIndex((line) => line.includes("Install nu"))
+    await app.mockMouse.click(frame.split("\n")[install].indexOf("Install nu") + 2, install)
+    await app.waitFor(() => installed.length === 1)
+    expect(installed).toEqual(["nu"])
+
+    const now = app.captureCharFrame()
+    const row = now.split("\n").findIndex((line) => line.includes("○ bash"))
+    await app.mockMouse.click(now.split("\n")[row].indexOf("○ bash") + 2, row)
+    await app.waitForFrame((frame) => frame.includes("● bash"))
+    expect((await HubState.read({ directory: tmp.path })).terminal).toBe("bash")
+    expect(shells).toEqual(["bash"])
   } finally {
     app.renderer.destroy()
   }

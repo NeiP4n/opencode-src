@@ -47,3 +47,17 @@ describe("Hub tool enable state", () => {
     expect(await Hub.read({ directory: tmp.path })).toEqual({ version: 1, enabled: {} })
   })
 })
+
+describe("Hub terminal choice", () => {
+  test("choosing a terminal keeps the switches and switches keep the terminal", async () => {
+    await using tmp = await tmpdir()
+    await Hub.setEnabled("jq", true, { directory: tmp.path })
+    await Hub.setTerminal("nu", { directory: tmp.path })
+    await Hub.setEnabled("git", true, { directory: tmp.path })
+    expect(await Hub.read({ directory: tmp.path })).toEqual({
+      version: 1,
+      enabled: { jq: true, git: true },
+      terminal: "nu",
+    })
+  })
+})
