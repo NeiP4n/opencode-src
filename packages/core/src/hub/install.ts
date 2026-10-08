@@ -27,6 +27,8 @@ const PACKAGE: Record<string, Partial<Record<Manager, string>>> = {
   pstree: { apt: "psmisc", dnf: "psmisc", pacman: "psmisc" },
   nc: { apt: "netcat-openbsd", dnf: "nmap-ncat", pacman: "gnu-netcat" },
   traceroute: { apt: "traceroute", dnf: "traceroute", pacman: "traceroute" },
+  // semgrep is not packaged for apt or pacman; brew carries it, elsewhere it is a pip install.
+  semgrep: { brew: "semgrep" },
 }
 
 // Tools that only exist on some managers' systems: Debian's package tooling

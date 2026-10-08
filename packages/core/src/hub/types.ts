@@ -19,6 +19,7 @@ export type Category =
   | "process"
   | "network"
   | "system"
+  | "security"
   | "windows"
 
 // One ready-made fast command. Templates are keyed by backend and may declare

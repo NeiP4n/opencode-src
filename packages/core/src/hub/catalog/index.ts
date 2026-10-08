@@ -12,6 +12,7 @@ import { entries as systemd } from "./systemd.js"
 import { entries as process } from "./process.js"
 import { entries as network } from "./network.js"
 import { entries as system } from "./system.js"
+import { entries as security } from "./security.js"
 import { entries as windows } from "./windows.js"
 
 // Single flat list; ids are unique and asserted once at module load so a
@@ -28,6 +29,7 @@ export const all: readonly Entry[] = [
   ...process,
   ...network,
   ...system,
+  ...security,
   ...windows,
 ]
 
