@@ -1,6 +1,7 @@
 export * as Note from "./note.js"
 
 import { Result, Schema } from "effect"
+import { ephemeral, inventory } from "./event.js"
 import { NonNegativeInt, optional } from "./schema.js"
 import { SessionID } from "./session-id.js"
 
@@ -12,7 +13,16 @@ export type Status = typeof Status.Type
 /** Status a note falls back to when its frontmatter is missing or unreadable. */
 export const FallbackStatus: Status = "inbox"
 
-export const Tag = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,31}$/)).annotate({
+/** How much the agent writes into a note bound to a chat. */
+export const Length = Schema.Literals(["brief", "balanced", "detailed"]).annotate({
+  identifier: "Note.Length",
+})
+export type Length = typeof Length.Type
+
+/** Length a note is treated as having when its frontmatter does not set one. */
+export const FallbackLength: Length = "balanced"
+
+export const Tag =Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,31}$/)).annotate({
   identifier: "Note.Tag",
   description: "Note tag (1 to 32 lowercase latin alphanumerics and hyphens, starting with an alphanumeric)",
 })
@@ -36,6 +46,7 @@ export const Frontmatter = Schema.Struct({
   title: Schema.String,
   status: Status,
   tags: Schema.Array(Tag),
+  length: optional(Length),
   session: optional(SessionID),
   created: NonNegativeInt,
   updated: NonNegativeInt,
@@ -48,7 +59,29 @@ export const File = Schema.Struct({
 }).annotate({ identifier: "Note.File" })
 export interface File extends Schema.Schema.Type<typeof File> {}
 
-export const Rejection = Schema.Struct({
+/** A note as clients see it: the file name, its parsed contents and the mtime to echo back on writes. */
+export const Info = Schema.Struct({
+  name: Slug,
+  frontmatter: Frontmatter,
+  body: Schema.String,
+  mtime: Schema.Number,
+}).annotate({ identifier: "Note.Info" })
+export interface Info extends Schema.Schema.Type<typeof Info> {}
+
+/**
+ * Announces that a note file in the event's location was written or removed, so
+ * clients showing it can refresh. The note itself is not carried: read it again.
+ */
+const Updated = ephemeral({
+  type: "note.updated",
+  schema: {
+    name: Slug,
+    removed: optional(Schema.Boolean),
+  },
+})
+export const Event = { Updated, Definitions: inventory(Updated) }
+
+export const Rejection =Schema.Struct({
   input: Schema.String,
   reason: Schema.Literals(["empty", "too_short", "too_long", "not_slug", "no_free_name"]),
 }).annotate({ identifier: "Note.Rejection" })
@@ -58,6 +91,7 @@ const FENCE = "---"
 const isSlug = Schema.is(Slug)
 const isTag = Schema.is(Tag)
 const isStatus = Schema.is(Status)
+const isLength = Schema.is(Length)
 const isSession = Schema.is(SessionID)
 const isMillis = Schema.is(NonNegativeInt)
 
@@ -89,6 +123,7 @@ export function parse(content: string): File {
 export function serialize(file: File) {
   const info = file.frontmatter
   const lines = [`title: ${oneLine(info.title)}`, `status: ${info.status}`, `tags: [${info.tags.join(", ")}]`]
+  if (info.length) lines.push(`length: ${info.length}`)
   if (info.session) lines.push(`session: ${info.session}`)
   lines.push(`created: ${info.created}`, `updated: ${info.updated}`)
   return [FENCE, ...lines, FENCE, "", file.body].join("\n")
@@ -125,11 +160,77 @@ export function unique(base: Slug, taken: ReadonlySet<string>): Result.Result<Sl
   return Result.fail({ input: base, reason: "no_free_name" })
 }
 
+/**
+ * Derives a file name from a title in any language: Cyrillic is transliterated,
+ * anything else that is not a latin letter or digit becomes a separator, and a
+ * title with nothing usable left falls back to `note`. The result still has to go
+ * through `unique`, because a note is its file name.
+ */
+export function slugify(title: string): Slug {
+  const candidate = Array.from(title.toLowerCase(), (char) => Cyrillic[char] ?? char)
+    .join("")
+    .replace(/[^a-z0-9]+/g, "-")
+    // A slug starts with a letter, so leading digits and separators are dropped.
+    .replace(/^[^a-z]+/, "")
+    .slice(0, SlugLength.max)
+    .replace(/-+$/, "")
+  return isSlug(candidate) ? Slug.make(candidate) : Slug.make("note")
+}
+
+const Cyrillic: Readonly<Record<string, string>> = {
+  а: "a",
+  б: "b",
+  в: "v",
+  г: "g",
+  д: "d",
+  е: "e",
+  ё: "e",
+  ж: "zh",
+  з: "z",
+  и: "i",
+  й: "y",
+  к: "k",
+  л: "l",
+  м: "m",
+  н: "n",
+  о: "o",
+  п: "p",
+  р: "r",
+  с: "s",
+  т: "t",
+  у: "u",
+  ф: "f",
+  х: "kh",
+  ц: "ts",
+  ч: "ch",
+  ш: "sh",
+  щ: "shch",
+  ъ: "",
+  ы: "y",
+  ь: "",
+  э: "e",
+  ю: "yu",
+  я: "ya",
+  і: "i",
+  ї: "yi",
+  є: "ye",
+  ґ: "g",
+  ў: "u",
+}
+
 /** Notes per base name that `unique` tries before giving up. */
 const MaxAttempts = 1000
 
 function fallback(): Frontmatter {
-  return { title: "", status: FallbackStatus, tags: [], session: undefined, created: 0, updated: 0 }
+  return {
+    title: "",
+    status: FallbackStatus,
+    tags: [],
+    length: undefined,
+    session: undefined,
+    created: 0,
+    updated: 0,
+  }
 }
 
 function normalize(content: string) {
@@ -148,6 +249,7 @@ function read(lines: ReadonlyArray<string>): Frontmatter {
     title: fields.get("title") ?? "",
     status: status(fields.get("status")),
     tags: tags(fields.get("tags")),
+    length: length(fields.get("length")),
     session: session(fields.get("session")),
     created: millis(fields.get("created")),
     updated: millis(fields.get("updated")),
@@ -168,6 +270,12 @@ function tags(value: string | undefined) {
     .split(",")
     .map((entry) => entry.trim())
     .filter(isTag)
+}
+
+function length(value: string | undefined) {
+  if (value === undefined) return undefined
+  if (!isLength(value)) return undefined
+  return value
 }
 
 function session(value: string | undefined) {
