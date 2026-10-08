@@ -3,6 +3,7 @@ export * as HubResolve from "./resolve.js"
 import type { Backend, Entry, Platform } from "./types.js"
 import { placeholders } from "./types.js"
 import { which } from "../util/which.js"
+import { all } from "./catalog/index.js"
 
 export type Rendered = {
   readonly entry: Entry
@@ -88,33 +89,11 @@ export function prepare(
   return { entry, backend, command: render(entry, backend, args) }
 }
 
-// Availability probe used by the install planner and the tool description:
-// which of the catalog's optional tools are on PATH right now.
+// Availability probe used by the install planner, the tool description and the
+// prompt hints: which of the catalog's tools, plus the alternative terminals and
+// winget, are on PATH right now. Derived from the catalog so a tool the Registry
+// shows as installed and switched on always reaches the prompt as well.
 export function available(bin?: string): string[] {
-  return [
-    "rg",
-    "fd",
-    "jq",
-    "yq",
-    "mlr",
-    "sqlite3",
-    "rsync",
-    "tree",
-    "watchexec",
-    "sd",
-    "lsof",
-    "pgrep",
-    "pstree",
-    "nc",
-    "dig",
-    "traceroute",
-    "lsd",
-    "diff-so-fancy",
-    "docker",
-    "systemctl",
-    "journalctl",
-    "pwsh",
-    "nu",
-    "winget",
-  ].filter((tool) => which(tool, undefined, bin))
+  const tools = new Set([...all.flatMap((entry) => entry.requires ?? []), "pwsh", "nu", "winget"])
+  return [...tools].filter((tool) => which(tool, undefined, bin))
 }
