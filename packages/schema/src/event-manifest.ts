@@ -18,6 +18,7 @@ import { LocationEvent } from "./location-event.js"
 import { McpEvent } from "./mcp-event.js"
 import { Model } from "./model.js"
 import { ModelsDev } from "./models-dev.js"
+import { Note } from "./note.js"
 import { Permission } from "./permission.js"
 import { PersistentPty } from "./persistent-pty.js"
 import { Plugin } from "./plugin.js"
@@ -66,6 +67,7 @@ const featureDefinitions = Event.inventory(
   ...Shell.Event.Definitions,
   ...Form.Event.Definitions,
   ...WebSearch.Event.Definitions,
+  ...Note.Event.Definitions,
 )
 
 export const ServerDefinitions = Event.inventory(

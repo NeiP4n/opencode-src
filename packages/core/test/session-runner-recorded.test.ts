@@ -32,6 +32,7 @@ import { Instructions } from "@opencode/core/instructions/index"
 import { SkillInstructions } from "@opencode/core/skill/instructions"
 import { ReferenceInstructions } from "@opencode/core/reference/instructions"
 import { McpInstructions } from "@opencode/core/mcp/instructions"
+import { NoteInstructions } from "@opencode/core/note-instructions"
 import { PluginSupervisor } from "@opencode/core/plugin/supervisor"
 import { Plugin } from "@opencode/core/plugin"
 import { PluginHooks } from "@opencode/core/plugin/hooks"
@@ -104,6 +105,10 @@ const runnerLayer = (llmClient: Layer.Layer<LLMClientService>) =>
     SkillInstructions.node.replace(skillInstructions),
     ReferenceInstructions.node.replace(referenceInstructions),
     McpInstructions.node.replace(mcpInstructions),
+    // The canvas reads the notes folder, which these fixture locations do not have on disk.
+    NoteInstructions.node.replace(
+      Layer.mock(NoteInstructions.Service, { load: () => Effect.succeed(Instructions.empty) }),
+    ),
     Config.node.replace(config),
     Permission.node.replace(permission),
     PluginSupervisor.node.replace(Layer.empty),
@@ -160,6 +165,10 @@ const testLayer = (llmClient: Layer.Layer<LLMClientService>) =>
       Location.node.replace(Location.boundNode({ directory: AbsolutePath.make("/project") })),
       SkillInstructions.node.replace(skillInstructions),
       ReferenceInstructions.node.replace(referenceInstructions),
+      McpInstructions.node.replace(mcpInstructions),
+      NoteInstructions.node.replace(
+        Layer.mock(NoteInstructions.Service, { load: () => Effect.succeed(Instructions.empty) }),
+      ),
       Config.node.replace(config),
       Snapshot.node.replace(Snapshot.noopLayer),
       PluginSupervisor.node.replace(Layer.empty),

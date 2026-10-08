@@ -31,10 +31,13 @@ test("exposes every standard HTTP API group", () => {
     "reference",
     "worktree",
     "vcs",
+    "note",
     "debug",
     "migration",
     "websearch",
     "config",
+    "room",
+    "orchestra",
   ])
   expect(Object.keys(client.debug)).toEqual(["location"])
   expect(Object.keys(client.debug.location)).toEqual(["list", "evict"])

@@ -24,6 +24,7 @@ import { Instructions } from "@opencode/core/instructions/index"
 import { InstructionBuiltIns } from "@opencode/core/instructions/builtins"
 import { Location } from "@opencode/core/location"
 import { McpInstructions } from "@opencode/core/mcp/instructions"
+import { NoteInstructions } from "@opencode/core/note-instructions"
 import { ID } from "@opencode/core/model"
 import { Project } from "@opencode/core/project"
 import { Provider } from "@opencode/core/provider"
@@ -156,6 +157,10 @@ const it = testEffect(
       SkillInstructions.node.replace(skills),
       ReferenceInstructions.node.replace(references),
       McpInstructions.node.replace(mcp),
+      // The canvas reads the notes folder, which these fixture locations do not have on disk.
+      NoteInstructions.node.replace(
+        Layer.mock(NoteInstructions.Service, { load: () => Effect.succeed(Instructions.empty) }),
+      ),
       PluginSupervisor.node.replace(Layer.empty),
       Tool.node.replace(tools),
       Location.node.replace(Location.boundNode({ directory: AbsolutePath.make("/project") })),

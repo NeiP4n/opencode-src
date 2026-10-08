@@ -254,6 +254,22 @@ import type {
   VcsBranchListOutput,
   VcsDiffInput,
   VcsDiffOutput,
+  NoteListInput,
+  NoteListOutput,
+  NoteGetInput,
+  NoteGetOutput,
+  NoteBoundInput,
+  NoteBoundOutput,
+  NoteCreateInput,
+  NoteCreateOutput,
+  NoteEditInput,
+  NoteEditOutput,
+  NoteUpdateInput,
+  NoteUpdateOutput,
+  NoteLinkInput,
+  NoteLinkOutput,
+  NoteRemoveInput,
+  NoteRemoveOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
   DebugLocationEvictOutput,
@@ -285,6 +301,8 @@ import type {
   RoomGuestLogOutput,
   RoomGuestMessagesInput,
   RoomGuestMessagesOutput,
+  RoomGuestNoteInput,
+  RoomGuestNoteOutput,
   RoomGuestPromptInput,
   RoomGuestPromptOutput,
   RoomGuestPermissionListInput,
@@ -2169,6 +2187,122 @@ export function make(options: ClientOptions) {
           requestOptions,
         ),
     },
+    note: {
+      list: (input?: NoteListInput, requestOptions?: RequestOptions) =>
+        request<NoteListOutput>(
+          {
+            method: "GET",
+            path: `/api/note`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      get: (input: NoteGetInput, requestOptions?: RequestOptions) =>
+        request<NoteGetOutput>(
+          {
+            method: "GET",
+            path: `/api/note/${encodeURIComponent(input.name)}`,
+            query: { location: input["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      bound: (input: NoteBoundInput, requestOptions?: RequestOptions) =>
+        request<NoteBoundOutput>(
+          {
+            method: "GET",
+            path: `/api/note/session/${encodeURIComponent(input.sessionID)}`,
+            query: { location: input["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      create: (input: NoteCreateInput, requestOptions?: RequestOptions) =>
+        request<NoteCreateOutput>(
+          {
+            method: "POST",
+            path: `/api/note`,
+            query: { location: input["location"] },
+            body: {
+              name: input["name"],
+              title: input["title"],
+              body: input["body"],
+              status: input["status"],
+              tags: input["tags"],
+              length: input["length"],
+              session: input["session"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      edit: (input: NoteEditInput, requestOptions?: RequestOptions) =>
+        request<NoteEditOutput>(
+          {
+            method: "POST",
+            path: `/api/note/${encodeURIComponent(input.name)}/edit`,
+            query: { location: input["location"] },
+            body: { body: input["body"], mode: input["mode"], expectedMtime: input["expectedMtime"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      update: (input: NoteUpdateInput, requestOptions?: RequestOptions) =>
+        request<NoteUpdateOutput>(
+          {
+            method: "PATCH",
+            path: `/api/note/${encodeURIComponent(input.name)}`,
+            query: { location: input["location"] },
+            body: {
+              title: input["title"],
+              status: input["status"],
+              tags: input["tags"],
+              length: input["length"],
+              expectedMtime: input["expectedMtime"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      link: (input: NoteLinkInput, requestOptions?: RequestOptions) =>
+        request<NoteLinkOutput>(
+          {
+            method: "POST",
+            path: `/api/note/${encodeURIComponent(input.name)}/link`,
+            query: { location: input["location"] },
+            body: { session: input["session"], expectedMtime: input["expectedMtime"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remove: (input: NoteRemoveInput, requestOptions?: RequestOptions) =>
+        request<NoteRemoveOutput>(
+          {
+            method: "DELETE",
+            path: `/api/note/${encodeURIComponent(input.name)}`,
+            query: { location: input["location"], expectedMtime: input["expectedMtime"] },
+            successStatus: 204,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: true,
+          },
+          requestOptions,
+        ),
+    },
     debug: {
       location: {
         list: (requestOptions?: RequestOptions) =>
@@ -2384,6 +2518,17 @@ export function make(options: ClientOptions) {
             },
             requestOptions,
           ),
+        note: (input: RoomGuestNoteInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: RoomGuestNoteOutput }>(
+            {
+              method: "GET",
+              path: `/api/room/${encodeURIComponent(input.roomID)}/guest/note`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
         prompt: (input: RoomGuestPromptInput, requestOptions?: RequestOptions) =>
           request<{ readonly data: RoomGuestPromptOutput }>(
             {

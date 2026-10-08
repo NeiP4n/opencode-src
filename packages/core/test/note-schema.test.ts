@@ -183,3 +183,50 @@ describe("note name collision", () => {
     }
   })
 })
+
+describe("note length", () => {
+  test("a set length is written after the tags and read back", () => {
+    const file = { frontmatter: { ...frontmatter, length: "brief" as const }, body: "Тело заметки." }
+    const text = Note.serialize(file)
+
+    expect(text).toBe(markdown.replace("tags: [net, lan, lan-rooms]\n", "tags: [net, lan, lan-rooms]\nlength: brief\n"))
+    expect(Note.parse(text).frontmatter).toEqual(file.frontmatter)
+  })
+
+  test("a note without a length keeps no length line, so existing files do not change", () => {
+    expect(Note.parse(markdown).frontmatter.length).toBeUndefined()
+    expect(Note.serialize(Note.parse(markdown))).toBe(markdown)
+  })
+
+  test("an unknown length is dropped instead of breaking the note", () => {
+    const file = Note.parse("---\ntitle: T\nlength: huge\n---\n\nbody")
+
+    expect(file.frontmatter.length).toBeUndefined()
+    expect(file.frontmatter.title).toBe("T")
+    expect(Note.FallbackLength).toBe("balanced")
+  })
+})
+
+describe("note slug from a title", () => {
+  test("a latin title becomes a hyphenated slug", () => {
+    expect(Note.slugify("  Room Plan: v2!  ")).toBe(Note.Slug.make("room-plan-v2"))
+  })
+
+  test("a Cyrillic title is transliterated", () => {
+    expect(Note.slugify("План по сети комнат")).toBe(Note.Slug.make("plan-po-seti-komnat"))
+    expect(Note.slugify("Щука и ёж")).toBe(Note.Slug.make("shchuka-i-ezh"))
+  })
+
+  test("leading digits are dropped and the result fits the length limit", () => {
+    expect(Note.slugify("2026 roadmap")).toBe(Note.Slug.make("roadmap"))
+    const long = Note.slugify("word ".repeat(30))
+    expect(long.length).toBeLessThanOrEqual(60)
+    expect(long.endsWith("-")).toBe(false)
+  })
+
+  test("a title with nothing usable falls back to note", () => {
+    expect(Note.slugify("")).toBe(Note.Slug.make("note"))
+    expect(Note.slugify("日本語")).toBe(Note.Slug.make("note"))
+    expect(Note.slugify("x")).toBe(Note.Slug.make("note"))
+  })
+})
