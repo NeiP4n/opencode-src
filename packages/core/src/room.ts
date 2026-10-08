@@ -12,6 +12,9 @@ export type ID = Room.ID
 export const Info = Room.Info
 export type Info = Room.Info
 
+export const Message = Room.Message
+export type Message = Room.Message
+
 export const CreateInput = Schema.Struct({
   sessionID: SessionID,
   name: Schema.String.pipe(Schema.optional),

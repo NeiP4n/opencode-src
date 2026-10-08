@@ -33,6 +33,10 @@ export function ProjectTree(props: { width: number }) {
   const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
   const [access, setAccess] = createStore<Record<string, OrchestraAccess>>({})
   const [hover, setHover] = createSignal<string>()
+  // Deleting is permanent, so the first click only arms the button and the second deletes.
+  const [armed, setArmed] = createSignal<string>()
+  // Hidden as soon as the delete succeeds; the server's deleted event drops the record later.
+  const [removed, setRemoved] = createStore<Record<string, boolean>>({})
 
   const current = () => (route.data.type === "session" ? data.session.get(route.data.sessionID) : undefined)
   const shared = createMemo(() => new Set((rooms() ?? []).map((room) => room.sessionID)))
@@ -91,12 +95,28 @@ export function ProjectTree(props: { width: number }) {
     })
   }
 
+  const remove = (sessionID: string) => {
+    if (armed() !== sessionID) return setArmed(sessionID)
+    setArmed()
+    void client.api.session
+      .remove({ sessionID })
+      .then(() => {
+        setRemoved(sessionID, true)
+        data.session.evict(sessionID)
+        if (route.data.type === "session" && route.data.sessionID === sessionID) route.navigate({ type: "home" })
+      })
+      .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
+  }
+
   const sessionsOf = (project: OrchestraProject) =>
     data.session
       .list()
       .filter(
         (session) =>
-          !session.parentID && session.id !== project.main && owner(session.location.directory)?.id === project.id,
+          !session.parentID &&
+          !removed[session.id] &&
+          session.id !== project.main &&
+          owner(session.location.directory)?.id === project.id,
       )
 
   return (
@@ -175,6 +195,17 @@ export function ProjectTree(props: { width: number }) {
                         <text
                           fg={theme.text.formfield.base}
                         >{`[${access[session.id] ?? Orchestra.defaultAccess}]`}</text>
+                      </box>
+                      <box
+                        onMouseOut={() => setArmed()}
+                        onMouseUp={(event) => {
+                          event.stopPropagation()
+                          remove(session.id)
+                        }}
+                      >
+                        <text fg={armed() === session.id ? theme.text.feedback.error.base : theme.text.muted}>
+                          {armed() === session.id ? " delete?" : " ×"}
+                        </text>
                       </box>
                     </Row>
                   )}

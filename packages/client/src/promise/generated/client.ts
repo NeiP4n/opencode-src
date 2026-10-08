@@ -282,6 +282,8 @@ import type {
   RoomGuestGetOutput,
   RoomGuestLogInput,
   RoomGuestLogOutput,
+  RoomGuestMessagesInput,
+  RoomGuestMessagesOutput,
   RoomGuestPromptInput,
   RoomGuestPromptOutput,
   RoomGuestPermissionListInput,
@@ -2359,6 +2361,17 @@ export function make(options: ClientOptions) {
               method: "GET",
               path: `/api/room/${encodeURIComponent(input.roomID)}/guest/log`,
               query: { after: input["after"], follow: input["follow"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        messages: (input: RoomGuestMessagesInput, requestOptions?: RequestOptions) =>
+          request<RoomGuestMessagesOutput>(
+            {
+              method: "GET",
+              path: `/api/room/${encodeURIComponent(input.roomID)}/guest/message`,
               successStatus: 200,
               declaredStatuses: [400, 401, 404],
               empty: false,

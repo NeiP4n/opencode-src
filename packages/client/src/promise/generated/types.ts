@@ -471,6 +471,14 @@ export type RoomInfo1 = {
   created: number | "Infinity" | "-Infinity" | "NaN"
 }
 
+export type RoomMessage = {
+  id: string
+  role: "user" | "assistant"
+  author?: string | undefined
+  text: string
+  created: number
+}
+
 export type OrchestraProject = {
   id: string
   name: string
@@ -6838,6 +6846,10 @@ export type RoomGuestLogInput = {
 }
 
 export type RoomGuestLogOutput = RoomLogItem
+
+export type RoomGuestMessagesInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type RoomGuestMessagesOutput = { data: Array<RoomMessage>; running: boolean }
 
 export type RoomGuestPromptInput = {
   readonly roomID: { readonly roomID: string }["roomID"]

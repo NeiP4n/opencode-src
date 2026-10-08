@@ -43,6 +43,10 @@ function render(state: string, calls: Call[], projects: (typeof project)[]) {
       if (url.pathname === `/api/orchestra/project/${project.id}/main`) return json(main)
       if (url.pathname.startsWith("/api/orchestra/access/")) return new Response(null, { status: 204 })
       if (url.pathname === "/api/session") return json({ data: [worker], cursor: {} })
+      if (url.pathname === `/api/session/${worker.id}` && request.method === "DELETE") {
+        calls.push({ method: "DELETE", path: url.pathname })
+        return new Response(null, { status: 204 })
+      }
       if (url.pathname === `/api/session/${worker.id}`) return json({ data: worker })
       if (url.pathname === `/api/session/${main.id}`) return json({ data: main })
       if (/^\/api\/session\/[^/]+\/(message|inbox|permission)$/.test(url.pathname))
@@ -90,6 +94,21 @@ test("the left panel lists the operator's projects with the orchestra and sessio
   const orchestra = cell(setup.captureCharFrame(), "★ Orchestra")
   await setup.mockMouse.click(orchestra.x + 2, orchestra.y)
   await setup.waitFor(() => calls.some((call) => call.path === `/api/orchestra/project/${project.id}/main`))
+})
+
+test("deleting a session takes two clicks on its ×", async () => {
+  await using state = await tmpdir()
+  const calls: Call[] = []
+  await using setup = await render(state.path, calls, [project])
+  const frame = await setup.waitForFrame((frame) => frame.includes("Worker task") && frame.includes("[write] ×"))
+  const button = cell(frame, " ×")
+  await setup.mockMouse.click(button.x + 1, button.y)
+  await setup.waitForFrame((frame) => frame.includes("delete?"))
+  expect(calls.some((call) => call.method === "DELETE")).toBe(false)
+  const confirm = cell(setup.captureCharFrame(), "delete?")
+  await setup.mockMouse.click(confirm.x, confirm.y)
+  await setup.waitFor(() => calls.some((call) => call.method === "DELETE"))
+  await setup.waitForFrame((frame) => !frame.includes("Worker task"))
 })
 
 test("a project is created from a name and a path", async () => {

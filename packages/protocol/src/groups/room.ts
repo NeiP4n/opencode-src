@@ -146,6 +146,19 @@ export const RoomGroup = HttpApiGroup.make("server.room")
     ),
   )
   .add(
+    HttpApiEndpoint.get("room.guest.messages", "/api/room/:roomID/guest/message", {
+      params: { roomID: Room.ID },
+      success: Schema.Struct({ data: Schema.Array(Room.Message), running: Schema.Boolean }),
+      error: [UnauthorizedError, RoomNotFoundError, SessionNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.messages",
+        summary: "Read the room chat",
+        description: "The latest messages of the shared session as plain chat, and whether the host model is working.",
+      }),
+    ),
+  )
+  .add(
     HttpApiEndpoint.post("room.guest.prompt", "/api/room/:roomID/guest/prompt", {
       params: { roomID: Room.ID },
       payload: Schema.Struct({ text: Schema.String }),

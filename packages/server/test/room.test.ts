@@ -120,6 +120,11 @@ it.live("the server stamps the guest as author and keeps approvals with the host
     expect(prompt.status).toBe(200)
     expect(prompt.body.data.payload.metadata.room).toEqual({ id: room.id, guest: joined.guest })
 
+    // the guest's chat shows plain messages with their author
+    const chat = yield* call(`/api/room/${room.id}/guest/message`, { headers: guest })
+    expect(chat.status).toBe(200)
+    expect(chat.body.running).toBe(false)
+
     const reply = yield* call(`/api/room/${room.id}/guest/permission/per_missing/reply`, {
       method: "POST",
       headers: guest,

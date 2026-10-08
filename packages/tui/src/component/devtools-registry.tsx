@@ -85,7 +85,10 @@ export function RegistryPanel(props: { options?: RegistryPanelOptions; onClose?:
   // description or category of a catalog entry that needs it, so "yaml" or
   // "docker logs" finds the binary behind the recipe.
   const visible = createMemo(() => {
-    const words = query().toLowerCase().split(/\s+/).filter((word) => word.length > 0)
+    const words = query()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((word) => word.length > 0)
     if (words.length === 0) return status().tools
     return status().tools.filter((row) => {
       const text = (haystack.get(row.tool) ?? row.tool).toLowerCase()
@@ -99,7 +102,11 @@ export function RegistryPanel(props: { options?: RegistryPanelOptions; onClose?:
   const missing = createMemo(() => status().tools.filter((row) => !row.installed))
   const isOn = (tool: string) => enabled()[tool] === true
 
-  const runAction = async (tool: string, verb: "installed" | "removed", action: (tool: string) => Promise<Hub.ActionResult>) => {
+  const runAction = async (
+    tool: string,
+    verb: "installed" | "removed",
+    action: (tool: string) => Promise<Hub.ActionResult>,
+  ) => {
     setBusy(tool)
     setMessage()
     const result = await action(tool).catch((error: unknown) => ({
@@ -221,7 +228,10 @@ export function RegistryPanel(props: { options?: RegistryPanelOptions; onClose?:
 
       <box flexDirection="row" gap={3}>
         <Stat label="Ready" value={`${status().ready}/${status().total}`} />
-        <Stat label="For the model" value={`${status().tools.filter((row) => isOn(row.tool)).length}/${status().tools.length}`} />
+        <Stat
+          label="For the model"
+          value={`${status().tools.filter((row) => isOn(row.tool)).length}/${status().tools.length}`}
+        />
         <box flexDirection="row" gap={1}>
           <text fg={theme.text.muted}>Terminals</text>
           <For each={status().terminals}>
@@ -271,13 +281,25 @@ export function RegistryPanel(props: { options?: RegistryPanelOptions; onClose?:
         </Button>
         <Button
           disabled={busy() !== undefined}
-          onClick={() => void setSwitch(status().tools.filter((row) => row.installed).map((row) => row.tool), true)}
+          onClick={() =>
+            void setSwitch(
+              status()
+                .tools.filter((row) => row.installed)
+                .map((row) => row.tool),
+              true,
+            )
+          }
         >
           All installed on
         </Button>
         <Button
           disabled={busy() !== undefined}
-          onClick={() => void setSwitch(status().tools.map((row) => row.tool), false)}
+          onClick={() =>
+            void setSwitch(
+              status().tools.map((row) => row.tool),
+              false,
+            )
+          }
         >
           All off
         </Button>
@@ -406,9 +428,8 @@ export function Button(props: { children: string; onClick: () => void; disabled?
       color={theme.text.action.primary.base}
       disabled={props.disabled}
       onLeave={props.onLeave}
-      background={theme.background.raised.base}
     >
-      {` ${props.children} `}
+      {`[ ${props.children} ]`}
     </Action>
   )
 }

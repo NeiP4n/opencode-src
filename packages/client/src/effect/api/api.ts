@@ -3394,6 +3394,12 @@ export type RoomGuestLogOutput =
   | EventLog.Synced
 export type RoomGuestLogOperation<E = never> = (input: RoomGuestLogInput) => Stream.Stream<RoomGuestLogOutput, E>
 
+export type RoomGuestMessagesInput = { readonly roomID: Room.ID }
+export type RoomGuestMessagesOutput = { readonly data: ReadonlyArray<Room.Message>; readonly running: boolean }
+export type RoomGuestMessagesOperation<E = never> = (
+  input: RoomGuestMessagesInput,
+) => Effect.Effect<RoomGuestMessagesOutput, E>
+
 export type RoomGuestPromptInput = { readonly roomID: Room.ID; readonly text: string }
 export type RoomGuestPromptOutput = SessionInbox.User
 export type RoomGuestPromptOperation<E = never> = (
@@ -3427,6 +3433,7 @@ export interface RoomApi<E = never> {
   readonly guest: {
     readonly get: RoomGuestGetOperation<E>
     readonly log: RoomGuestLogOperation<E>
+    readonly messages: RoomGuestMessagesOperation<E>
     readonly prompt: RoomGuestPromptOperation<E>
     readonly permission: {
       readonly list: RoomGuestPermissionListOperation<E>

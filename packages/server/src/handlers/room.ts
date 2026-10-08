@@ -9,7 +9,8 @@ import {
   RoomNotFoundError,
   UnauthorizedError,
 } from "@opencode/protocol/errors"
-import { Effect, Stream } from "effect"
+import { DateTime, Effect, Predicate, Stream } from "effect"
+import type { SessionMessage } from "@opencode/core/session/message"
 import { HttpServerRequest } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
@@ -20,6 +21,20 @@ import { missingSession } from "./session-error"
 
 function missingRequest(id: Permission.ID) {
   return new PermissionNotFoundError({ requestID: id, message: `Permission request not found: ${id}` })
+}
+
+const CHAT_LIMIT = 100
+
+function chatMessage(message: SessionMessage.Info): Room.Message[] {
+  const created = DateTime.toEpochMillis(message.time.created)
+  if (message.type === "user") {
+    const room = message.metadata?.room
+    const author = Predicate.isObject(room) && Predicate.isObject(room.guest) ? room.guest.name : undefined
+    return [{ id: message.id, role: "user" as const, author: typeof author === "string" ? author : "host", text: message.text, created }]
+  }
+  if (message.type !== "assistant") return []
+  const text = message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
+  return text ? [{ id: message.id, role: "assistant" as const, text, created }] : []
 }
 
 function missingRoom(error: Room.NotFoundError) {
@@ -112,6 +127,19 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
           return sessions
             .log({ sessionID: joined.room.sessionID, after: ctx.query.after, follow: ctx.query.follow })
             .pipe(Stream.orDie)
+        }),
+      )
+      .handle(
+        "room.guest.messages",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestOf(ctx.params.roomID)
+          const messages = yield* sessions
+            .messages({ sessionID: joined.room.sessionID, limit: CHAT_LIMIT, order: "desc" })
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession), Effect.orDie)
+          return {
+            data: messages.toReversed().flatMap(chatMessage),
+            running: (yield* sessions.active).has(joined.room.sessionID),
+          }
         }),
       )
       .handle(

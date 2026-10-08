@@ -49,3 +49,15 @@ export const Joined = Schema.Struct({
   room: Info,
 }).annotate({ identifier: "Room.Joined" })
 export interface Joined extends Schema.Schema.Type<typeof Joined> {}
+
+// What a guest sees of the shared session: who said what. Tool calls, reasoning
+// and file paths stay on the host.
+export const Message = Schema.Struct({
+  id: Schema.String,
+  role: Schema.Literals(["user", "assistant"]),
+  // The guest's name, "host" for the host's own prompts, absent for the model.
+  author: Schema.String.pipe(Schema.optional),
+  text: Schema.String,
+  created: Schema.Number,
+}).annotate({ identifier: "Room.Message" })
+export interface Message extends Schema.Schema.Type<typeof Message> {}

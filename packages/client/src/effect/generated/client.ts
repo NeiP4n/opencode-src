@@ -284,6 +284,8 @@ import type {
   RoomGuestGetOutput,
   RoomGuestLogInput,
   RoomGuestLogOutput,
+  RoomGuestMessagesInput,
+  RoomGuestMessagesOutput,
   RoomGuestPromptInput,
   RoomGuestPromptOutput,
   RoomGuestPermissionListInput,
@@ -1695,6 +1697,11 @@ const EndpointRoomGuestLog = (raw: RawClient["server.room"]) => (input: RoomGues
     ),
   )
 
+const EndpointRoomGuestMessages = (raw: RawClient["server.room"]) => (input: RoomGuestMessagesInput) =>
+  preserveEffect<RoomGuestMessagesOutput>()(
+    raw["room.guest.messages"]({ params: { roomID: input["roomID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointRoomGuestPrompt = (raw: RawClient["server.room"]) => (input: RoomGuestPromptInput) =>
   preserveEffect<RoomGuestPromptOutput>()(
     raw["room.guest.prompt"]({ params: { roomID: input["roomID"] }, payload: { text: input["text"] } }).pipe(
@@ -1729,6 +1736,7 @@ const adaptGroupRoom = (raw: RawClient["server.room"]) => ({
   guest: {
     get: EndpointRoomGuestGet(raw),
     log: EndpointRoomGuestLog(raw),
+    messages: EndpointRoomGuestMessages(raw),
     prompt: EndpointRoomGuestPrompt(raw),
     permission: { list: EndpointRoomGuestPermissionList(raw), reply: EndpointRoomGuestPermissionReply(raw) },
   },
