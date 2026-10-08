@@ -17,7 +17,7 @@ import {
 } from "../errors.js"
 import { BooleanFromString } from "./session.js"
 
-const GUEST_PATH = /^\/api\/room\/(join|[^/]+\/guest(\/.*)?)$/
+const GUEST_PATH = /^\/api\/room\/(join|public|[^/]+\/guest(\/.*)?)$/
 
 // Guest routes carry a room token instead of the server credential, so the
 // Authorization middleware lets them through and the room handler verifies the
@@ -97,6 +97,21 @@ export const RoomGroup = HttpApiGroup.make("server.room")
         identifier: "room.code",
         summary: "Create join code",
         description: "Create a short-lived code that lets devices join this room until it expires.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("room.public", "/api/room/public", {
+      success: Schema.Struct({
+        host: Schema.String,
+        rooms: Schema.Array(Schema.Struct({ id: Room.ID, name: Schema.String })),
+      }),
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.public",
+        summary: "List joinable rooms",
+        description:
+          "Names of the rooms this host shares, for devices looking for rooms on the network. Joining still needs a code.",
       }),
     ),
   )

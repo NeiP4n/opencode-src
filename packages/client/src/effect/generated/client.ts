@@ -278,6 +278,7 @@ import type {
   RoomRemoveOutput,
   RoomCodeInput,
   RoomCodeOutput,
+  RoomPublicOutput,
   RoomJoinInput,
   RoomJoinOutput,
   RoomGuestGetInput,
@@ -1674,6 +1675,9 @@ const EndpointRoomCode = (raw: RawClient["server.room"]) => (input: RoomCodeInpu
     raw["room.code"]({ params: { roomID: input["roomID"] } }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointRoomPublic = (raw: RawClient["server.room"]) => () =>
+  preserveEffect<RoomPublicOutput>()(raw["room.public"]({}).pipe(Effect.mapError(mapClientError)))
+
 const EndpointRoomJoin = (raw: RawClient["server.room"]) => (input: RoomJoinInput) =>
   preserveEffect<RoomJoinOutput>()(
     raw["room.join"]({ payload: { code: input["code"], name: input["name"] } }).pipe(Effect.mapError(mapClientError)),
@@ -1732,6 +1736,7 @@ const adaptGroupRoom = (raw: RawClient["server.room"]) => ({
   update: EndpointRoomUpdate(raw),
   remove: EndpointRoomRemove(raw),
   code: EndpointRoomCode(raw),
+  public: EndpointRoomPublic(raw),
   join: EndpointRoomJoin(raw),
   guest: {
     get: EndpointRoomGuestGet(raw),

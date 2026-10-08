@@ -9,6 +9,7 @@ import {
   RoomNotFoundError,
   UnauthorizedError,
 } from "@opencode/protocol/errors"
+import { hostname } from "node:os"
 import { DateTime, Effect, Predicate, Stream } from "effect"
 import type { SessionMessage } from "@opencode/core/session/message"
 import { HttpServerRequest } from "effect/unstable/http"
@@ -30,7 +31,15 @@ function chatMessage(message: SessionMessage.Info): Room.Message[] {
   if (message.type === "user") {
     const room = message.metadata?.room
     const author = Predicate.isObject(room) && Predicate.isObject(room.guest) ? room.guest.name : undefined
-    return [{ id: message.id, role: "user" as const, author: typeof author === "string" ? author : "host", text: message.text, created }]
+    return [
+      {
+        id: message.id,
+        role: "user" as const,
+        author: typeof author === "string" ? author : "host",
+        text: message.text,
+        created,
+      },
+    ]
   }
   if (message.type !== "assistant") return []
   const text = message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
@@ -93,6 +102,13 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
           yield* rooms.get(ctx.params.roomID).pipe(Effect.catchTag("Room.NotFoundError", missingRoom))
           return yield* codes.issueCode(ctx.params.roomID)
         }),
+      )
+      .handle("room.public", () =>
+        rooms
+          .list()
+          .pipe(
+            Effect.map((list) => ({ host: hostname(), rooms: list.map((room) => ({ id: room.id, name: room.name })) })),
+          ),
       )
       .handle(
         "room.join",

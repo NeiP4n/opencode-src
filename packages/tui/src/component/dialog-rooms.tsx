@@ -13,6 +13,7 @@ import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
 import { Button } from "./devtools-registry"
 import { DialogRoomChat, roomClient, type JoinedRoom } from "./dialog-room-chat"
+import { scanRooms, type FoundRoom } from "@opencode/client/room-discovery"
 
 // Two halves: rooms this computer shares (a room is one session other devices
 // join with a short code; only this computer's AI answers in it), and rooms
@@ -32,6 +33,8 @@ export function DialogRooms(props: { onClose?: () => void }) {
   const [armed, setArmed] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
   const [joinError, setJoinError] = createSignal<string>()
+  // Rooms other computers on this network share; scanned when the dialog opens.
+  const [found, { refetch: rescan }] = createResource(() => scanRooms())
   const fields: { address?: InputRenderable; code?: InputRenderable; name?: InputRenderable } = {}
 
   const sessionID = () => (route.data.type === "session" ? route.data.sessionID : undefined)
@@ -92,6 +95,13 @@ export function DialogRooms(props: { onClose?: () => void }) {
       )
       .catch((error: unknown) => setJoinError(errorMessage(error)))
       .finally(() => setBusy(false))
+  }
+
+  // A found room only lacks the code: fill its address and move to the code field.
+  const pick = (room: FoundRoom) => {
+    if (fields.address) fields.address.value = new URL(room.url).host
+    setJoinError()
+    fields.code?.focus()
   }
 
   const open = (room: JoinedRoom) => {
@@ -233,6 +243,31 @@ export function DialogRooms(props: { onClose?: () => void }) {
       </Show>
 
       <Section title="Join a room on another computer" />
+      <box flexDirection="row" gap={1}>
+        <text fg={theme.text.muted}>
+          {found.loading ? "Looking for rooms on this network…" : `Found on this network: ${found()?.length ?? 0}`}
+        </text>
+        <Button disabled={found.loading} onClick={() => void rescan()}>
+          Rescan
+        </Button>
+      </box>
+      <For each={found() ?? []}>
+        {(room) => (
+          <box flexDirection="row" gap={1}>
+            <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
+              {room.name}
+            </text>
+            <text fg={theme.text.muted}>{`${room.host} · ${new URL(room.url).host}`}</text>
+            <box flexGrow={1} />
+            <Button variant="primary" onClick={() => pick(room)}>
+              Join
+            </Button>
+          </box>
+        )}
+      </For>
+      <text fg={theme.text.muted} wrapMode="word">
+        Or enter an address yourself, for example over a VPN such as Radmin:
+      </text>
       {field("address", "Address", "e.g. 192.168.1.5:49375")}
       {field("code", "Join code", "e.g. ABCD-EFGH")}
       {field("name", "Your name", `${hostname()} (default)`)}
@@ -245,7 +280,7 @@ export function DialogRooms(props: { onClose?: () => void }) {
       </Show>
       <box flexDirection="row">
         <Button variant="primary" disabled={busy()} onClick={join}>
-          Join
+          Join with code
         </Button>
       </box>
       <Show when={saved.joined.length > 0}>

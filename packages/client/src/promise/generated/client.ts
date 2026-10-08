@@ -276,6 +276,7 @@ import type {
   RoomRemoveOutput,
   RoomCodeInput,
   RoomCodeOutput,
+  RoomPublicOutput,
   RoomJoinInput,
   RoomJoinOutput,
   RoomGuestGetInput,
@@ -2329,6 +2330,11 @@ export function make(options: ClientOptions) {
             declaredStatuses: [400, 401, 404],
             empty: false,
           },
+          requestOptions,
+        ),
+      public: (requestOptions?: RequestOptions) =>
+        request<RoomPublicOutput>(
+          { method: "GET", path: `/api/room/public`, successStatus: 200, declaredStatuses: [400, 401], empty: false },
           requestOptions,
         ),
       join: (input: RoomJoinInput, requestOptions?: RequestOptions) =>

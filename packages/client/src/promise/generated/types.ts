@@ -6828,6 +6828,8 @@ export type RoomCodeInput = { readonly roomID: { readonly roomID: string }["room
 
 export type RoomCodeOutput = RoomJoinCode
 
+export type RoomPublicOutput = { host: string; rooms: Array<{ id: string; name: string }> }
+
 export type RoomJoinInput = {
   readonly code: { readonly code: string; readonly name: string }["code"]
   readonly name: { readonly code: string; readonly name: string }["name"]

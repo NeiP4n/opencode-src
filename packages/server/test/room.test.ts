@@ -5,6 +5,10 @@ import { Effect, Layer } from "effect"
 import { tmpdir } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { ServerFetch } from "../src/fetch"
+import { ServerRoomDiscovery } from "../src/room-discovery"
+import { PORT, QUERY, decodeReply } from "@opencode/protocol/room-discovery"
+import { createSocket } from "node:dgram"
+import { hostname } from "node:os"
 
 // Rooms only admit prompts; no model runs in these tests.
 const idle = Layer.succeed(
@@ -93,6 +97,34 @@ it.live("a join code admits a guest whose token opens only that room", () =>
     expect((yield* call(`/api/room/${other.id}/guest`, { headers: guest })).status).toBe(401)
     // without a token the guest routes refuse as well
     expect((yield* call(`/api/room/${room.id}/guest`)).status).toBe(401)
+  }).pipe(Effect.scoped),
+)
+
+it.live("devices on the network see room names without a credential", () =>
+  Effect.gen(function* () {
+    const { call, room } = yield* setup
+    const listed = yield* call("/api/room/public")
+    expect(listed.status).toBe(200)
+    expect(listed.body.rooms).toEqual([{ id: room.id, name: "Lab" }])
+    expect(typeof listed.body.host).toBe("string")
+  }).pipe(Effect.scoped),
+)
+
+it.live("the discovery responder answers a broadcast query with name and port", () =>
+  Effect.gen(function* () {
+    yield* ServerRoomDiscovery.respond(4321)
+    const reply = yield* Effect.promise(
+      () =>
+        new Promise<string>((resolve) => {
+          const socket = createSocket("udp4")
+          socket.on("message", (message) => {
+            socket.close()
+            resolve(message.toString())
+          })
+          socket.bind(0, () => socket.send(QUERY, PORT, "127.0.0.1"))
+        }),
+    )
+    expect(decodeReply(reply)).toEqual({ name: hostname(), port: 4321 })
   }).pipe(Effect.scoped),
 )
 

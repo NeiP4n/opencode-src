@@ -23,7 +23,8 @@
     "./solid": "./src/solid/index.ts",
     "./effect": "./src/effect/index.ts",
     "./effect/api": "./src/effect/api.ts",
-    "./effect/service": "./src/effect/service.ts"
+    "./effect/service": "./src/effect/service.ts",
+    "./room-discovery": "./src/room-discovery.ts"
   },
   "scripts": {
     "build": "bun run script/build-package.ts",

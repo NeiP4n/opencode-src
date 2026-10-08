@@ -7,6 +7,7 @@ import { InstallationEvent } from "@opencode/schema/installation-event"
 import { hasPtyConnectTicketURL } from "@opencode/protocol/groups/pty"
 import { hasPersistentPtyConnectTicketURL } from "@opencode/protocol/groups/persistent-pty"
 import { isPairingConnectURL } from "@opencode/protocol/groups/server"
+import { isRoomGuestURL } from "@opencode/protocol/groups/room"
 import { Global } from "@opencode/util/global"
 import { Cause, Context, Effect, Exit, Latch, Layer, Option, Ref, Scope } from "effect"
 import { HttpMiddleware, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
@@ -17,6 +18,7 @@ import { authorizedRequest, unauthorizedResponse } from "./middleware/authorizat
 import { withoutParentSpan } from "./request-tracing"
 import { createRoutes } from "./routes"
 import { ServerInfo } from "./server-info"
+import { ServerRoomDiscovery } from "./room-discovery"
 import { Status } from "./service-status"
 import type { ServerOptions } from "./options"
 
@@ -73,6 +75,10 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
       errorResponseLogger,
     )
     .pipe(Effect.provide(NodeHttpServer.layerHttpServices), withoutParentSpan)
+  // Only a server other devices can reach answers room discovery.
+  const address = bound.server.address()
+  if (!isLoopback(hostname) && address !== null && typeof address !== "string")
+    yield* ServerRoomDiscovery.respond(address.port)
   if (lifecycle)
     yield* lifecycle.onListen(bound.http.address, shutdown.open.pipe(Effect.asVoid)).pipe(
       Effect.flatMap((cleanup) =>
@@ -186,8 +192,11 @@ function dispatch(
       if (!(yield* authorizedRequest(request, auth))) return unauthorizedResponse(request)
       return yield* infoResponse(status, version, urls, tmp)
     }
+    // Pairing links and room guest routes carry their own proof (a code or a room
+    // token) that the handlers check; everything else needs the server credential.
     if (
       !isPairingConnectURL(url) &&
+      !(ready && isRoomGuestURL(url)) &&
       (!ready || (!hasPtyConnectTicketURL(url) && !hasPersistentPtyConnectTicketURL(url))) &&
       !(yield* authorizedRequest(request, auth))
     )
@@ -237,3 +246,7 @@ function unavailable(status: Status.State) {
 const installRestartContinuity = Effect.fnUntraced(function* (restart: SessionRestart.Interface) {
   yield* Effect.forkScoped(restart.resumeSuspendedSessions)
 })
+
+function isLoopback(hostname: string) {
+  return hostname === "localhost" || hostname.startsWith("127.") || hostname === "::1" || hostname === "[::1]"
+}

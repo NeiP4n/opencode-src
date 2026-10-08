@@ -236,3 +236,37 @@ async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, expect
     if (new TextDecoder().decode(next.value).includes(expected)) return
   }
 }
+
+it.live("room guest routes pass the process credential gate and nothing else does", () =>
+  Effect.gen(function* () {
+    const server = yield* ServerProcess.start<never, never>({
+      hostname: "127.0.0.1",
+      port: 0,
+      password: "secret",
+      app: { version: "test-version" },
+      database: { path: ":memory:" },
+      models: { fetch: false },
+    })
+    const base = HttpServer.formatAddress(server.address)
+    const status = (pathname: string, init?: RequestInit) =>
+      Effect.promise(() => fetch(new URL(pathname, base), init).then((response) => response.status))
+    // reaching the server status first, so the app is ready before guest routes are tried
+    yield* Effect.promise(() =>
+      fetch(new URL("/api/info", base), { headers: { authorization: `Basic ${btoa("opencode:secret")}` } }),
+    )
+
+    expect(yield* status("/api/room/public")).toBe(200)
+    // a wrong code reaches the handler and is refused there
+    const join = yield* Effect.promise(() =>
+      fetch(new URL("/api/room/join", base), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: "AAAA-AAAA", name: "Phone" }),
+      }).then((response) => response.json()),
+    )
+    expect(join).toMatchObject({ _tag: "UnauthorizedError", message: "Join code is wrong or expired" })
+    // the host API stays behind the credential
+    expect(yield* status("/api/room")).toBe(401)
+    expect(yield* status("/api/session")).toBe(401)
+  }),
+)

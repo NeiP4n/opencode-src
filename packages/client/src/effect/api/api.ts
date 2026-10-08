@@ -2435,6 +2435,12 @@ export type RoomCodeInput = { readonly roomID: Room.ID }
 export type RoomCodeOutput = Room.JoinCode
 export type RoomCodeOperation<E = never> = (input: RoomCodeInput) => Effect.Effect<RoomCodeOutput, E>
 
+export type RoomPublicOutput = {
+  readonly host: string
+  readonly rooms: ReadonlyArray<{ readonly id: Room.ID; readonly name: string }>
+}
+export type RoomPublicOperation<E = never> = () => Effect.Effect<RoomPublicOutput, E>
+
 export type RoomJoinInput = { readonly code: string; readonly name: string }
 export type RoomJoinOutput = Room.Joined
 export type RoomJoinOperation<E = never> = (input: RoomJoinInput) => Effect.Effect<RoomJoinOutput, E>
@@ -3429,6 +3435,7 @@ export interface RoomApi<E = never> {
   readonly update: RoomUpdateOperation<E>
   readonly remove: RoomRemoveOperation<E>
   readonly code: RoomCodeOperation<E>
+  readonly public: RoomPublicOperation<E>
   readonly join: RoomJoinOperation<E>
   readonly guest: {
     readonly get: RoomGuestGetOperation<E>
