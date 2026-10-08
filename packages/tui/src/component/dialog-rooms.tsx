@@ -1,5 +1,5 @@
 import { TextAttributes, type InputRenderable } from "@opentui/core"
-import { createResource, createSignal, For, Show } from "solid-js"
+import { createResource, createSignal, For, Show, type JSX } from "solid-js"
 import type { RoomInfo, RoomJoinCode } from "@opencode/client/promise"
 import { hostname } from "node:os"
 import { useConfig } from "../config"
@@ -36,9 +36,13 @@ export function DialogRooms(props: { onClose?: () => void }) {
 
   const sessionID = () => (route.data.type === "session" ? route.data.sessionID : undefined)
   const shared = () => rooms()?.some((room) => room.sessionID === sessionID()) ?? false
-  // Guests need an address they can reach; loopback ones only work on this machine.
+  // Guests need an address they can reach. Loopback only works on this machine, and
+  // container bridges (172.16/12) and TUN adapters (198.18/15) are not the network
+  // other devices are on; Wi-Fi and VPNs such as Radmin (26.*) stay.
   const addresses = () =>
-    (server()?.urls ?? []).map((url) => new URL(url).host).filter((host) => !/^(localhost|127\.|\[::1\])/.test(host))
+    (server()?.urls ?? [])
+      .map((url) => new URL(url).host)
+      .filter((host) => !/^(localhost|127\.|\[::1\]|172\.(1[6-9]|2\d|3[01])\.|198\.1[89]\.)/.test(host))
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true)
@@ -104,22 +108,24 @@ export function DialogRooms(props: { onClose?: () => void }) {
     })
   }
 
-  const field = (key: "address" | "code" | "name", placeholder: string, width: number) => (
-    <input
-      width={width}
-      cursorStyle={config.cursor}
-      ref={(element: InputRenderable) => {
-        fields[key] = element
-      }}
-      onSubmit={join}
-      placeholder={placeholder}
-      placeholderColor={theme.text.muted}
-      textColor={theme.text.formfield.base}
-      focusedTextColor={theme.text.formfield.focused}
-      cursorColor={theme.text.formfield.focused}
-      backgroundColor={theme.background.formfield.base}
-      focusedBackgroundColor={theme.background.formfield.focused}
-    />
+  const field = (key: "address" | "code" | "name", label: string, placeholder: string) => (
+    <Labeled label={label}>
+      <input
+        width={30}
+        cursorStyle={config.cursor}
+        ref={(element: InputRenderable) => {
+          fields[key] = element
+        }}
+        onSubmit={join}
+        placeholder={placeholder}
+        placeholderColor={theme.text.muted}
+        textColor={theme.text.formfield.base}
+        focusedTextColor={theme.text.formfield.focused}
+        cursorColor={theme.text.formfield.focused}
+        backgroundColor={theme.background.formfield.base}
+        focusedBackgroundColor={theme.background.formfield.focused}
+      />
+    </Labeled>
   )
 
   return (
@@ -143,99 +149,107 @@ export function DialogRooms(props: { onClose?: () => void }) {
           </text>
         }
       >
-        <box flexDirection="row" gap={1}>
-          <text fg={theme.text.muted}>Other devices connect to</text>
-          <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
-            {addresses().join("  ")}
-          </text>
-        </box>
-      </Show>
-      <box flexDirection="row" gap={1}>
-        <Button disabled={busy() || !sessionID() || shared()} onClick={share}>
-          {shared() ? "This session is shared" : "Share this session"}
-        </Button>
-        <Show when={!sessionID()}>
-          <text fg={theme.text.muted}>Open a session to share it.</text>
-        </Show>
-      </box>
-      <box>
-        <For each={rooms() ?? []}>
-          {(room) => (
-            <box paddingBottom={1}>
-              <box flexDirection="row" gap={1}>
+        <Labeled label="Address">
+          <box>
+            <For each={addresses()}>
+              {(address) => (
                 <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
-                  {room.name}
+                  {address}
                 </text>
-                <box flexGrow={1} />
-                <Button disabled={busy()} onClick={() => code(room)}>
-                  Get join code
-                </Button>
-                <Button disabled={busy()} onLeave={() => setArmed()} onClick={() => close(room)}>
-                  {armed() === room.id ? "Click again to stop sharing" : "Stop sharing"}
-                </Button>
-              </box>
-              <box flexDirection="row" gap={1}>
-                <text fg={theme.text.muted}>AI may message</text>
-                <Button
-                  disabled={busy()}
-                  onClick={() =>
-                    void run(() =>
-                      client.api.room.update({ roomID: room.id, ai: room.ai === "linked" ? "discovered" : "linked" }),
-                    )
-                  }
-                >
-                  {room.ai === "linked" ? "linked rooms only" : "any room, asking first"}
-                </Button>
-                <text fg={theme.text.muted}> Approvals by</text>
-                <Button
-                  disabled={busy()}
-                  onClick={() =>
-                    void run(() => client.api.room.update({ roomID: room.id, guestApprovals: !room.guestApprovals }))
-                  }
-                >
-                  {room.guestApprovals ? "me and guests" : "me only"}
-                </Button>
-              </box>
-              <Show when={codes()[room.id]}>
-                {(issued) => (
-                  <box>
-                    <text fg={theme.text.muted}>
-                      {"Join code: "}
-                      <span style={{ fg: theme.text.base, bold: true }}>{issued().code}</span>
-                      {`  (valid until ${new Date(issued().until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`}
-                    </text>
-                    <text fg={theme.text.muted} wrapMode="word">
-                      On the other device: Rooms, Join a room, then this address and code.
-                    </text>
-                  </box>
-                )}
-              </Show>
+              )}
+            </For>
+          </box>
+        </Labeled>
+      </Show>
+      <Show when={sessionID()} fallback={<text fg={theme.text.muted}>Open a session to share it as a room.</text>}>
+        <Show when={!shared()}>
+          <box flexDirection="row">
+            <Button variant="primary" disabled={busy()} onClick={share}>
+              Share this session
+            </Button>
+          </box>
+        </Show>
+      </Show>
+      <For each={rooms() ?? []}>
+        {(room) => (
+          <box>
+            <Labeled label="Room">
+              <text fg={theme.text.base} attributes={TextAttributes.BOLD} wrapMode="none" truncate>
+                {room.name}
+              </text>
+            </Labeled>
+            <Labeled label="AI messages">
+              <Button
+                disabled={busy()}
+                onClick={() =>
+                  void run(() =>
+                    client.api.room.update({ roomID: room.id, ai: room.ai === "linked" ? "discovered" : "linked" }),
+                  )
+                }
+              >
+                {room.ai === "linked" ? "linked rooms only" : "any room, asking first"}
+              </Button>
+            </Labeled>
+            <Labeled label="Approvals">
+              <Button
+                disabled={busy()}
+                onClick={() =>
+                  void run(() => client.api.room.update({ roomID: room.id, guestApprovals: !room.guestApprovals }))
+                }
+              >
+                {room.guestApprovals ? "me and guests" : "me only"}
+              </Button>
+            </Labeled>
+            <Show when={codes()[room.id]}>
+              {(issued) => (
+                <Labeled label="Join code">
+                  <text fg={theme.text.base}>
+                    <span style={{ bold: true }}>{issued().code}</span>
+                    <span style={{ fg: theme.text.muted }}>
+                      {`  valid until ${new Date(issued().until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+                    </span>
+                  </text>
+                </Labeled>
+              )}
+            </Show>
+            <box flexDirection="row" gap={1} paddingTop={1}>
+              <Button variant="primary" disabled={busy()} onClick={() => code(room)}>
+                {codes()[room.id] ? "New join code" : "Get join code"}
+              </Button>
+              <Button disabled={busy()} onLeave={() => setArmed()} onClick={() => close(room)}>
+                {armed() === room.id ? "Click again to stop sharing" : "Stop sharing"}
+              </Button>
             </box>
-          )}
-        </For>
-        <Show when={rooms() && rooms()!.length === 0}>
-          <text fg={theme.text.muted}>Nothing shared yet.</text>
-        </Show>
-        <Show when={rooms.error}>
-          <text fg={theme.text.feedback.error.base}>{errorMessage(rooms.error)}</text>
-        </Show>
-      </box>
+            <Show when={codes()[room.id]}>
+              <text fg={theme.text.muted} wrapMode="word">
+                On the other device open Rooms and enter the address and the join code.
+              </text>
+            </Show>
+          </box>
+        )}
+      </For>
+      <Show when={rooms.error}>
+        <text fg={theme.text.feedback.error.base}>{errorMessage(rooms.error)}</text>
+      </Show>
 
       <Section title="Join a room on another computer" />
-      <box flexDirection="row" gap={1}>
-        {field("address", "host:port", 24)}
-        {field("code", "code", 12)}
-        {field("name", `your name: ${hostname()}`, 22)}
-        <Button disabled={busy()} onClick={join}>
-          Join
-        </Button>
-      </box>
+      {field("address", "Address", "e.g. 192.168.1.5:49375")}
+      {field("code", "Join code", "e.g. ABCD-EFGH")}
+      {field("name", "Your name", `${hostname()} (default)`)}
       <Show when={joinError()}>
         {(message) => (
           <text fg={theme.text.feedback.error.base} wrapMode="word">
             {message()}
           </text>
         )}
+      </Show>
+      <box flexDirection="row">
+        <Button variant="primary" disabled={busy()} onClick={join}>
+          Join
+        </Button>
+      </box>
+      <Show when={saved.joined.length > 0}>
+        <text fg={theme.text.muted}>Joined rooms</text>
       </Show>
       <For each={saved.joined}>
         {(room) => (
@@ -245,16 +259,29 @@ export function DialogRooms(props: { onClose?: () => void }) {
             </text>
             <text fg={theme.text.muted}>{`${new URL(room.url).host} · as ${room.guest}`}</text>
             <box flexGrow={1} />
-            <Button onClick={() => open(room)}>Open chat</Button>
+            <Button variant="primary" onClick={() => open(room)}>
+              Open chat
+            </Button>
             <Button onLeave={() => setArmed()} onClick={() => leave(room)}>
               {armed() === `${room.url}#${room.roomID}` ? "Click again to leave" : "Leave"}
             </Button>
           </box>
         )}
       </For>
-      <Show when={saved.joined.length === 0}>
-        <text fg={theme.text.muted}>Rooms you join appear here.</text>
-      </Show>
+    </box>
+  )
+}
+
+const LABEL_WIDTH = 14
+
+function Labeled(props: { label: string; children: JSX.Element }) {
+  const theme = useTheme().surface("dialog")
+  return (
+    <box flexDirection="row">
+      <box width={LABEL_WIDTH} flexShrink={0}>
+        <text fg={theme.text.muted}>{props.label}</text>
+      </box>
+      {props.children}
     </box>
   )
 }

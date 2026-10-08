@@ -276,7 +276,11 @@ export function RegistryPanel(props: { options?: RegistryPanelOptions; onClose?:
       </box>
 
       <box flexDirection="row" gap={1}>
-        <Button disabled={busy() !== undefined || missing().length === 0} onClick={() => void onInstallMissing()}>
+        <Button
+          variant="primary"
+          disabled={busy() !== undefined || missing().length === 0}
+          onClick={() => void onInstallMissing()}
+        >
           {`Install missing (${missing().length})`}
         </Button>
         <Button
@@ -420,17 +424,51 @@ function ToolRow(props: {
   )
 }
 
-export function Button(props: { children: string; onClick: () => void; disabled?: boolean; onLeave?: () => void }) {
+// A filled chip so it reads as a button on any surface. Primary is for the main
+// action of a section; secondary for toggles and less important actions.
+export function Button(props: {
+  children: string
+  onClick: () => void
+  disabled?: boolean
+  onLeave?: () => void
+  variant?: "primary" | "secondary"
+}) {
   const theme = useTheme().surface("dialog")
+  const [hovered, setHovered] = createSignal(false)
+  const variant = () => props.variant ?? "secondary"
   return (
-    <Action
-      onClick={props.onClick}
-      color={theme.text.action.primary.base}
-      disabled={props.disabled}
-      onLeave={props.onLeave}
+    <box
+      paddingLeft={1}
+      paddingRight={1}
+      backgroundColor={
+        props.disabled
+          ? undefined
+          : hovered()
+            ? theme.background.action[variant()].hovered
+            : theme.background.action[variant()].focused
+      }
+      onMouseOver={() => setHovered(true)}
+      onMouseOut={() => {
+        setHovered(false)
+        props.onLeave?.()
+      }}
+      onMouseUp={(event) => {
+        event.stopPropagation()
+        if (!props.disabled) props.onClick()
+      }}
     >
-      {`[ ${props.children} ]`}
-    </Action>
+      <text
+        fg={
+          props.disabled
+            ? theme.text.action[variant()].disabled
+            : hovered()
+              ? theme.text.action[variant()].hovered
+              : theme.text.action[variant()].focused
+        }
+      >
+        {props.children}
+      </text>
+    </box>
   )
 }
 

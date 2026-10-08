@@ -23,7 +23,18 @@ test("the rooms dialog separates sharing from joining and shows where to enter a
     fetch: (url, request) => {
       if (url.pathname === "/api/location") return json(location)
       if (url.pathname === "/api/info")
-        return json({ version: "test", pid: 1, urls: ["http://192.168.1.5:4096"], paths: { tmp: "/tmp" } })
+        return json({
+          version: "test",
+          pid: 1,
+          urls: [
+            "http://127.0.0.1:4096",
+            "http://192.168.1.5:4096",
+            "http://172.17.0.1:4096",
+            "http://198.18.0.1:4096",
+            "http://26.10.0.2:4096",
+          ],
+          paths: { tmp: "/tmp" },
+        })
       if (url.pathname === "/api/room") return json({ data: [room] })
       if (url.pathname === `/api/room/${room.id}/code` && request.method === "POST")
         return json({ code: "ABCD-EFGH", expires_in: 600 })
@@ -34,17 +45,18 @@ test("the rooms dialog separates sharing from joining and shows where to enter a
   const entry = cell(bar.split("\n").slice(-3).join("\n"), "Rooms")
   await setup.mockMouse.click(entry.x, bar.split("\n").length - 3 + entry.y)
   const frame = await setup.waitForFrame(
-    (frame) => frame.includes("Join a room on another computer") && frame.includes("[ Get join code ]"),
+    (frame) => frame.includes("Join a room on another computer") && frame.includes("Get join code"),
   )
   expect(frame).toContain("Shared from this computer")
+  // only addresses other devices can reach: Wi-Fi and VPN, not loopback or container bridges
   expect(frame).toContain("192.168.1.5:4096")
-  expect(frame).toContain("[ Get join code ]")
-  expect(frame).toContain("[ Join ]")
-  expect(frame).toContain("Rooms you join appear here.")
+  expect(frame).toContain("26.10.0.2:4096")
+  expect(frame).not.toContain("172.17.0.1")
+  expect(frame).not.toContain("198.18.0.1")
+  expect(frame).toContain("Your name")
 
-  const button = cell(frame, "[ Get join code ]")
+  const button = cell(frame, "Get join code")
   await setup.mockMouse.click(button.x + 2, button.y)
-  const issued = await setup.waitForFrame((frame) => frame.includes("ABCD-EFGH"))
-  expect(issued).toContain("Join code: ABCD-EFGH")
-  expect(issued).toContain("On the other device: Rooms, Join a room, then this address and code.")
+  const issued = await setup.waitForFrame((frame) => frame.includes("ABCD-EFGH  valid until"))
+  expect(issued).toContain("On the other device open Rooms and enter the address and the join code.")
 })

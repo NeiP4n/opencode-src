@@ -122,7 +122,7 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
         )}
       </Show>
       <box flexDirection="row" gap={1}>
-        <Button disabled={busy()} onClick={save}>
+        <Button variant="primary" disabled={busy()} onClick={save}>
           {props.project ? "Save" : "Create"}
         </Button>
         <Show when={props.project}>
