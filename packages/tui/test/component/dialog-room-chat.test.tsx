@@ -53,7 +53,9 @@ test("a guest sees the note the room writes into and reads it without leaving th
   )
   app.renderer.start()
   try {
-    const frame = await app.waitForFrame((frame) => frame.includes("Note: Release plan") && frame.includes("Add the goals"))
+    const frame = await app.waitForFrame(
+      (frame) => frame.includes("Note: Release plan") && frame.includes("Add the goals"),
+    )
     expect(frame).toContain("Read note")
 
     const lines = frame.split("\n")

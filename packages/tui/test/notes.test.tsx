@@ -50,7 +50,13 @@ const plan = (): Note => ({
 })
 const ideas = (): Note => ({
   name: "ideas",
-  frontmatter: { title: "Onboarding ideas", status: "inbox", tags: ["ux"], created: now, updated: now - 86_400_000 * 2 },
+  frontmatter: {
+    title: "Onboarding ideas",
+    status: "inbox",
+    tags: ["ux"],
+    created: now,
+    updated: now - 86_400_000 * 2,
+  },
   body: "",
   mtime: 50,
 })
@@ -74,10 +80,7 @@ function render(state: string, input: { notes: Note[]; calls: Call[]; conflict?:
         const note = input.notes.find((item) => item.name === name)
         if (!note) return json({ _tag: "NoteNotFoundError", name, message: "missing" }, { status: 404 })
         if (input.conflict?.())
-          return json(
-            { _tag: "NoteConflictError", name, expected: 1, actual: 2, message: "changed" },
-            { status: 409 },
-          )
+          return json({ _tag: "NoteConflictError", name, expected: 1, actual: 2, message: "changed" }, { status: 409 })
         if (url.pathname.endsWith("/edit") && body && typeof body === "object" && "body" in body) {
           note.body = String(body.body)
           note.mtime += 1

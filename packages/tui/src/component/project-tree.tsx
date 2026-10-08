@@ -155,9 +155,7 @@ export function ProjectTree(props: { width: number }) {
           setHover={setHover}
           onClick={() => (notes.tab() === "notes" ? notes.setCreating(true) : edit())}
         >
-          <text fg={hover() === "new" ? theme.text.action.primary.hovered : theme.text.action.primary.base}>
-            + New
-          </text>
+          <text fg={hover() === "new" ? theme.text.action.primary.hovered : theme.text.action.primary.base}>+ New</text>
         </Row>
       </box>
       <Show when={notes.tab() === "notes"}>

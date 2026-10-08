@@ -379,44 +379,44 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                   <LocationProvider>
                                                     <ProjectsProvider>
                                                       <NotesProvider>
-                                                      <SessionTabsProvider>
-                                                        <SessionTerminalsProvider>
-                                                          <ThemeProvider
-                                                            mode={mode}
-                                                            source={createThemeSource(global.config)}
-                                                          >
-                                                            <ThemeErrorToast />
-                                                            <LocalProvider>
-                                                              <PromptStashProvider>
-                                                                <DialogProvider>
-                                                                  <FrecencyProvider>
-                                                                    <PromptHistoryProvider>
-                                                                      <PromptRefProvider>
-                                                                        <EditorContextProvider>
-                                                                          <AttentionProvider>
-                                                                            <UpdateNotificationProvider
-                                                                              updater={input.updater}
-                                                                            >
-                                                                              <PanelProvider>
-                                                                                <PluginProvider
-                                                                                  packages={input.packages}
-                                                                                  directories={pluginDirectories}
-                                                                                >
-                                                                                  <App />
-                                                                                </PluginProvider>
-                                                                              </PanelProvider>
-                                                                            </UpdateNotificationProvider>
-                                                                          </AttentionProvider>
-                                                                        </EditorContextProvider>
-                                                                      </PromptRefProvider>
-                                                                    </PromptHistoryProvider>
-                                                                  </FrecencyProvider>
-                                                                </DialogProvider>
-                                                              </PromptStashProvider>
-                                                            </LocalProvider>
-                                                          </ThemeProvider>
-                                                        </SessionTerminalsProvider>
-                                                      </SessionTabsProvider>
+                                                        <SessionTabsProvider>
+                                                          <SessionTerminalsProvider>
+                                                            <ThemeProvider
+                                                              mode={mode}
+                                                              source={createThemeSource(global.config)}
+                                                            >
+                                                              <ThemeErrorToast />
+                                                              <LocalProvider>
+                                                                <PromptStashProvider>
+                                                                  <DialogProvider>
+                                                                    <FrecencyProvider>
+                                                                      <PromptHistoryProvider>
+                                                                        <PromptRefProvider>
+                                                                          <EditorContextProvider>
+                                                                            <AttentionProvider>
+                                                                              <UpdateNotificationProvider
+                                                                                updater={input.updater}
+                                                                              >
+                                                                                <PanelProvider>
+                                                                                  <PluginProvider
+                                                                                    packages={input.packages}
+                                                                                    directories={pluginDirectories}
+                                                                                  >
+                                                                                    <App />
+                                                                                  </PluginProvider>
+                                                                                </PanelProvider>
+                                                                              </UpdateNotificationProvider>
+                                                                            </AttentionProvider>
+                                                                          </EditorContextProvider>
+                                                                        </PromptRefProvider>
+                                                                      </PromptHistoryProvider>
+                                                                    </FrecencyProvider>
+                                                                  </DialogProvider>
+                                                                </PromptStashProvider>
+                                                              </LocalProvider>
+                                                            </ThemeProvider>
+                                                          </SessionTerminalsProvider>
+                                                        </SessionTabsProvider>
                                                       </NotesProvider>
                                                     </ProjectsProvider>
                                                   </LocationProvider>

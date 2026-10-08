@@ -157,7 +157,10 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
             }
           >
             {(current) => (
-              <Show when={current().body.trim()} fallback={<text fg={theme.text.muted}>The note is empty so far.</text>}>
+              <Show
+                when={current().body.trim()}
+                fallback={<text fg={theme.text.muted}>The note is empty so far.</text>}
+              >
                 <markdown
                   syntaxStyle={syntax()}
                   content={current().body}

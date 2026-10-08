@@ -140,7 +140,9 @@ export function NotesPanel(props: {
               selected={note.name === props.openName}
               onClick={() => props.onOpen(note)}
             >
-              <text fg={statusColor(theme, note.frontmatter.status)}>{`${NOTE_STATUS_MARKER[note.frontmatter.status]} `}</text>
+              <text
+                fg={statusColor(theme, note.frontmatter.status)}
+              >{`${NOTE_STATUS_MARKER[note.frontmatter.status]} `}</text>
               <box flexGrow={1} minWidth={0}>
                 <text fg={theme.text.base} wrapMode="none" truncate>
                   {noteTitle(note)}
@@ -183,7 +185,9 @@ export function NotesPanel(props: {
               No notes yet.
             </text>
             <Row id="notes:empty-new" hover={hover} setHover={setHover} onClick={() => props.onCreating(true)}>
-              <text fg={hover() === "notes:empty-new" ? theme.text.action.primary.hovered : theme.text.action.primary.base}>
+              <text
+                fg={hover() === "notes:empty-new" ? theme.text.action.primary.hovered : theme.text.action.primary.base}
+              >
                 + New note
               </text>
             </Row>

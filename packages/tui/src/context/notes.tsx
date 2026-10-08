@@ -178,10 +178,7 @@ export const { use: useNotes, provider: NotesProvider } = createSimpleContext({
       bound,
       // The note a session shows as its document: bound, in Notes mode, and not put aside for the chat.
       canvas: (sessionID: string) => (tab() === "notes" && !chat[sessionID] ? bound(sessionID) : undefined),
-      async create(
-        directory: string,
-        input: { title: string; body?: string; length?: NoteLength; session?: string },
-      ) {
+      async create(directory: string, input: { title: string; body?: string; length?: NoteLength; session?: string }) {
         const result = await client.api.note.create({ location: { directory }, ...input })
         upsert(directory, result.data)
         return result.data

@@ -48,9 +48,7 @@ export function matchesNote(note: NoteInfo, filter: string) {
   const query = filter.trim().toLowerCase()
   if (!query) return true
   if (query.startsWith("#")) return note.frontmatter.tags.some((tag) => tag.includes(query.slice(1)))
-  return (
-    noteTitle(note).toLowerCase().includes(query) || note.frontmatter.tags.some((tag) => tag.includes(query))
-  )
+  return noteTitle(note).toLowerCase().includes(query) || note.frontmatter.tags.some((tag) => tag.includes(query))
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" })

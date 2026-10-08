@@ -1,9 +1,4 @@
-import {
-  TextAttributes,
-  type InputRenderable,
-  type MarkdownOptions,
-  type TextareaRenderable,
-} from "@opentui/core"
+import { TextAttributes, type InputRenderable, type MarkdownOptions, type TextareaRenderable } from "@opentui/core"
 import type { NoteInfo, NoteLength, NoteStatus } from "@opencode/client"
 import { createSignal, For, Match, Show, Switch, type JSX } from "solid-js"
 import { useConfig } from "../config"
@@ -197,7 +192,14 @@ export function NoteDocument(props: {
           </For>
         </box>
       </box>
-      <box flexShrink={0} height={1} marginLeft={2} marginRight={2} border={["bottom"]} borderColor={theme.border.base} />
+      <box
+        flexShrink={0}
+        height={1}
+        marginLeft={2}
+        marginRight={2}
+        border={["bottom"]}
+        borderColor={theme.border.base}
+      />
       <Show when={changed()}>
         <box flexShrink={0} flexDirection="row" flexWrap="wrap" columnGap={2} paddingLeft={2} paddingRight={2}>
           <text fg={theme.text.feedback.warning.base} wrapMode="word">
@@ -324,7 +326,14 @@ function Action(props: {
         props.onClick()
       }}
     >
-      <Show when={props.tone === "plain"} fallback={<text fg={color()} wrapMode="none">{props.children}</text>}>
+      <Show
+        when={props.tone === "plain"}
+        fallback={
+          <text fg={color()} wrapMode="none">
+            {props.children}
+          </text>
+        }
+      >
         {props.children}
       </Show>
     </box>
