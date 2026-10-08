@@ -4,6 +4,7 @@ import type { Entry } from "../types.js"
 
 // Host information and package management. nushell templates for the same
 // lookups are provided where they differ meaningfully from POSIX output.
+// Linux-only tools carry `platforms`; Windows equivalents live in windows.ts.
 export const entries: Entry[] = [
   {
     id: "system.kernel",
@@ -12,7 +13,7 @@ export const entries: Entry[] = [
     category: "system",
     templates: {
       bash: "uname -a",
-      nu: "sys | into record | first | format-list",
+      nu: "sys host",
     },
   },
   {
@@ -20,9 +21,10 @@ export const entries: Entry[] = [
     title: "Memory usage",
     description: "Total, free and available RAM",
     category: "system",
+    platforms: ["linux"],
     templates: {
       bash: "free -h",
-      nu: "sys mem | format-list",
+      nu: "sys mem",
     },
   },
   {
@@ -30,6 +32,7 @@ export const entries: Entry[] = [
     title: "CPU model and cores",
     description: "Processor model, core count and current frequency",
     category: "system",
+    platforms: ["linux"],
     templates: { bash: "lscpu | head -{limit}" },
   },
   {
@@ -37,6 +40,7 @@ export const entries: Entry[] = [
     title: "Block devices",
     description: "Disks, partitions, filesystems and mount points",
     category: "system",
+    platforms: ["linux"],
     templates: { bash: "lsblk -f" },
   },
   {
@@ -46,7 +50,7 @@ export const entries: Entry[] = [
     category: "system",
     templates: {
       bash: "env | sort",
-      nu: "env | sort-by name | transpose k v | each {|r| $'($r.k)=($r.v)'} | str join (char nl)",
+      nu: '$env | transpose name value | sort-by name | each {|r| $"($r.name)=($r.value | to text | str trim)"} | str join (char nl)',
     },
   },
   {
@@ -61,6 +65,7 @@ export const entries: Entry[] = [
     title: "Logged-in users",
     description: "Who is signed in and since when",
     category: "system",
+    platforms: ["linux", "darwin"],
     templates: { bash: "who" },
   },
   {
@@ -68,6 +73,7 @@ export const entries: Entry[] = [
     title: "System log tail",
     description: "Last lines of the system log",
     category: "system",
+    platforms: ["linux"],
     templates: { bash: "journalctl -n {lines} --no-pager" },
   },
   {
@@ -75,6 +81,7 @@ export const entries: Entry[] = [
     title: "Installed packages",
     description: "Installed packages for the detected package manager",
     category: "system",
+    platforms: ["linux"],
     requires: ["dpkg-query"],
     templates: { bash: "dpkg-query -W | sort" },
   },
@@ -83,6 +90,7 @@ export const entries: Entry[] = [
     title: "Search a package",
     description: "Find an available package by name substring",
     category: "system",
+    platforms: ["linux"],
     requires: ["apt-cache"],
     templates: { bash: "apt-cache search {query}" },
   },
@@ -92,7 +100,7 @@ export const entries: Entry[] = [
     description: "Date, time and timezone in ISO format",
     category: "system",
     templates: {
-      bash: "date --iso-8601=seconds",
+      bash: "date +%Y-%m-%dT%H:%M:%S%z",
       nu: "date now | format date '%Y-%m-%dT%H:%M:%S%z'",
     },
   },
@@ -101,6 +109,7 @@ export const entries: Entry[] = [
     title: "Scheduled timers",
     description: "systemd timers with next run time",
     category: "system",
+    platforms: ["linux"],
     requires: ["systemctl"],
     templates: { bash: "systemctl list-timers --no-pager" },
   },
