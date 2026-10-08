@@ -1,5 +1,5 @@
 import { TextAttributes, type InputRenderable } from "@opentui/core"
-import { createSignal, onMount, Show } from "solid-js"
+import { createResource, createSignal, For, onMount, Show } from "solid-js"
 import type { OrchestraProject } from "@opencode/client/promise"
 import { useConfig } from "../config"
 import { useClient } from "../context/client"
@@ -12,6 +12,8 @@ import { Button } from "./devtools-registry"
 
 // Create a project, or rename it, move it to another directory or forget it.
 // Projects are the operator's own: a name and a directory, nothing discovered.
+// A new project may start with an AI team: the template opens its role
+// sessions next to the Orchestra; "No team" opens nothing.
 export function DialogProject(props: { project?: OrchestraProject; onDone: () => void; onClose: () => void }) {
   const client = useClient()
   const location = useLocation()
@@ -21,6 +23,26 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
   const [busy, setBusy] = createSignal(false)
   const [armed, setArmed] = createSignal(false)
   const fields: { name?: InputRenderable; directory?: InputRenderable } = {}
+  const [templates] = createResource(
+    () => !props.project,
+    () => client.api.orchestra.template.list().catch(() => []),
+  )
+  // 0 is "No team"; n picks templates()[n - 1].
+  const [team, setTeam] = createSignal(0)
+  const [teamFocused, setTeamFocused] = createSignal(false)
+  const focusTeam = () => {
+    fields.name?.blur()
+    fields.directory?.blur()
+    setTeamFocused(true)
+  }
+  const focusField = (field: InputRenderable | undefined) => {
+    setTeamFocused(false)
+    field?.focus()
+  }
+  const moveTeam = (direction: 1 | -1) => {
+    const count = (templates()?.length ?? 0) + 1
+    setTeam((team() + direction + count) % count)
+  }
 
   onMount(() =>
     setTimeout(() => {
@@ -46,7 +68,7 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
     void run(() =>
       project
         ? client.api.orchestra.project.update({ projectID: project.id, name, directory })
-        : client.api.orchestra.project.create({ name, directory }),
+        : client.api.orchestra.project.create({ name, directory, template: templates()?.[team() - 1]?.id }),
     )
   }
 
@@ -57,7 +79,7 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
     void run(() => client.api.orchestra.project.remove({ projectID: project.id }))
   }
 
-  // Tab moves between the two fields; enter in either saves.
+  // Tab moves between the fields (and the team list of a new project); enter saves.
   Keymap.createLayer(() => ({
     mode: "modal",
     commands: [
@@ -65,8 +87,15 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
         bind: "tab",
         title: "Next field",
         group: "Project",
-        run: () => (fields.name?.focused ? fields.directory : fields.name)?.focus(),
+        run: () => {
+          if (fields.name?.focused) return focusField(fields.directory)
+          if (fields.directory?.focused && !props.project) return focusTeam()
+          focusField(fields.name)
+        },
       },
+      { bind: "up", title: "Previous team", group: "Project", enabled: teamFocused, run: () => moveTeam(-1) },
+      { bind: "down", title: "Next team", group: "Project", enabled: teamFocused, run: () => moveTeam(1) },
+      { bind: "return", title: "Create", group: "Project", enabled: teamFocused, run: save },
     ],
   }))
 
@@ -114,6 +143,39 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
           props.project?.directory ?? location.current?.directory ?? process.cwd(),
         )}
       </box>
+      <Show when={!props.project}>
+        <box flexDirection="row" gap={1}>
+          <box width={6}>
+            <text fg={teamFocused() ? theme.text.formfield.focused : theme.text.muted}>Team</text>
+          </box>
+          <box flexGrow={1}>
+            <TeamOption
+              selected={team() === 0}
+              focused={teamFocused()}
+              name="No team"
+              detail="only the Orchestra"
+              onClick={() => {
+                setTeam(0)
+                focusTeam()
+              }}
+            />
+            <For each={templates()}>
+              {(template, index) => (
+                <TeamOption
+                  selected={team() === index() + 1}
+                  focused={teamFocused()}
+                  name={template.name}
+                  detail={template.members.map((member) => member.title).join(", ")}
+                  onClick={() => {
+                    setTeam(index() + 1)
+                    focusTeam()
+                  }}
+                />
+              )}
+            </For>
+          </box>
+        </box>
+      </Show>
       <Show when={error()}>
         {(message) => (
           <text fg={theme.text.feedback.error.base} wrapMode="word">
@@ -131,7 +193,31 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
           </Button>
         </Show>
         <box flexGrow={1} />
-        <text fg={theme.text.muted}>tab next field · enter save</text>
+        <text fg={theme.text.muted}>
+          {props.project ? "tab next field · enter save" : "tab next field · ↑↓ team · enter create"}
+        </text>
+      </box>
+    </box>
+  )
+}
+
+function TeamOption(props: { selected: boolean; focused: boolean; name: string; detail: string; onClick: () => void }) {
+  const theme = useTheme().surface("dialog")
+  return (
+    <box
+      flexDirection="row"
+      gap={1}
+      backgroundColor={props.selected && props.focused ? theme.background.formfield.focused : undefined}
+      onMouseUp={props.onClick}
+    >
+      <text fg={props.selected ? theme.text.formfield.focused : theme.text.muted}>{props.selected ? "●" : "○"}</text>
+      <text fg={props.selected ? theme.text.formfield.focused : theme.text.formfield.base} wrapMode="none">
+        {props.name}
+      </text>
+      <box flexGrow={1} minWidth={0}>
+        <text fg={theme.text.muted} wrapMode="none" truncate>
+          {`· ${props.detail}`}
+        </text>
       </box>
     </box>
   )

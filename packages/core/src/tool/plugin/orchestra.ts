@@ -4,6 +4,7 @@ import { ToolFailure } from "@opencode/ai"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
 import { Effect, Schema } from "effect"
+import { Agent } from "@opencode/schema/agent"
 import { Orchestra } from "../../orchestra.js"
 import { AbsolutePath } from "../../schema.js"
 import { Session } from "../../session.js"
@@ -14,7 +15,7 @@ export const name = "sessions"
 
 const description = [
   "Manage the other sessions of this project. Only the project's main session (the orchestra) has this tool.",
-  "Actions: list shows each session with its status and the access the operator granted;",
+  "Actions: list shows each session with its role (agent), its status and the access the operator granted;",
   "read returns the latest messages of a session; send posts a message into a session, which starts its model;",
   "create opens a new session in the project and can give it a first task; stop interrupts a running session.",
   "Access per session is hidden < read < write < full: read allows list and read, write adds send, full adds stop.",
@@ -28,6 +29,10 @@ export const Input = Schema.Struct({
     description: "Message for send, or the first task for create",
   }),
   title: Schema.optionalKey(Schema.String).annotate({ description: "Title of the session to create" }),
+  agent: Schema.optionalKey(Schema.String).annotate({
+    description:
+      "Role of the session to create: architect, developer, tester, reviewer, debugger, researcher, designer, writer or devops",
+  }),
   limit: Schema.optionalKey(Schema.Int).annotate({ description: "How many recent messages read returns (default 10)" }),
 })
 
@@ -78,7 +83,7 @@ export const Plugin = {
       return visible
         .map(
           (row) =>
-            `${row.session.id}  ${row.session.title ?? "(untitled)"}  [${active.has(row.session.id) ? "running" : "idle"}, access: ${row.access}]`,
+            `${row.session.id}  ${row.session.title ?? "(untitled)"}  [role: ${row.session.agent ?? "default"}, ${active.has(row.session.id) ? "running" : "idle"}, access: ${row.access}]`,
         )
         .join("\n")
     })
@@ -121,10 +126,13 @@ export const Plugin = {
                   }
                 }
                 case "create": {
+                  if (input.agent === Orchestra.agent)
+                    return yield* new ToolFailure({ message: "A project has one Orchestra; pick a working role" })
                   const created = yield* sessions
                     .create({
                       location: { directory: AbsolutePath.make(project.directory) },
                       title: input.title?.trim() || undefined,
+                      agent: input.agent ? Agent.ID.make(input.agent) : undefined,
                     })
                     .pipe(Effect.mapError((error) => new ToolFailure({ message: "Could not create a session", error })))
                   yield* orchestra.setAccess(created.id, "full")

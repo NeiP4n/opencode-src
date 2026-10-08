@@ -19,15 +19,31 @@ export const OrchestraGroup = HttpApiGroup.make("server.orchestra")
     ),
   )
   .add(
+    HttpApiEndpoint.get("orchestra.template.list", "/api/orchestra/template", {
+      success: Schema.Array(Orchestra.Template),
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.template.list",
+        summary: "List team templates",
+        description: "Ready-made AI teams a project can be created with: the role sessions each one opens.",
+      }),
+    ),
+  )
+  .add(
     HttpApiEndpoint.post("orchestra.project.create", root, {
-      payload: Schema.Struct({ name: Schema.String, directory: Schema.String }),
+      payload: Schema.Struct({
+        name: Schema.String,
+        directory: Schema.String,
+        template: Schema.String.pipe(Schema.optional),
+      }),
       success: Orchestra.Project,
       error: InvalidRequestError,
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "orchestra.project.create",
         summary: "Create project",
-        description: "Create a named project for an existing directory; its sessions are those opened in or below it.",
+        description:
+          "Create a named project for an existing directory; its sessions are those opened in or below it. With a template, also open the main session and one session per team member.",
       }),
     ),
   )

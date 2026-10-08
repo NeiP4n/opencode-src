@@ -7,6 +7,7 @@ import path from "path"
 import { useTuiPaths } from "./runtime"
 import { useArgs } from "./args"
 import { RGBA } from "@opentui/core"
+import { Orchestra } from "@opencode/schema/orchestra"
 import { readJson, writeJsonAtomic } from "../util/persistence"
 import {
   createModelPreferenceRepository,
@@ -60,6 +61,11 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const visibleAgents = createMemo(() =>
         (data.location.agent.list(location.ref) ?? []).filter((agent) => !agent.hidden),
       )
+      // A project's main session always runs the hidden Orchestra agent; the composer shows it and cannot change it.
+      const fixed = () =>
+        route.data.type === "session" && data.session.get(route.data.sessionID)?.agent === Orchestra.agent
+          ? data.location.agent.list(location.ref)?.find((agent) => agent.id === Orchestra.agent)
+          : undefined
       const [agentStore, setAgentStore] = createStore({
         current: undefined as string | undefined,
         draftBySession: {} as Record<string, { agent?: string } | undefined>,
@@ -84,6 +90,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           return agents()
         },
         current() {
+          const orchestra = fixed()
+          if (orchestra) return orchestra
           const draft = route.data.type === "session" ? agentStore.draftBySession[route.data.sessionID] : undefined
           const selected =
             route.data.type === "session"
@@ -95,6 +103,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           return agents().find((agent) => agent.id === selected) ?? agents().at(0)
         },
         set(id: string) {
+          if (fixed())
+            return toast.show({ variant: "info", message: "The Orchestra session's role is fixed", duration: 3000 })
           if (!agents().some((agent) => agent.id === id))
             return toast.show({
               variant: "warning",

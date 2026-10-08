@@ -12,6 +12,12 @@ function missingProject(error: Orchestra.ProjectNotFoundError) {
   )
 }
 
+function badTemplate(error: Orchestra.TemplateNotFoundError) {
+  return Effect.fail(
+    new InvalidRequestError({ message: `Unknown team template: ${error.template}`, field: "template" }),
+  )
+}
+
 function badDirectory(error: Orchestra.DirectoryError) {
   return Effect.fail(
     new InvalidRequestError({ message: `Not an existing directory: ${error.directory}`, field: "directory" }),
@@ -25,8 +31,14 @@ export const OrchestraHandler = HttpApiBuilder.group(Api, "server.orchestra", (h
 
     return handlers
       .handle("orchestra.project.list", () => orchestra.projects())
+      .handle("orchestra.template.list", () => Effect.succeed(Orchestra.templates))
       .handle("orchestra.project.create", (ctx) =>
-        orchestra.create(ctx.payload).pipe(Effect.catchTag("Orchestra.DirectoryError", badDirectory)),
+        orchestra
+          .create(ctx.payload)
+          .pipe(
+            Effect.catchTag("Orchestra.DirectoryError", badDirectory),
+            Effect.catchTag("Orchestra.TemplateNotFoundError", badTemplate),
+          ),
       )
       .handle("orchestra.project.update", (ctx) =>
         orchestra

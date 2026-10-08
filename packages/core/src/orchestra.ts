@@ -11,6 +11,7 @@ import { AbsolutePath } from "./schema.js"
 import { KV } from "./kv.js"
 import { Session } from "./session.js"
 
+export const agent = Orchestra.agent
 export const Access = Orchestra.Access
 export type Access = Orchestra.Access
 export const allows = Orchestra.allows
@@ -19,10 +20,18 @@ export const Project = Orchestra.Project
 export type Project = Orchestra.Project
 export const ProjectID = Orchestra.ProjectID
 export type ProjectID = Orchestra.ProjectID
+export const Template = Orchestra.Template
+export type Template = Orchestra.Template
+export const templates = Orchestra.templates
 
 export class ProjectNotFoundError extends Schema.TaggedError<ProjectNotFoundError>()("Orchestra.ProjectNotFoundError", {
   projectID: Schema.String,
 }) {}
+
+export class TemplateNotFoundError extends Schema.TaggedError<TemplateNotFoundError>()(
+  "Orchestra.TemplateNotFoundError",
+  { template: Schema.String },
+) {}
 
 export class DirectoryError extends Schema.TaggedError<DirectoryError>()("Orchestra.DirectoryError", {
   directory: Schema.String,
@@ -30,7 +39,12 @@ export class DirectoryError extends Schema.TaggedError<DirectoryError>()("Orches
 
 export interface Interface {
   readonly projects: () => Effect.Effect<ReadonlyArray<Project>>
-  readonly create: (input: { name: string; directory: string }) => Effect.Effect<Project, DirectoryError>
+  // With a template, also opens the main session and one session per team member.
+  readonly create: (input: {
+    name: string
+    directory: string
+    template?: string
+  }) => Effect.Effect<Project, DirectoryError | TemplateNotFoundError>
   readonly update: (
     id: ProjectID,
     input: { name?: string; directory?: string },
@@ -89,6 +103,18 @@ const layer = Layer.effect(
       return resolved
     })
 
+    const mainSession = Effect.fnUntraced(function* (project: Project) {
+      const created = yield* sessions
+        .create({
+          location: { directory: AbsolutePath.make(project.directory) },
+          title: `${project.name} · Orchestra`,
+          agent: Orchestra.agent,
+        })
+        .pipe(Effect.orDie)
+      yield* save({ ...project, main: created.id })
+      return created
+    })
+
     const access = Effect.fn("Orchestra.access")(function* (sessionID: SessionID) {
       return Option.getOrElse(decodeAccess(yield* kv.get(ACCESS + sessionID)), () => Orchestra.defaultAccess)
     })
@@ -96,13 +122,34 @@ const layer = Layer.effect(
     return Service.of({
       projects,
       create: Effect.fn("Orchestra.create")(function* (input) {
+        const template = input.template ? templates.find((item) => item.id === input.template) : undefined
+        if (input.template && !template) return yield* new TemplateNotFoundError({ template: input.template })
         const resolved = yield* directory(input.directory)
-        return yield* save({
+        const project = yield* save({
           id: ProjectID.create(),
           name: input.name.trim() || path.basename(resolved),
           directory: resolved,
           created: Date.now(),
         })
+        if (!template) return project
+        // Sessions list newest first, so opening the last member first shows the team in template order.
+        yield* Effect.forEach(
+          template.members.toReversed(),
+          (member) =>
+            sessions
+              .create({
+                location: { directory: AbsolutePath.make(resolved) },
+                title: member.title,
+                agent: member.agent,
+              })
+              .pipe(
+                Effect.orDie,
+                Effect.flatMap((session) => kv.set(ACCESS + session.id, "full")),
+              ),
+          { discard: true },
+        )
+        const main = yield* mainSession(project)
+        return { ...project, main: main.id }
       }),
       update: Effect.fn("Orchestra.update")(function* (id, input) {
         const project = yield* get(id)
@@ -121,15 +168,11 @@ const layer = Layer.effect(
         const existing = project.main
           ? yield* sessions.get(project.main).pipe(Effect.orElseSucceed(() => undefined))
           : undefined
-        if (existing) return existing
-        const created = yield* sessions
-          .create({
-            location: { directory: AbsolutePath.make(project.directory) },
-            title: `${project.name} · Orchestra`,
-          })
-          .pipe(Effect.orDie)
-        yield* save({ ...project, main: created.id })
-        return created
+        if (!existing) return yield* mainSession(project)
+        if (existing.agent === Orchestra.agent) return existing
+        // Main sessions created before the Orchestra agent existed adopt it on next open.
+        yield* sessions.switchAgent({ sessionID: existing.id, agent: Orchestra.agent }).pipe(Effect.orDie)
+        return { ...existing, agent: Orchestra.agent }
       }),
       sessions: Effect.fn("Orchestra.sessions")(function* (id) {
         const project = yield* get(id)

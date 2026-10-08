@@ -5,6 +5,7 @@ import type { Agent } from "@opencode/schema/agent"
 import type { Model } from "@opencode/schema/model"
 import type { Permission } from "@opencode/schema/permission"
 import { Event } from "@opencode/schema/event"
+import { Orchestra } from "@opencode/schema/orchestra"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Bus } from "../bus.js"
 import { Database } from "../database/database.js"
@@ -91,6 +92,8 @@ export const make = Effect.fn("Session.make")(function* () {
     input: { agent: Agent.ID },
   ) {
     const session = yield* get(sessionID)
+    // A project's main session is created with the Orchestra agent and keeps it.
+    if (session.agent === Orchestra.agent) return
     yield* bus.publish(SessionEvent.AgentSelected, { sessionID, agent: input.agent, previous: session.agent })
   })
   const switchModel = Effect.fn("Session.switchModel")(function* (

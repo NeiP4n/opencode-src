@@ -487,6 +487,8 @@ export type OrchestraProject = {
   created: number
 }
 
+export type OrchestraMember = { agent: string; title: string }
+
 export type OrchestraAccess = "hidden" | "read" | "write" | "full"
 
 export type SessionMessageLocationSwitched = {
@@ -1737,6 +1739,8 @@ export type WorktreeList = Array<WorktreeDirectory>
 export type VcsInfo = { provider?: string; branch: VcsBranch }
 
 export type RoomJoined = { token: string; guest: RoomGuest; room: RoomInfo }
+
+export type OrchestraTemplate = { id: string; name: string; description: string; members: Array<OrchestraMember> }
 
 export type SessionInboxMove = {
   id: string
@@ -6881,9 +6885,20 @@ export type RoomGuestPermissionReplyOutput = void
 
 export type OrchestraProjectListOutput = Array<OrchestraProject>
 
+export type OrchestraTemplateListOutput = Array<OrchestraTemplate>
+
 export type OrchestraProjectCreateInput = {
-  readonly name: { readonly name: string; readonly directory: string }["name"]
-  readonly directory: { readonly name: string; readonly directory: string }["directory"]
+  readonly name: { readonly name: string; readonly directory: string; readonly template?: string | undefined }["name"]
+  readonly directory: {
+    readonly name: string
+    readonly directory: string
+    readonly template?: string | undefined
+  }["directory"]
+  readonly template?: {
+    readonly name: string
+    readonly directory: string
+    readonly template?: string | undefined
+  }["template"]
 }
 
 export type OrchestraProjectCreateOutput = OrchestraProject

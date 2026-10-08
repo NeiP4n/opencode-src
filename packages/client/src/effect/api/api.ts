@@ -3452,7 +3452,14 @@ export interface RoomApi<E = never> {
 export type OrchestraProjectListOutput = ReadonlyArray<Orchestra.Project>
 export type OrchestraProjectListOperation<E = never> = () => Effect.Effect<OrchestraProjectListOutput, E>
 
-export type OrchestraProjectCreateInput = { readonly name: string; readonly directory: string }
+export type OrchestraTemplateListOutput = ReadonlyArray<Orchestra.Template>
+export type OrchestraTemplateListOperation<E = never> = () => Effect.Effect<OrchestraTemplateListOutput, E>
+
+export type OrchestraProjectCreateInput = {
+  readonly name: string
+  readonly directory: string
+  readonly template?: string | undefined
+}
 export type OrchestraProjectCreateOutput = Orchestra.Project
 export type OrchestraProjectCreateOperation<E = never> = (
   input: OrchestraProjectCreateInput,
@@ -3504,6 +3511,7 @@ export interface OrchestraApi<E = never> {
     readonly main: OrchestraProjectMainOperation<E>
     readonly sessions: OrchestraProjectSessionsOperation<E>
   }
+  readonly template: { readonly list: OrchestraTemplateListOperation<E> }
   readonly access: OrchestraAccessOperation<E>
 }
 

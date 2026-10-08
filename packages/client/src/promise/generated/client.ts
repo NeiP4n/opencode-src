@@ -292,6 +292,7 @@ import type {
   RoomGuestPermissionReplyInput,
   RoomGuestPermissionReplyOutput,
   OrchestraProjectListOutput,
+  OrchestraTemplateListOutput,
   OrchestraProjectCreateInput,
   OrchestraProjectCreateOutput,
   OrchestraProjectUpdateInput,
@@ -2441,7 +2442,7 @@ export function make(options: ClientOptions) {
             {
               method: "POST",
               path: `/api/orchestra/project`,
-              body: { name: input["name"], directory: input["directory"] },
+              body: { name: input["name"], directory: input["directory"], template: input["template"] },
               successStatus: 200,
               declaredStatuses: [400, 401],
               empty: false,
@@ -2489,6 +2490,19 @@ export function make(options: ClientOptions) {
               path: `/api/orchestra/project/${encodeURIComponent(input.projectID)}/session`,
               successStatus: 200,
               declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
+      template: {
+        list: (requestOptions?: RequestOptions) =>
+          request<OrchestraTemplateListOutput>(
+            {
+              method: "GET",
+              path: `/api/orchestra/template`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
               empty: false,
             },
             requestOptions,

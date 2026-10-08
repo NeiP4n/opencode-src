@@ -21,6 +21,16 @@ const main = session("ses_main", "Demo · Orchestra")
 
 type Call = { method: string; path: string; body?: unknown }
 
+const team = {
+  id: "feature",
+  name: "Feature",
+  description: "Design, build, test and review a new feature",
+  members: [
+    { agent: "architect", title: "Architect" },
+    { agent: "developer", title: "Developer" },
+  ],
+}
+
 function render(state: string, calls: Call[], projects: (typeof project)[]) {
   return createAppFixture({
     width: 120,
@@ -38,6 +48,7 @@ function render(state: string, calls: Call[], projects: (typeof project)[]) {
       if (url.pathname === "/api/orchestra/project" && request.method === "POST")
         return json({ ...project, id: "prj_new", name: "Created" })
       if (url.pathname === "/api/orchestra/project") return json(projects)
+      if (url.pathname === "/api/orchestra/template") return json([team])
       if (url.pathname === `/api/orchestra/project/${project.id}/session`)
         return json({ data: [worker], access: { [worker.id]: "write" } })
       if (url.pathname === `/api/orchestra/project/${project.id}/main`) return json(main)
@@ -127,4 +138,24 @@ test("a project is created from a name and a path", async () => {
   await setup.mockInput.pressEnter()
   await setup.waitFor(() => calls.some((call) => call.method === "POST" && call.path === "/api/orchestra/project"))
   expect(calls.find((call) => call.method === "POST")?.body).toEqual({ name: "Created", directory })
+})
+
+test("a new project can start with an AI team from a template", async () => {
+  await using state = await tmpdir()
+  const calls: Call[] = []
+  await using setup = await render(state.path, calls, [])
+
+  const add = cell(await setup.waitForFrame((frame) => frame.includes("+ Project")), "+ Project")
+  await setup.mockMouse.click(add.x, add.y)
+  // the template list shows each team with its roles; "No team" is selected first
+  await setup.waitForFrame((frame) => frame.includes("● No team") && frame.includes("Architect, Developer"))
+
+  await setup.mockInput.typeText("Team")
+  await setup.mockInput.pressTab()
+  await setup.mockInput.pressTab()
+  await setup.mockInput.pressArrow("down")
+  await setup.waitForFrame((frame) => frame.includes("● Feature"))
+  await setup.mockInput.pressEnter()
+  await setup.waitFor(() => calls.some((call) => call.method === "POST" && call.path === "/api/orchestra/project"))
+  expect(calls.find((call) => call.method === "POST")?.body).toEqual({ name: "Team", directory, template: "feature" })
 })
