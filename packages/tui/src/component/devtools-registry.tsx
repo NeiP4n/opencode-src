@@ -398,7 +398,7 @@ function ToolRow(props: {
   )
 }
 
-function Button(props: { children: string; onClick: () => void; disabled?: boolean; onLeave?: () => void }) {
+export function Button(props: { children: string; onClick: () => void; disabled?: boolean; onLeave?: () => void }) {
   const theme = useTheme().surface("dialog")
   return (
     <Action

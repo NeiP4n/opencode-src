@@ -5,6 +5,7 @@ import { Agent } from "@opencode/schema/agent"
 import { Command } from "@opencode/schema/command"
 import { Config } from "@opencode/schema/config"
 import { Credential } from "@opencode/schema/credential"
+import { Room } from "@opencode/schema/room"
 import { Event } from "@opencode/schema/event"
 import { EventLog } from "@opencode/schema/event-log"
 import { FileDiff } from "@opencode/schema/file-diff"
@@ -67,6 +68,7 @@ const effectTypeReferences = [
   ...namespaceTypes("PtyTicket", "@opencode/schema/pty-ticket", PtyTicket),
   ...namespaceTypes("Question", "@opencode/schema/question", Question),
   ...namespaceTypes("Reference", "@opencode/schema/reference", Reference),
+  ...namespaceTypes("Room", "@opencode/schema/room", Room),
   ...namespaceTypes("Session", "@opencode/schema/session", Session),
   ...namespaceTypes("SessionMessage", "@opencode/schema/session-message", SessionMessage),
   ...namespaceTypes("SessionInbox", "@opencode/schema/session-inbox", SessionInbox),

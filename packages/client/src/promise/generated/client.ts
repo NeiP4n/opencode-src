@@ -267,27 +267,27 @@ import type {
   ConfigShellsOutput,
   ConfigUpdateInput,
   ConfigUpdateOutput,
-  ServerRoomListOutput,
-  ServerRoomCreateInput,
-  ServerRoomCreateOutput,
-  ServerRoomUpdateInput,
-  ServerRoomUpdateOutput,
-  ServerRoomRemoveInput,
-  ServerRoomRemoveOutput,
-  ServerRoomCodeInput,
-  ServerRoomCodeOutput,
-  ServerRoomJoinInput,
-  ServerRoomJoinOutput,
-  ServerRoomGuestGetInput,
-  ServerRoomGuestGetOutput,
-  ServerRoomGuestLogInput,
-  ServerRoomGuestLogOutput,
-  ServerRoomGuestPromptInput,
-  ServerRoomGuestPromptOutput,
-  ServerRoomGuestPermissionListInput,
-  ServerRoomGuestPermissionListOutput,
-  ServerRoomGuestPermissionReplyInput,
-  ServerRoomGuestPermissionReplyOutput,
+  RoomListOutput,
+  RoomCreateInput,
+  RoomCreateOutput,
+  RoomUpdateInput,
+  RoomUpdateOutput,
+  RoomRemoveInput,
+  RoomRemoveOutput,
+  RoomCodeInput,
+  RoomCodeOutput,
+  RoomJoinInput,
+  RoomJoinOutput,
+  RoomGuestGetInput,
+  RoomGuestGetOutput,
+  RoomGuestLogInput,
+  RoomGuestLogOutput,
+  RoomGuestPromptInput,
+  RoomGuestPromptOutput,
+  RoomGuestPermissionListInput,
+  RoomGuestPermissionListOutput,
+  RoomGuestPermissionReplyInput,
+  RoomGuestPermissionReplyOutput,
 } from "./types.js"
 import { ClientError } from "./client-error.js"
 
@@ -2259,14 +2259,14 @@ export function make(options: ClientOptions) {
           requestOptions,
         ),
     },
-    "server.room": {
+    room: {
       list: (requestOptions?: RequestOptions) =>
-        request<{ readonly data: ServerRoomListOutput }>(
+        request<{ readonly data: RoomListOutput }>(
           { method: "GET", path: `/api/room`, successStatus: 200, declaredStatuses: [400, 401], empty: false },
           requestOptions,
         ).then((value) => value.data),
-      create: (input: ServerRoomCreateInput, requestOptions?: RequestOptions) =>
-        request<{ readonly data: ServerRoomCreateOutput }>(
+      create: (input: RoomCreateInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: RoomCreateOutput }>(
           {
             method: "POST",
             path: `/api/room`,
@@ -2282,8 +2282,8 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ).then((value) => value.data),
-      update: (input: ServerRoomUpdateInput, requestOptions?: RequestOptions) =>
-        request<{ readonly data: ServerRoomUpdateOutput }>(
+      update: (input: RoomUpdateInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: RoomUpdateOutput }>(
           {
             method: "PATCH",
             path: `/api/room/${encodeURIComponent(input.roomID)}`,
@@ -2294,8 +2294,8 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ).then((value) => value.data),
-      remove: (input: ServerRoomRemoveInput, requestOptions?: RequestOptions) =>
-        request<ServerRoomRemoveOutput>(
+      remove: (input: RoomRemoveInput, requestOptions?: RequestOptions) =>
+        request<RoomRemoveOutput>(
           {
             method: "DELETE",
             path: `/api/room/${encodeURIComponent(input.roomID)}`,
@@ -2305,8 +2305,8 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      code: (input: ServerRoomCodeInput, requestOptions?: RequestOptions) =>
-        request<ServerRoomCodeOutput>(
+      code: (input: RoomCodeInput, requestOptions?: RequestOptions) =>
+        request<RoomCodeOutput>(
           {
             method: "POST",
             path: `/api/room/${encodeURIComponent(input.roomID)}/code`,
@@ -2316,8 +2316,8 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      join: (input: ServerRoomJoinInput, requestOptions?: RequestOptions) =>
-        request<ServerRoomJoinOutput>(
+      join: (input: RoomJoinInput, requestOptions?: RequestOptions) =>
+        request<RoomJoinOutput>(
           {
             method: "POST",
             path: `/api/room/join`,
@@ -2329,8 +2329,8 @@ export function make(options: ClientOptions) {
           requestOptions,
         ),
       guest: {
-        get: (input: ServerRoomGuestGetInput, requestOptions?: RequestOptions) =>
-          request<ServerRoomGuestGetOutput>(
+        get: (input: RoomGuestGetInput, requestOptions?: RequestOptions) =>
+          request<RoomGuestGetOutput>(
             {
               method: "GET",
               path: `/api/room/${encodeURIComponent(input.roomID)}/guest`,
@@ -2340,11 +2340,8 @@ export function make(options: ClientOptions) {
             },
             requestOptions,
           ),
-        log: (
-          input: ServerRoomGuestLogInput,
-          requestOptions?: RequestOptions,
-        ): AsyncIterable<ServerRoomGuestLogOutput> =>
-          sse<ServerRoomGuestLogOutput>(
+        log: (input: RoomGuestLogInput, requestOptions?: RequestOptions): AsyncIterable<RoomGuestLogOutput> =>
+          sse<RoomGuestLogOutput>(
             {
               method: "GET",
               path: `/api/room/${encodeURIComponent(input.roomID)}/guest/log`,
@@ -2355,8 +2352,8 @@ export function make(options: ClientOptions) {
             },
             requestOptions,
           ),
-        prompt: (input: ServerRoomGuestPromptInput, requestOptions?: RequestOptions) =>
-          request<{ readonly data: ServerRoomGuestPromptOutput }>(
+        prompt: (input: RoomGuestPromptInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: RoomGuestPromptOutput }>(
             {
               method: "POST",
               path: `/api/room/${encodeURIComponent(input.roomID)}/guest/prompt`,
@@ -2368,8 +2365,8 @@ export function make(options: ClientOptions) {
             requestOptions,
           ).then((value) => value.data),
         permission: {
-          list: (input: ServerRoomGuestPermissionListInput, requestOptions?: RequestOptions) =>
-            request<{ readonly data: ServerRoomGuestPermissionListOutput }>(
+          list: (input: RoomGuestPermissionListInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: RoomGuestPermissionListOutput }>(
               {
                 method: "GET",
                 path: `/api/room/${encodeURIComponent(input.roomID)}/guest/permission`,
@@ -2379,8 +2376,8 @@ export function make(options: ClientOptions) {
               },
               requestOptions,
             ).then((value) => value.data),
-          reply: (input: ServerRoomGuestPermissionReplyInput, requestOptions?: RequestOptions) =>
-            request<ServerRoomGuestPermissionReplyOutput>(
+          reply: (input: RoomGuestPermissionReplyInput, requestOptions?: RequestOptions) =>
+            request<RoomGuestPermissionReplyOutput>(
               {
                 method: "POST",
                 path: `/api/room/${encodeURIComponent(input.roomID)}/guest/permission/${encodeURIComponent(input.requestID)}/reply`,

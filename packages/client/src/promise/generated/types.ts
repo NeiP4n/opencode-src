@@ -6750,9 +6750,9 @@ export type ConfigUpdateInput = { readonly shell: { readonly shell: string | nul
 
 export type ConfigUpdateOutput = void
 
-export type ServerRoomListOutput = { data: Array<RoomInfo> }["data"]
+export type RoomListOutput = { data: Array<RoomInfo> }["data"]
 
-export type ServerRoomCreateInput = {
+export type RoomCreateInput = {
   readonly sessionID: {
     readonly sessionID: string
     readonly name?: string | undefined
@@ -6779,9 +6779,9 @@ export type ServerRoomCreateInput = {
   }["guestApprovals"]
 }
 
-export type ServerRoomCreateOutput = { data: RoomInfo }["data"]
+export type RoomCreateOutput = { data: RoomInfo }["data"]
 
-export type ServerRoomUpdateInput = {
+export type RoomUpdateInput = {
   readonly roomID: { readonly roomID: string }["roomID"]
   readonly name?: {
     readonly name?: string | undefined
@@ -6800,47 +6800,47 @@ export type ServerRoomUpdateInput = {
   }["guestApprovals"]
 }
 
-export type ServerRoomUpdateOutput = { data: RoomInfo }["data"]
+export type RoomUpdateOutput = { data: RoomInfo }["data"]
 
-export type ServerRoomRemoveInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+export type RoomRemoveInput = { readonly roomID: { readonly roomID: string }["roomID"] }
 
-export type ServerRoomRemoveOutput = void
+export type RoomRemoveOutput = void
 
-export type ServerRoomCodeInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+export type RoomCodeInput = { readonly roomID: { readonly roomID: string }["roomID"] }
 
-export type ServerRoomCodeOutput = RoomJoinCode
+export type RoomCodeOutput = RoomJoinCode
 
-export type ServerRoomJoinInput = {
+export type RoomJoinInput = {
   readonly code: { readonly code: string; readonly name: string }["code"]
   readonly name: { readonly code: string; readonly name: string }["name"]
 }
 
-export type ServerRoomJoinOutput = RoomJoined
+export type RoomJoinOutput = RoomJoined
 
-export type ServerRoomGuestGetInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+export type RoomGuestGetInput = { readonly roomID: { readonly roomID: string }["roomID"] }
 
-export type ServerRoomGuestGetOutput = { room: RoomInfo1; guest: RoomGuest; session: SessionInfo1 }
+export type RoomGuestGetOutput = { room: RoomInfo1; guest: RoomGuest; session: SessionInfo1 }
 
-export type ServerRoomGuestLogInput = {
+export type RoomGuestLogInput = {
   readonly roomID: { readonly roomID: string }["roomID"]
   readonly after?: { readonly after?: number | undefined; readonly follow?: boolean | undefined }["after"]
   readonly follow?: { readonly after?: number | undefined; readonly follow?: boolean | undefined }["follow"]
 }
 
-export type ServerRoomGuestLogOutput = RoomLogItem
+export type RoomGuestLogOutput = RoomLogItem
 
-export type ServerRoomGuestPromptInput = {
+export type RoomGuestPromptInput = {
   readonly roomID: { readonly roomID: string }["roomID"]
   readonly text: { readonly text: string }["text"]
 }
 
-export type ServerRoomGuestPromptOutput = { data: SessionInboxUser }["data"]
+export type RoomGuestPromptOutput = { data: SessionInboxUser }["data"]
 
-export type ServerRoomGuestPermissionListInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+export type RoomGuestPermissionListInput = { readonly roomID: { readonly roomID: string }["roomID"] }
 
-export type ServerRoomGuestPermissionListOutput = { data: Array<PermissionRequest> }["data"]
+export type RoomGuestPermissionListOutput = { data: Array<PermissionRequest> }["data"]
 
-export type ServerRoomGuestPermissionReplyInput = {
+export type RoomGuestPermissionReplyInput = {
   readonly roomID: { readonly roomID: string; readonly requestID: string }["roomID"]
   readonly requestID: { readonly roomID: string; readonly requestID: string }["requestID"]
   readonly decision: {
@@ -6853,4 +6853,4 @@ export type ServerRoomGuestPermissionReplyInput = {
   }["message"]
 }
 
-export type ServerRoomGuestPermissionReplyOutput = void
+export type RoomGuestPermissionReplyOutput = void

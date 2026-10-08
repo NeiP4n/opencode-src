@@ -16,6 +16,7 @@ import { DevTools } from "../devtools"
 import { useDialog } from "../ui/dialog"
 import { PanelBox, PanelTitle, Row } from "./devtools-panel"
 import { RegistryPanel } from "./devtools-registry"
+import { DialogRooms } from "./dialog-rooms"
 import { DialogExperiments } from "./dialog-experiments"
 import { usePlugin } from "../plugin/context"
 import { errorMessage } from "../util/error"
@@ -149,11 +150,7 @@ export function DevToolsBar() {
     const routeData = route.data
     const sessionID = routeData.type === "session" ? routeData.sessionID : undefined
     const info = sessionID ? data.session.get(sessionID) : undefined
-    const sessionLocation =
-      info?.location ??
-      (location.current
-        ? { directory: location.current.directory }
-        : undefined)
+    const sessionLocation = info?.location ?? (location.current ? { directory: location.current.directory } : undefined)
     const details = server()
     const backend = {
       connected: connected(),
@@ -442,6 +439,16 @@ export function DevToolsBar() {
         active={false}
         onClick={() => {
           close()
+          dialog.replace(() => <DialogRooms onClose={() => dialog.clear()} />, undefined, { size: "large" })
+          dialog.setCentered(true)
+        }}
+      >
+        <text fg={theme.text.muted}>Rooms</text>
+      </BarItem>
+      <BarItem
+        active={false}
+        onClick={() => {
+          close()
           dialog.replace(() => <DialogExperiments />)
         }}
       >
@@ -490,9 +497,7 @@ function Action(props: ParentProps<{ onClick: () => void; disabled?: boolean; ho
   const [hovered, setHovered] = createSignal(false)
   return (
     <box
-      backgroundColor={
-        props.hoverBackground && hovered() && !props.disabled ? theme.background.raised.high : undefined
-      }
+      backgroundColor={props.hoverBackground && hovered() && !props.disabled ? theme.background.raised.high : undefined}
       onMouseOver={() => setHovered(true)}
       onMouseOut={() => setHovered(false)}
       onMouseUp={(event) => {
