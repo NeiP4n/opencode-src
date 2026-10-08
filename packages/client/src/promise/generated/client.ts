@@ -267,6 +267,27 @@ import type {
   ConfigShellsOutput,
   ConfigUpdateInput,
   ConfigUpdateOutput,
+  ServerRoomListOutput,
+  ServerRoomCreateInput,
+  ServerRoomCreateOutput,
+  ServerRoomUpdateInput,
+  ServerRoomUpdateOutput,
+  ServerRoomRemoveInput,
+  ServerRoomRemoveOutput,
+  ServerRoomCodeInput,
+  ServerRoomCodeOutput,
+  ServerRoomJoinInput,
+  ServerRoomJoinOutput,
+  ServerRoomGuestGetInput,
+  ServerRoomGuestGetOutput,
+  ServerRoomGuestLogInput,
+  ServerRoomGuestLogOutput,
+  ServerRoomGuestPromptInput,
+  ServerRoomGuestPromptOutput,
+  ServerRoomGuestPermissionListInput,
+  ServerRoomGuestPermissionListOutput,
+  ServerRoomGuestPermissionReplyInput,
+  ServerRoomGuestPermissionReplyOutput,
 } from "./types.js"
 import { ClientError } from "./client-error.js"
 
@@ -2237,6 +2258,141 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+    },
+    "server.room": {
+      list: (requestOptions?: RequestOptions) =>
+        request<{ readonly data: ServerRoomListOutput }>(
+          { method: "GET", path: `/api/room`, successStatus: 200, declaredStatuses: [400, 401], empty: false },
+          requestOptions,
+        ).then((value) => value.data),
+      create: (input: ServerRoomCreateInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: ServerRoomCreateOutput }>(
+          {
+            method: "POST",
+            path: `/api/room`,
+            body: {
+              sessionID: input["sessionID"],
+              name: input["name"],
+              ai: input["ai"],
+              guestApprovals: input["guestApprovals"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
+      update: (input: ServerRoomUpdateInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: ServerRoomUpdateOutput }>(
+          {
+            method: "PATCH",
+            path: `/api/room/${encodeURIComponent(input.roomID)}`,
+            body: { name: input["name"], ai: input["ai"], guestApprovals: input["guestApprovals"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
+      remove: (input: ServerRoomRemoveInput, requestOptions?: RequestOptions) =>
+        request<ServerRoomRemoveOutput>(
+          {
+            method: "DELETE",
+            path: `/api/room/${encodeURIComponent(input.roomID)}`,
+            successStatus: 204,
+            declaredStatuses: [400, 401, 404],
+            empty: true,
+          },
+          requestOptions,
+        ),
+      code: (input: ServerRoomCodeInput, requestOptions?: RequestOptions) =>
+        request<ServerRoomCodeOutput>(
+          {
+            method: "POST",
+            path: `/api/room/${encodeURIComponent(input.roomID)}/code`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      join: (input: ServerRoomJoinInput, requestOptions?: RequestOptions) =>
+        request<ServerRoomJoinOutput>(
+          {
+            method: "POST",
+            path: `/api/room/join`,
+            body: { code: input["code"], name: input["name"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      guest: {
+        get: (input: ServerRoomGuestGetInput, requestOptions?: RequestOptions) =>
+          request<ServerRoomGuestGetOutput>(
+            {
+              method: "GET",
+              path: `/api/room/${encodeURIComponent(input.roomID)}/guest`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        log: (
+          input: ServerRoomGuestLogInput,
+          requestOptions?: RequestOptions,
+        ): AsyncIterable<ServerRoomGuestLogOutput> =>
+          sse<ServerRoomGuestLogOutput>(
+            {
+              method: "GET",
+              path: `/api/room/${encodeURIComponent(input.roomID)}/guest/log`,
+              query: { after: input["after"], follow: input["follow"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        prompt: (input: ServerRoomGuestPromptInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: ServerRoomGuestPromptOutput }>(
+            {
+              method: "POST",
+              path: `/api/room/${encodeURIComponent(input.roomID)}/guest/prompt`,
+              body: { text: input["text"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        permission: {
+          list: (input: ServerRoomGuestPermissionListInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: ServerRoomGuestPermissionListOutput }>(
+              {
+                method: "GET",
+                path: `/api/room/${encodeURIComponent(input.roomID)}/guest/permission`,
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
+          reply: (input: ServerRoomGuestPermissionReplyInput, requestOptions?: RequestOptions) =>
+            request<ServerRoomGuestPermissionReplyOutput>(
+              {
+                method: "POST",
+                path: `/api/room/${encodeURIComponent(input.roomID)}/guest/permission/${encodeURIComponent(input.requestID)}/reply`,
+                body: { decision: input["decision"], message: input["message"] },
+                successStatus: 204,
+                declaredStatuses: [400, 401, 403, 404],
+                empty: true,
+              },
+              requestOptions,
+            ),
+        },
+      },
     },
   }
 }

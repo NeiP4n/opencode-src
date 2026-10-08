@@ -449,6 +449,28 @@ export type ConfigModelCapabilities = { tools?: boolean; input?: Array<string>; 
 
 export type ConfigShellOption = { path: string; name: string; acceptable: boolean }
 
+export type RoomInfo = {
+  id: string
+  sessionID: string
+  name: string
+  ai: "linked" | "discovered"
+  guestApprovals: boolean
+  created: number
+}
+
+export type RoomJoinCode = { code: string; expires_in: number }
+
+export type RoomGuest = { id: string; name: string }
+
+export type RoomInfo1 = {
+  id: string
+  sessionID: string
+  name: string
+  ai: "linked" | "discovered"
+  guestApprovals: boolean
+  created: number | "Infinity" | "-Infinity" | "NaN"
+}
+
 export type SessionMessageLocationSwitched = {
   id: string
   metadata?: { [x: string]: JsonValue }
@@ -1696,6 +1718,8 @@ export type WorktreeList = Array<WorktreeDirectory>
 
 export type VcsInfo = { provider?: string; branch: VcsBranch }
 
+export type RoomJoined = { token: string; guest: RoomGuest; room: RoomInfo }
+
 export type SessionInboxMove = {
   id: string
   sessionID: string
@@ -2210,6 +2234,25 @@ export type ConfigEntry =
     }
   | { type: "directory"; path: string }
 
+export type SessionInfo1 = {
+  id: string
+  parentID?: string
+  fork?: { sessionID: string; boundary: SessionForkBoundary }
+  projectID: string
+  agent?: string
+  model?: ModelRef
+  cost: MoneyUSD
+  tokens: TokenUsageInfo
+  outcome?: "succeeded" | "failed" | "interrupted"
+  time: { created: number; updated: number; idle?: number; viewed?: number; archived?: number }
+  title?: string
+  location: LocationRef
+  subpath?: string
+  metadata?: SessionMetadata
+  permissions?: PermissionRuleset
+  revert?: SessionRevert
+}
+
 export type SessionInboxUser = {
   id: string
   sessionID: string
@@ -2529,6 +2572,8 @@ export type V2Event =
 
 export type SessionLogItem = SessionEventDurable | EventLogSynced
 
+export type RoomLogItem = SessionEventDurable | EventLogSynced
+
 export type InvalidRequestError = {
   readonly _tag: "InvalidRequestError"
   readonly message: string
@@ -2774,6 +2819,14 @@ export type VcsInitNotSupportedError = {
 }
 export const isVcsInitNotSupportedError = (value: unknown): value is VcsInitNotSupportedError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "VcsInitNotSupportedError"
+
+export type RoomNotFoundError = {
+  readonly _tag: "RoomNotFoundError"
+  readonly roomID: string
+  readonly message: string
+}
+export const isRoomNotFoundError = (value: unknown): value is RoomNotFoundError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "RoomNotFoundError"
 
 export type ServerInfoOutput = ServerInfo
 
@@ -6696,3 +6749,108 @@ export type ConfigShellsOutput = Array<ConfigShellOption>
 export type ConfigUpdateInput = { readonly shell: { readonly shell: string | null }["shell"] }
 
 export type ConfigUpdateOutput = void
+
+export type ServerRoomListOutput = { data: Array<RoomInfo> }["data"]
+
+export type ServerRoomCreateInput = {
+  readonly sessionID: {
+    readonly sessionID: string
+    readonly name?: string | undefined
+    readonly ai?: "linked" | "discovered" | undefined
+    readonly guestApprovals?: boolean | undefined
+  }["sessionID"]
+  readonly name?: {
+    readonly sessionID: string
+    readonly name?: string | undefined
+    readonly ai?: "linked" | "discovered" | undefined
+    readonly guestApprovals?: boolean | undefined
+  }["name"]
+  readonly ai?: {
+    readonly sessionID: string
+    readonly name?: string | undefined
+    readonly ai?: "linked" | "discovered" | undefined
+    readonly guestApprovals?: boolean | undefined
+  }["ai"]
+  readonly guestApprovals?: {
+    readonly sessionID: string
+    readonly name?: string | undefined
+    readonly ai?: "linked" | "discovered" | undefined
+    readonly guestApprovals?: boolean | undefined
+  }["guestApprovals"]
+}
+
+export type ServerRoomCreateOutput = { data: RoomInfo }["data"]
+
+export type ServerRoomUpdateInput = {
+  readonly roomID: { readonly roomID: string }["roomID"]
+  readonly name?: {
+    readonly name?: string | undefined
+    readonly ai?: "linked" | "discovered" | undefined
+    readonly guestApprovals?: boolean | undefined
+  }["name"]
+  readonly ai?: {
+    readonly name?: string | undefined
+    readonly ai?: "linked" | "discovered" | undefined
+    readonly guestApprovals?: boolean | undefined
+  }["ai"]
+  readonly guestApprovals?: {
+    readonly name?: string | undefined
+    readonly ai?: "linked" | "discovered" | undefined
+    readonly guestApprovals?: boolean | undefined
+  }["guestApprovals"]
+}
+
+export type ServerRoomUpdateOutput = { data: RoomInfo }["data"]
+
+export type ServerRoomRemoveInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type ServerRoomRemoveOutput = void
+
+export type ServerRoomCodeInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type ServerRoomCodeOutput = RoomJoinCode
+
+export type ServerRoomJoinInput = {
+  readonly code: { readonly code: string; readonly name: string }["code"]
+  readonly name: { readonly code: string; readonly name: string }["name"]
+}
+
+export type ServerRoomJoinOutput = RoomJoined
+
+export type ServerRoomGuestGetInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type ServerRoomGuestGetOutput = { room: RoomInfo1; guest: RoomGuest; session: SessionInfo1 }
+
+export type ServerRoomGuestLogInput = {
+  readonly roomID: { readonly roomID: string }["roomID"]
+  readonly after?: { readonly after?: number | undefined; readonly follow?: boolean | undefined }["after"]
+  readonly follow?: { readonly after?: number | undefined; readonly follow?: boolean | undefined }["follow"]
+}
+
+export type ServerRoomGuestLogOutput = RoomLogItem
+
+export type ServerRoomGuestPromptInput = {
+  readonly roomID: { readonly roomID: string }["roomID"]
+  readonly text: { readonly text: string }["text"]
+}
+
+export type ServerRoomGuestPromptOutput = { data: SessionInboxUser }["data"]
+
+export type ServerRoomGuestPermissionListInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type ServerRoomGuestPermissionListOutput = { data: Array<PermissionRequest> }["data"]
+
+export type ServerRoomGuestPermissionReplyInput = {
+  readonly roomID: { readonly roomID: string; readonly requestID: string }["roomID"]
+  readonly requestID: { readonly roomID: string; readonly requestID: string }["requestID"]
+  readonly decision: {
+    readonly decision: "once" | "always" | "reject"
+    readonly message?: string | undefined
+  }["decision"]
+  readonly message?: {
+    readonly decision: "once" | "always" | "reject"
+    readonly message?: string | undefined
+  }["message"]
+}
+
+export type ServerRoomGuestPermissionReplyOutput = void

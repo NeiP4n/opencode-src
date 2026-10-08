@@ -269,6 +269,27 @@ import type {
   ConfigShellsOutput,
   ConfigUpdateInput,
   ConfigUpdateOutput,
+  ServerRoomListOutput,
+  ServerRoomCreateInput,
+  ServerRoomCreateOutput,
+  ServerRoomUpdateInput,
+  ServerRoomUpdateOutput,
+  ServerRoomRemoveInput,
+  ServerRoomRemoveOutput,
+  ServerRoomCodeInput,
+  ServerRoomCodeOutput,
+  ServerRoomJoinInput,
+  ServerRoomJoinOutput,
+  ServerRoomGuestGetInput,
+  ServerRoomGuestGetOutput,
+  ServerRoomGuestLogInput,
+  ServerRoomGuestLogOutput,
+  ServerRoomGuestPromptInput,
+  ServerRoomGuestPromptOutput,
+  ServerRoomGuestPermissionListInput,
+  ServerRoomGuestPermissionListOutput,
+  ServerRoomGuestPermissionReplyInput,
+  ServerRoomGuestPermissionReplyOutput,
 } from "../api/api.js"
 import { ClientError } from "./client-error.js"
 
@@ -1594,6 +1615,117 @@ const adaptGroupConfig = (raw: RawClient["server.config"]) => ({
   update: EndpointConfigUpdate(raw),
 })
 
+const EndpointServerRoomList = (raw: RawClient["server.room"]) => () =>
+  preserveEffect<ServerRoomListOutput>()(
+    raw["room.list"]({}).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointServerRoomCreate = (raw: RawClient["server.room"]) => (input: ServerRoomCreateInput) =>
+  preserveEffect<ServerRoomCreateOutput>()(
+    raw["room.create"]({
+      payload: {
+        sessionID: input["sessionID"],
+        name: input["name"],
+        ai: input["ai"],
+        guestApprovals: input["guestApprovals"],
+      },
+    }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointServerRoomUpdate = (raw: RawClient["server.room"]) => (input: ServerRoomUpdateInput) =>
+  preserveEffect<ServerRoomUpdateOutput>()(
+    raw["room.update"]({
+      params: { roomID: input["roomID"] },
+      payload: { name: input["name"], ai: input["ai"], guestApprovals: input["guestApprovals"] },
+    }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointServerRoomRemove = (raw: RawClient["server.room"]) => (input: ServerRoomRemoveInput) =>
+  preserveEffect<ServerRoomRemoveOutput>()(
+    raw["room.remove"]({ params: { roomID: input["roomID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointServerRoomCode = (raw: RawClient["server.room"]) => (input: ServerRoomCodeInput) =>
+  preserveEffect<ServerRoomCodeOutput>()(
+    raw["room.code"]({ params: { roomID: input["roomID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointServerRoomJoin = (raw: RawClient["server.room"]) => (input: ServerRoomJoinInput) =>
+  preserveEffect<ServerRoomJoinOutput>()(
+    raw["room.join"]({ payload: { code: input["code"], name: input["name"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointServerRoomGuestGet = (raw: RawClient["server.room"]) => (input: ServerRoomGuestGetInput) =>
+  preserveEffect<ServerRoomGuestGetOutput>()(
+    raw["room.guest.get"]({ params: { roomID: input["roomID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointServerRoomGuestLog = (raw: RawClient["server.room"]) => (input: ServerRoomGuestLogInput) =>
+  preserveStream<ServerRoomGuestLogOutput>()(
+    Stream.unwrap(
+      raw["room.guest.log"]({
+        params: { roomID: input["roomID"] },
+        query: { after: input["after"], follow: input["follow"] },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((stream) => stream.pipe(Stream.mapError(mapClientError))),
+      ),
+    ),
+  )
+
+const EndpointServerRoomGuestPrompt = (raw: RawClient["server.room"]) => (input: ServerRoomGuestPromptInput) =>
+  preserveEffect<ServerRoomGuestPromptOutput>()(
+    raw["room.guest.prompt"]({ params: { roomID: input["roomID"] }, payload: { text: input["text"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointServerRoomGuestPermissionList =
+  (raw: RawClient["server.room"]) => (input: ServerRoomGuestPermissionListInput) =>
+    preserveEffect<ServerRoomGuestPermissionListOutput>()(
+      raw["room.guest.permission.list"]({ params: { roomID: input["roomID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointServerRoomGuestPermissionReply =
+  (raw: RawClient["server.room"]) => (input: ServerRoomGuestPermissionReplyInput) =>
+    preserveEffect<ServerRoomGuestPermissionReplyOutput>()(
+      raw["room.guest.permission.reply"]({
+        params: { roomID: input["roomID"], requestID: input["requestID"] },
+        payload: { decision: input["decision"], message: input["message"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const adaptGroupServerRoom = (raw: RawClient["server.room"]) => ({
+  list: EndpointServerRoomList(raw),
+  create: EndpointServerRoomCreate(raw),
+  update: EndpointServerRoomUpdate(raw),
+  remove: EndpointServerRoomRemove(raw),
+  code: EndpointServerRoomCode(raw),
+  join: EndpointServerRoomJoin(raw),
+  guest: {
+    get: EndpointServerRoomGuestGet(raw),
+    log: EndpointServerRoomGuestLog(raw),
+    prompt: EndpointServerRoomGuestPrompt(raw),
+    permission: {
+      list: EndpointServerRoomGuestPermissionList(raw),
+      reply: EndpointServerRoomGuestPermissionReply(raw),
+    },
+  },
+})
+
 const adaptClient = (raw: RawClient) => ({
   server: adaptGroupServer(raw["server.server"]),
   location: adaptGroupLocation(raw["server.location"]),
@@ -1625,6 +1757,7 @@ const adaptClient = (raw: RawClient) => ({
   migration: adaptGroupMigration(raw["server.migration"]),
   websearch: adaptGroupWebsearch(raw["server.websearch"]),
   config: adaptGroupConfig(raw["server.config"]),
+  "server.room": adaptGroupServerRoom(raw["server.room"]),
 })
 
 export const make = (options?: { readonly baseUrl?: URL | string }) =>

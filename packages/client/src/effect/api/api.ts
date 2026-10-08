@@ -2404,6 +2404,1084 @@ export interface ConfigApi<E = never> {
   readonly update: ConfigUpdateOperation<E>
 }
 
+export type ServerRoomListOutput = ReadonlyArray<{
+  readonly id: string & Brand.Brand<"RoomID">
+  readonly sessionID: Session.ID
+  readonly name: string
+  readonly ai: "linked" | "discovered"
+  readonly guestApprovals: boolean
+  readonly created: number
+}>
+export type ServerRoomListOperation<E = never> = () => Effect.Effect<ServerRoomListOutput, E>
+
+export type ServerRoomCreateInput = {
+  readonly sessionID: Session.ID
+  readonly name?: string | undefined
+  readonly ai?: "linked" | "discovered" | undefined
+  readonly guestApprovals?: boolean | undefined
+}
+export type ServerRoomCreateOutput = {
+  readonly id: string & Brand.Brand<"RoomID">
+  readonly sessionID: Session.ID
+  readonly name: string
+  readonly ai: "linked" | "discovered"
+  readonly guestApprovals: boolean
+  readonly created: number
+}
+export type ServerRoomCreateOperation<E = never> = (
+  input: ServerRoomCreateInput,
+) => Effect.Effect<ServerRoomCreateOutput, E>
+
+export type ServerRoomUpdateInput = {
+  readonly roomID: string & Brand.Brand<"RoomID">
+  readonly name?: string | undefined
+  readonly ai?: "linked" | "discovered" | undefined
+  readonly guestApprovals?: boolean | undefined
+}
+export type ServerRoomUpdateOutput = {
+  readonly id: string & Brand.Brand<"RoomID">
+  readonly sessionID: Session.ID
+  readonly name: string
+  readonly ai: "linked" | "discovered"
+  readonly guestApprovals: boolean
+  readonly created: number
+}
+export type ServerRoomUpdateOperation<E = never> = (
+  input: ServerRoomUpdateInput,
+) => Effect.Effect<ServerRoomUpdateOutput, E>
+
+export type ServerRoomRemoveInput = { readonly roomID: string & Brand.Brand<"RoomID"> }
+export type ServerRoomRemoveOutput = void
+export type ServerRoomRemoveOperation<E = never> = (
+  input: ServerRoomRemoveInput,
+) => Effect.Effect<ServerRoomRemoveOutput, E>
+
+export type ServerRoomCodeInput = { readonly roomID: string & Brand.Brand<"RoomID"> }
+export type ServerRoomCodeOutput = { readonly code: string; readonly expires_in: number }
+export type ServerRoomCodeOperation<E = never> = (input: ServerRoomCodeInput) => Effect.Effect<ServerRoomCodeOutput, E>
+
+export type ServerRoomJoinInput = { readonly code: string; readonly name: string }
+export type ServerRoomJoinOutput = {
+  readonly token: string
+  readonly guest: { readonly id: string; readonly name: string }
+  readonly room: {
+    readonly id: string & Brand.Brand<"RoomID">
+    readonly sessionID: Session.ID
+    readonly name: string
+    readonly ai: "linked" | "discovered"
+    readonly guestApprovals: boolean
+    readonly created: number
+  }
+}
+export type ServerRoomJoinOperation<E = never> = (input: ServerRoomJoinInput) => Effect.Effect<ServerRoomJoinOutput, E>
+
+export type ServerRoomGuestGetInput = { readonly roomID: string & Brand.Brand<"RoomID"> }
+export type ServerRoomGuestGetOutput = {
+  readonly room: {
+    readonly id: string & Brand.Brand<"RoomID">
+    readonly sessionID: Session.ID
+    readonly name: string
+    readonly ai: "linked" | "discovered"
+    readonly guestApprovals: boolean
+    readonly created: number
+  }
+  readonly guest: { readonly id: string; readonly name: string }
+  readonly session: Session.Info
+}
+export type ServerRoomGuestGetOperation<E = never> = (
+  input: ServerRoomGuestGetInput,
+) => Effect.Effect<ServerRoomGuestGetOutput, E>
+
+export type ServerRoomGuestLogInput = {
+  readonly roomID: string & Brand.Brand<"RoomID">
+  readonly after?: Event.Seq | undefined
+  readonly follow?: boolean | undefined
+}
+export type ServerRoomGuestLogOutput =
+  | (
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.created"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly projectID: Project.ID
+            readonly location: {
+              readonly directory: AbsolutePath
+              readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+            }
+            readonly subpath?: RelativePath | undefined
+            readonly parentID?: Session.ID | undefined
+            readonly slug: string
+            readonly title?: string | undefined
+            readonly agent?: Agent.ID | undefined
+            readonly model?: Model.Ref | undefined
+            readonly metadata?: Session.Metadata | undefined
+            readonly permissions?: Permission.Ruleset | undefined
+            readonly version: string
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.agent.selected"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly agent: Agent.ID
+            readonly previous?: Agent.ID | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.model.selected"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly model: Model.Ref
+            readonly previous?: Model.Ref | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.moved"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly location: {
+              readonly directory: AbsolutePath
+              readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+            }
+            readonly projectID: Project.ID
+            readonly subpath?: RelativePath | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.renamed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly title: string }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.metadata.updated"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly metadata: Session.Metadata }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.permissions"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly permissions: Permission.Ruleset }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.viewed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly idle: number }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.deleted"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.forked"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly parentID: Session.ID
+            readonly boundary: Session.ForkBoundary
+            readonly instructions?:
+              | { readonly [x: string & Brand.Brand<"Instruction.Key">]: string & Brand.Brand<"Instruction.Hash"> }
+              | undefined
+            readonly instructionEntries?: InstructionEntry.Snapshot | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.inbox.delivered"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly inboxID: SessionMessage.ID }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.inbox.enqueued"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly inboxID: SessionMessage.ID
+            readonly item: SessionInbox.Item
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.inbox.cancelled"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly inboxID: SessionMessage.ID }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.inbox.delivery.changed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly inboxID: SessionMessage.ID
+            readonly delivery: SessionInbox.Delivery
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.execution.started"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.execution.succeeded"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.execution.failed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly error: {
+              readonly type: string
+              readonly message: string
+              readonly status?: number | undefined
+              readonly response?: { readonly body: string } | undefined
+            }
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.execution.interrupted"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly reason: "user" | "shutdown" | "superseded" | "inactivity"
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.instructions.updated"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly delta: { readonly [x: string]: (string & Brand.Brand<"Instruction.Hash">) | "removed" }
+            readonly text?: string | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.synthetic"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly text: string
+            readonly description?: string | undefined
+            readonly metadata?: { readonly [x: string]: unknown } | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.skill.activated"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly id: Skill.ID
+            readonly name: Skill.Name
+            readonly text: string
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.shell.started"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly shell: Shell.Info }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.shell.ended"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly shell: Shell.Info
+            readonly output: {
+              readonly output: string
+              readonly cursor: number
+              readonly size: number
+              readonly truncated: boolean
+            }
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.step.started"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly agent: Agent.ID
+            readonly model: Model.Ref
+            readonly snapshot?: (string & Brand.Brand<"Snapshot.ID">) | undefined
+            readonly started: number
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.step.streamed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly assistantMessageID: SessionMessage.ID }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.step.ended"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly finish: "stop" | "length" | "tool-calls" | "content-filter" | "error" | "unknown"
+            readonly rawFinish?: string | undefined
+            readonly providerState?: SessionMessage.ProviderState | undefined
+            readonly cost: number & Brand.Brand<"Money.USD">
+            readonly tokens: {
+              readonly input: number
+              readonly output: number
+              readonly reasoning: number
+              readonly cache: { readonly read: number; readonly write: number }
+            }
+            readonly snapshot?: (string & Brand.Brand<"Snapshot.ID">) | undefined
+            readonly files?: ReadonlyArray<RelativePath> | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.step.failed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly error: {
+              readonly type: string
+              readonly message: string
+              readonly status?: number | undefined
+              readonly response?: { readonly body: string } | undefined
+            }
+            readonly finish?: "content-filter" | undefined
+            readonly rawFinish?: string | undefined
+            readonly providerState?: SessionMessage.ProviderState | undefined
+            readonly cost?: (number & Brand.Brand<"Money.USD">) | undefined
+            readonly tokens?:
+              | {
+                  readonly input: number
+                  readonly output: number
+                  readonly reasoning: number
+                  readonly cache: { readonly read: number; readonly write: number }
+                }
+              | undefined
+            readonly snapshot?: (string & Brand.Brand<"Snapshot.ID">) | undefined
+            readonly files?: ReadonlyArray<RelativePath> | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.text.started"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly ordinal: number
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.text.ended"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly ordinal: number
+            readonly text: string
+            readonly state?: SessionMessage.ProviderState | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.reasoning.started"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly ordinal: number
+            readonly state?: SessionMessage.ProviderState | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.reasoning.ended"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly ordinal: number
+            readonly text: string
+            readonly state?: SessionMessage.ProviderState | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.tool.input.started"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly id: string
+            readonly name: string
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.tool.input.ended"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly id: string
+            readonly text: string
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.tool.called"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly id: string
+            readonly input: { readonly [x: string]: unknown }
+            readonly executed: boolean
+            readonly state?: SessionMessage.ProviderState | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.tool.success"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly id: string
+            readonly content: readonly [
+              (
+                | { readonly type: "text"; readonly text: string }
+                | {
+                    readonly type: "file"
+                    readonly uri: string
+                    readonly mime: string
+                    readonly name?: string | undefined
+                  }
+              ),
+              ...Array<
+                | { readonly type: "text"; readonly text: string }
+                | {
+                    readonly type: "file"
+                    readonly uri: string
+                    readonly mime: string
+                    readonly name?: string | undefined
+                  }
+              >,
+            ]
+            readonly metadata?: { readonly [x: string]: Schema.Json } | undefined
+            readonly executed: boolean
+            readonly resultState?: SessionMessage.ProviderState | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.tool.failed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly id: string
+            readonly error: {
+              readonly type: string
+              readonly message: string
+              readonly status?: number | undefined
+              readonly response?: { readonly body: string } | undefined
+            }
+            readonly content?:
+              | readonly [
+                  (
+                    | { readonly type: "text"; readonly text: string }
+                    | {
+                        readonly type: "file"
+                        readonly uri: string
+                        readonly mime: string
+                        readonly name?: string | undefined
+                      }
+                  ),
+                  ...Array<
+                    | { readonly type: "text"; readonly text: string }
+                    | {
+                        readonly type: "file"
+                        readonly uri: string
+                        readonly mime: string
+                        readonly name?: string | undefined
+                      }
+                  >,
+                ]
+              | undefined
+            readonly metadata?: { readonly [x: string]: Schema.Json } | undefined
+            readonly executed: boolean
+            readonly resultState?: SessionMessage.ProviderState | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.retry.scheduled"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly attempt: number
+            readonly at: number
+            readonly error: {
+              readonly type: string
+              readonly message: string
+              readonly status?: number | undefined
+              readonly response?: { readonly body: string } | undefined
+            }
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.compaction.started"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly reason: "auto" | "manual"
+            readonly recent: string
+            readonly inputID?: SessionMessage.ID | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.compaction.ended"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly reason: "auto" | "manual"
+            readonly model?: Model.Ref | undefined
+            readonly providerState?: SessionMessage.ProviderState | undefined
+            readonly providerContext?:
+              | {
+                  readonly version: 1
+                  readonly provenance: {
+                    readonly providerID: Provider.ID
+                    readonly provider: string
+                    readonly modelID: string
+                    readonly route: string
+                    readonly protocol: string
+                    readonly endpoint: string
+                  }
+                  readonly messages: Schema.Json
+                }
+              | undefined
+            readonly text: string
+            readonly recent: string
+            readonly cost?: (number & Brand.Brand<"Money.USD">) | undefined
+            readonly tokens?:
+              | {
+                  readonly input: number
+                  readonly output: number
+                  readonly reasoning: number
+                  readonly cache: { readonly read: number; readonly write: number }
+                }
+              | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.compaction.failed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly reason: "auto" | "manual"
+            readonly error: {
+              readonly type: string
+              readonly message: string
+              readonly status?: number | undefined
+              readonly response?: { readonly body: string } | undefined
+            }
+            readonly inputID?: SessionMessage.ID | undefined
+            readonly cost?: (number & Brand.Brand<"Money.USD">) | undefined
+            readonly tokens?:
+              | {
+                  readonly input: number
+                  readonly output: number
+                  readonly reasoning: number
+                  readonly cache: { readonly read: number; readonly write: number }
+                }
+              | undefined
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.revert.staged"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly revert: Session.Revert }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.revert.cleared"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.revert.committed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly to: SessionMessage.ID }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.usage.recorded"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly source: "title" | "compaction"
+            readonly cost: number & Brand.Brand<"Money.USD">
+            readonly tokens: {
+              readonly input: number
+              readonly output: number
+              readonly reasoning: number
+              readonly cache: { readonly read: number; readonly write: number }
+            }
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.message.content.updated"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly messageID: SessionMessage.ID
+            readonly content: ReadonlyArray<SessionMessage.AssistantContentEncoded>
+          }
+        }
+    )
+  | EventLog.Synced
+export type ServerRoomGuestLogOperation<E = never> = (
+  input: ServerRoomGuestLogInput,
+) => Stream.Stream<ServerRoomGuestLogOutput, E>
+
+export type ServerRoomGuestPromptInput = { readonly roomID: string & Brand.Brand<"RoomID">; readonly text: string }
+export type ServerRoomGuestPromptOutput = SessionInbox.User
+export type ServerRoomGuestPromptOperation<E = never> = (
+  input: ServerRoomGuestPromptInput,
+) => Effect.Effect<ServerRoomGuestPromptOutput, E>
+
+export type ServerRoomGuestPermissionListInput = { readonly roomID: string & Brand.Brand<"RoomID"> }
+export type ServerRoomGuestPermissionListOutput = ReadonlyArray<Permission.Request>
+export type ServerRoomGuestPermissionListOperation<E = never> = (
+  input: ServerRoomGuestPermissionListInput,
+) => Effect.Effect<ServerRoomGuestPermissionListOutput, E>
+
+export type ServerRoomGuestPermissionReplyInput = {
+  readonly roomID: string & Brand.Brand<"RoomID">
+  readonly requestID: Permission.ID
+  readonly decision: Permission.Reply
+  readonly message?: string | undefined
+}
+export type ServerRoomGuestPermissionReplyOutput = void
+export type ServerRoomGuestPermissionReplyOperation<E = never> = (
+  input: ServerRoomGuestPermissionReplyInput,
+) => Effect.Effect<ServerRoomGuestPermissionReplyOutput, E>
+
+export interface ServerRoomApi<E = never> {
+  readonly list: ServerRoomListOperation<E>
+  readonly create: ServerRoomCreateOperation<E>
+  readonly update: ServerRoomUpdateOperation<E>
+  readonly remove: ServerRoomRemoveOperation<E>
+  readonly code: ServerRoomCodeOperation<E>
+  readonly join: ServerRoomJoinOperation<E>
+  readonly guest: {
+    readonly get: ServerRoomGuestGetOperation<E>
+    readonly log: ServerRoomGuestLogOperation<E>
+    readonly prompt: ServerRoomGuestPromptOperation<E>
+    readonly permission: {
+      readonly list: ServerRoomGuestPermissionListOperation<E>
+      readonly reply: ServerRoomGuestPermissionReplyOperation<E>
+    }
+  }
+}
+
 export interface AppApi<E = never> {
   readonly server: ServerApi<E>
   readonly location: LocationApi<E>
@@ -2435,4 +3513,5 @@ export interface AppApi<E = never> {
   readonly migration: MigrationApi<E>
   readonly websearch: WebsearchApi<E>
   readonly config: ConfigApi<E>
+  readonly "server.room": ServerRoomApi<E>
 }

@@ -31,6 +31,7 @@ import { PluginUpdate } from "@opencode/core/plugin/update"
 import { SdkPlugins } from "@opencode/core/plugin/sdk"
 import { WellKnown } from "@opencode/core/wellknown"
 import { Workspace } from "@opencode/core/workspace"
+import { Room } from "@opencode/core/room"
 import { Watcher } from "@opencode/core/filesystem/watcher"
 import { HttpRouter } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -43,6 +44,7 @@ import { authorizationLayer } from "./middleware/authorization"
 import { schemaErrorLayer } from "./middleware/schema-error"
 import { PtyEnvironment } from "./pty-environment"
 import { ServerPairing } from "./pairing"
+import { ServerRooms } from "./rooms"
 import { layer } from "./location"
 import { formLocationLayer } from "./middleware/form-location"
 import { sessionLocationLayer } from "./middleware/session-location"
@@ -70,6 +72,8 @@ const applicationServiceNodes = [
   WellKnown.node,
   PtyEnvironment.node,
   ServerPairing.node,
+  ServerRooms.node,
+  Room.node,
   LocationServiceMap.node,
   LocationActivity.node,
   SessionRestart.node,

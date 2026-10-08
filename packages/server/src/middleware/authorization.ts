@@ -5,6 +5,7 @@ export { Authorization } from "@opencode/protocol/middleware/authorization"
 import { hasPtyConnectTicketURL } from "@opencode/protocol/groups/pty"
 import { hasPersistentPtyConnectTicketURL } from "@opencode/protocol/groups/persistent-pty"
 import { isPairingConnectURL } from "@opencode/protocol/groups/server"
+import { isRoomGuestURL } from "@opencode/protocol/groups/room"
 import { Effect, Encoding, Layer, Redacted } from "effect"
 import { HttpEffect, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 
@@ -77,10 +78,15 @@ export const authorizationLayer = Layer.effect(
     return Authorization.of((effect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
-        // Ticketed PTY connects (browsers cannot set headers on WebSocket upgrades) and pairing links
-        // skip credential checks here; their handlers consume and validate the ticket or code.
+        // Ticketed PTY connects (browsers cannot set headers on WebSocket upgrades), pairing links and
+        // room guest routes skip credential checks here; their handlers validate the ticket, code or room token.
         const url = new URL(request.url, "http://localhost")
-        if (hasPtyConnectTicketURL(url) || hasPersistentPtyConnectTicketURL(url) || isPairingConnectURL(url))
+        if (
+          hasPtyConnectTicketURL(url) ||
+          hasPersistentPtyConnectTicketURL(url) ||
+          isPairingConnectURL(url) ||
+          isRoomGuestURL(url)
+        )
           return yield* effect
         if (yield* authorizedRequest(request, config)) return yield* effect
         if (challengeRequest(request))
