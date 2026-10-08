@@ -379,6 +379,8 @@ export type FormWhen1 = { key: string; op: "eq" | "neq"; value: string | number 
 
 export type FormValue1 = string | number | boolean | Array<string>
 
+export type NoteSlug = string
+
 export type SessionStatus =
   | { type: "idle" }
   | {
@@ -437,6 +439,12 @@ export type VcsFileStatus = {
 
 export type VcsBranchList = Array<string>
 
+export type NoteStatus = "inbox" | "active" | "done" | "archived"
+
+export type NoteTag = string
+
+export type NoteLength = "brief" | "balanced" | "detailed"
+
 export type WebSearchProvider = { id: string; name: string }
 
 export type WebSearchResult = { url: string; title?: string; content?: string; time: { published?: number } }
@@ -474,9 +482,9 @@ export type RoomInfo1 = {
 export type RoomMessage = {
   id: string
   role: "user" | "assistant"
-  author?: string | undefined
+  author?: string | null
   text: string
-  created: number
+  created: number | "Infinity" | "-Infinity" | "NaN"
 }
 
 export type OrchestraProject = {
@@ -1721,6 +1729,15 @@ export type FormMultiselectField1 = {
 
 export type FormAnswer2 = { [x: string]: FormValue1 }
 
+export type NoteUpdated = {
+  id: string
+  created: number
+  metadata?: { [x: string]: any }
+  type: "note.updated"
+  location?: LocationRef
+  data: { name: NoteSlug; removed?: boolean }
+}
+
 export type SessionStatusUpdated = {
   id: string
   created: number
@@ -1735,6 +1752,16 @@ export type ReferenceSource = ReferenceLocalSource | ReferenceGitSource
 export type WorktreeList = Array<WorktreeDirectory>
 
 export type VcsInfo = { provider?: string; branch: VcsBranch }
+
+export type NoteFrontmatter = {
+  title: string
+  status: NoteStatus
+  tags: Array<NoteTag>
+  length?: NoteLength
+  session?: string
+  created: number
+  updated: number
+}
 
 export type RoomJoined = { token: string; guest: RoomGuest; room: RoomInfo }
 
@@ -1990,6 +2017,13 @@ export type ReferenceInfo = {
   description?: string
   hidden?: boolean
   source: ReferenceSource
+}
+
+export type NoteInfo = {
+  name: NoteSlug
+  frontmatter: NoteFrontmatter
+  body: string
+  mtime: number | "Infinity" | "-Infinity" | "NaN"
 }
 
 export type ModelInfo = {
@@ -2574,6 +2608,7 @@ export type V2Event =
   | FormReplied
   | FormCancelled
   | WebsearchUpdated
+  | NoteUpdated
   | SessionStatusUpdated
   | SessionIdle
   | TuiPromptAppend
@@ -2837,6 +2872,20 @@ export type VcsInitNotSupportedError = {
 }
 export const isVcsInitNotSupportedError = (value: unknown): value is VcsInitNotSupportedError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "VcsInitNotSupportedError"
+
+export type NoteNotFoundError = { readonly _tag: "NoteNotFoundError"; readonly name: string; readonly message: string }
+export const isNoteNotFoundError = (value: unknown): value is NoteNotFoundError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "NoteNotFoundError"
+
+export type NoteConflictError = {
+  readonly _tag: "NoteConflictError"
+  readonly name: string
+  readonly expected: number
+  readonly actual: number
+  readonly message: string
+}
+export const isNoteConflictError = (value: unknown): value is NoteConflictError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "NoteConflictError"
 
 export type RoomNotFoundError = {
   readonly _tag: "RoomNotFoundError"
@@ -6726,6 +6775,188 @@ export type VcsDiffInput = {
 
 export type VcsDiffOutput = { location: LocationPublicRef; data: Array<FileDiffInfo> }
 
+export type NoteListInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type NoteListOutput = { location: LocationPublicRef; data: Array<NoteInfo> }
+
+export type NoteGetInput = {
+  readonly name: { readonly name: string }["name"]
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type NoteGetOutput = { location: LocationPublicRef; data: NoteInfo }
+
+export type NoteBoundInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+}
+
+export type NoteBoundOutput = { location: LocationPublicRef; data: NoteInfo | null }
+
+export type NoteCreateInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly name?: {
+    readonly name?: string
+    readonly title: string
+    readonly body?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly session?: string
+  }["name"]
+  readonly title: {
+    readonly name?: string
+    readonly title: string
+    readonly body?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly session?: string
+  }["title"]
+  readonly body?: {
+    readonly name?: string
+    readonly title: string
+    readonly body?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly session?: string
+  }["body"]
+  readonly status?: {
+    readonly name?: string
+    readonly title: string
+    readonly body?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly session?: string
+  }["status"]
+  readonly tags?: {
+    readonly name?: string
+    readonly title: string
+    readonly body?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly session?: string
+  }["tags"]
+  readonly length?: {
+    readonly name?: string
+    readonly title: string
+    readonly body?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly session?: string
+  }["length"]
+  readonly session?: {
+    readonly name?: string
+    readonly title: string
+    readonly body?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly session?: string
+  }["session"]
+}
+
+export type NoteCreateOutput = { location: LocationPublicRef; data: NoteInfo }
+
+export type NoteEditInput = {
+  readonly name: { readonly name: string }["name"]
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly body: {
+    readonly body: string
+    readonly mode?: "replace" | "append"
+    readonly expectedMtime: number | "Infinity" | "-Infinity" | "NaN"
+  }["body"]
+  readonly mode?: {
+    readonly body: string
+    readonly mode?: "replace" | "append"
+    readonly expectedMtime: number | "Infinity" | "-Infinity" | "NaN"
+  }["mode"]
+  readonly expectedMtime: {
+    readonly body: string
+    readonly mode?: "replace" | "append"
+    readonly expectedMtime: number | "Infinity" | "-Infinity" | "NaN"
+  }["expectedMtime"]
+}
+
+export type NoteEditOutput = { location: LocationPublicRef; data: NoteInfo }
+
+export type NoteUpdateInput = {
+  readonly name: { readonly name: string }["name"]
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly title?: {
+    readonly title?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly expectedMtime: number | "Infinity" | "-Infinity" | "NaN"
+  }["title"]
+  readonly status?: {
+    readonly title?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly expectedMtime: number | "Infinity" | "-Infinity" | "NaN"
+  }["status"]
+  readonly tags?: {
+    readonly title?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly expectedMtime: number | "Infinity" | "-Infinity" | "NaN"
+  }["tags"]
+  readonly length?: {
+    readonly title?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly expectedMtime: number | "Infinity" | "-Infinity" | "NaN"
+  }["length"]
+  readonly expectedMtime: {
+    readonly title?: string
+    readonly status?: "inbox" | "active" | "done" | "archived"
+    readonly tags?: ReadonlyArray<string>
+    readonly length?: "brief" | "balanced" | "detailed"
+    readonly expectedMtime: number | "Infinity" | "-Infinity" | "NaN"
+  }["expectedMtime"]
+}
+
+export type NoteUpdateOutput = { location: LocationPublicRef; data: NoteInfo }
+
+export type NoteLinkInput = {
+  readonly name: { readonly name: string }["name"]
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly session?: {
+    readonly session?: string
+    readonly expectedMtime: number | "Infinity" | "-Infinity" | "NaN"
+  }["session"]
+  readonly expectedMtime: {
+    readonly session?: string
+    readonly expectedMtime: number | "Infinity" | "-Infinity" | "NaN"
+  }["expectedMtime"]
+}
+
+export type NoteLinkOutput = { location: LocationPublicRef; data: NoteInfo }
+
+export type NoteRemoveInput = {
+  readonly name: { readonly name: string }["name"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined } | undefined
+    readonly expectedMtime: number
+  }["location"]
+  readonly expectedMtime: {
+    readonly location?: { readonly directory?: string | undefined } | undefined
+    readonly expectedMtime: number
+  }["expectedMtime"]
+}
+
+export type NoteRemoveOutput = void
+
 export type DebugLocationListOutput = Array<LocationPublicRef>
 
 export type DebugLocationEvictInput = {
@@ -6851,7 +7082,15 @@ export type RoomGuestLogOutput = RoomLogItem
 
 export type RoomGuestMessagesInput = { readonly roomID: { readonly roomID: string }["roomID"] }
 
-export type RoomGuestMessagesOutput = { data: Array<RoomMessage>; running: boolean }
+export type RoomGuestMessagesOutput = {
+  data: Array<RoomMessage>
+  running: boolean
+  note?: { name: NoteSlug; title: string }
+}
+
+export type RoomGuestNoteInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type RoomGuestNoteOutput = { data: NoteInfo | null }["data"]
 
 export type RoomGuestPromptInput = {
   readonly roomID: { readonly roomID: string }["roomID"]

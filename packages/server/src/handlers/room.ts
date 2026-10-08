@@ -1,4 +1,5 @@
 import { Instance } from "@opencode/core/instance/service"
+import { NoteStore } from "@opencode/core/note"
 import { Permission } from "@opencode/core/permission"
 import { Room } from "@opencode/core/room"
 import { Session } from "@opencode/core/session"
@@ -68,6 +69,16 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
         return yield* new UnauthorizedError({ message: "Room token is missing, expired or for another room" })
       const room = yield* rooms.get(roomID).pipe(Effect.catchTag("Room.NotFoundError", missingRoom))
       return { room, guest: token.guest }
+    })
+
+    // Notes live in the session's location, which a guest never names, so the session decides where to look.
+    const boundNote = Effect.fnUntraced(function* (sessionID: Session.ID) {
+      const session = yield* sessionInfo(sessions, sessionID)
+      return yield* NoteStore.Service.use((notes) => notes.bound(sessionID)).pipe(
+        instances.provide(session),
+        locationErrors,
+        Effect.orDie,
+      )
     })
 
     return handlers
@@ -152,10 +163,19 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
           const messages = yield* sessions
             .messages({ sessionID: joined.room.sessionID, limit: CHAT_LIMIT, order: "desc" })
             .pipe(Effect.catchTag("Session.NotFoundError", missingSession), Effect.orDie)
+          const note = yield* boundNote(joined.room.sessionID)
           return {
             data: messages.toReversed().flatMap(chatMessage),
             running: (yield* sessions.active).has(joined.room.sessionID),
+            note: note && { name: note.name, title: note.frontmatter.title || note.name },
           }
+        }),
+      )
+      .handle(
+        "room.guest.note",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestOf(ctx.params.roomID)
+          return { data: (yield* boundNote(joined.room.sessionID)) ?? null }
         }),
       )
       .handle(

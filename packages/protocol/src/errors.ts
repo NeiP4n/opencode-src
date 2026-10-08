@@ -274,3 +274,24 @@ export class RoomNotFoundError extends Schema.TaggedError<RoomNotFoundError>()(
   },
   { httpApiStatus: 404 },
 ) {}
+
+export class NoteNotFoundError extends Schema.TaggedError<NoteNotFoundError>()(
+  "NoteNotFoundError",
+  {
+    name: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
+/** The note changed since the caller read it: read it again and re-apply the change with the new mtime. */
+export class NoteConflictError extends Schema.TaggedError<NoteConflictError>()(
+  "NoteConflictError",
+  {
+    name: Schema.String,
+    expected: Schema.Number,
+    actual: Schema.Number,
+    message: Schema.String,
+  },
+  { httpApiStatus: 409 },
+) {}

@@ -65,7 +65,7 @@ const setup = Effect.gen(function* () {
     body: { sessionID: session.id, name: "Lab" },
   })).body.data
   const code = (yield* call(`/api/room/${room.id}/code`, { method: "POST", headers: host })).body.code as string
-  return { call, session, room, code }
+  return { call, session, room, code, directory: tmp.path }
 })
 
 it.live("a join code admits a guest whose token opens only that room", () =>
@@ -163,6 +163,34 @@ it.live("the server stamps the guest as author and keeps approvals with the host
       body: { decision: "once" },
     })
     expect(reply.status).toBe(403)
+  }).pipe(Effect.scoped),
+)
+
+it.live("guests see the note the shared session is bound to", () =>
+  Effect.gen(function* () {
+    const { call, session, room, code, directory } = yield* setup
+    const joined = (yield* call("/api/room/join", { method: "POST", body: { code, name: "Phone" } })).body
+    const guest = { authorization: `Bearer ${joined.token}` }
+
+    const before = yield* call(`/api/room/${room.id}/guest/note`, { headers: guest })
+    expect(before.status).toBe(200)
+    expect(before.body.data).toBeNull()
+    expect((yield* call(`/api/room/${room.id}/guest/message`, { headers: guest })).body.note).toBeUndefined()
+
+    const created = yield* call(`/api/note?location[directory]=${encodeURIComponent(directory)}`, {
+      method: "POST",
+      headers: host,
+      body: { title: "Room plan", body: "draft", session: session.id },
+    })
+    expect(created.status).toBe(200)
+
+    const after = yield* call(`/api/room/${room.id}/guest/note`, { headers: guest })
+    expect(after.status).toBe(200)
+    expect(after.body.data).toMatchObject({ name: "room-plan", body: "draft", frontmatter: { title: "Room plan" } })
+    const chat = yield* call(`/api/room/${room.id}/guest/message`, { headers: guest })
+    expect(chat.body.note).toEqual({ name: "room-plan", title: "Room plan" })
+    // the room token opens the note of its own room only
+    expect((yield* call(`/api/room/${room.id}/guest/note`)).status).toBe(401)
   }).pipe(Effect.scoped),
 )
 
