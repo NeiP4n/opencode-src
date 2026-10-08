@@ -2,7 +2,7 @@ export * as OwnedFetch from "./fetch"
 
 export function make(handler: (request: Request) => Promise<Response>, dispose: () => Promise<void>) {
   const requests = new Map<AbortController, Promise<void>>()
-  const closed = new Error("OpenMAMI host is closed")
+  const closed = new Error("Opencode++ host is closed")
   let closePromise: Promise<void> | undefined
   const fetch = Object.assign(
     (input: RequestInfo | URL, init?: RequestInit) => {

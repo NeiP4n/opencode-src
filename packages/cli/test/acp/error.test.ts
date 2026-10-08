@@ -33,7 +33,7 @@ describe("acp error boundary over the wire", () => {
       })
       const unavailable = {
         code: -32603,
-        message: "Internal error: OpenMAMI server is unavailable",
+        message: "Internal error: Opencode++ server is unavailable",
         data: { errorName: "ServerUnavailable" },
       }
 

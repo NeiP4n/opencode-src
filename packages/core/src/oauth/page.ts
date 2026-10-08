@@ -25,7 +25,7 @@ export function success(options?: CallbackPageOptions) {
     body: renderCard({
       status: "success",
       headline: "Authorization successful",
-      message: provider ? `OpenMAMI is now connected to ${escapeHtml(provider)}.` : "OpenMAMI is now authorized.",
+      message: provider ? `Opencode++ is now connected to ${escapeHtml(provider)}.` : "Opencode++ is now authorized.",
       footnote: "You can close this window.",
     }),
     script: options?.autoClose === false ? undefined : AUTO_CLOSE_SCRIPT,
@@ -40,10 +40,10 @@ export function error(detail: string, options?: CallbackPageOptions) {
       status: "error",
       headline: "Authorization failed",
       message: provider
-        ? `OpenMAMI couldn't finish connecting to ${escapeHtml(provider)}.`
-        : "OpenMAMI couldn't complete authorization.",
+        ? `Opencode++ couldn't finish connecting to ${escapeHtml(provider)}.`
+        : "Opencode++ couldn't complete authorization.",
       detail,
-      footnote: "Close this window and try again from OpenMAMI.",
+      footnote: "Close this window and try again from Opencode++.",
     }),
   })
 }
@@ -100,7 +100,7 @@ function renderDocument(input: { title: string; body: string; script?: string })
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>${escapeHtml(input.title)} · OpenMAMI</title>
+    <title>${escapeHtml(input.title)} · Opencode++</title>
     <style>${STYLES}</style>
   </head>
   <body>
@@ -249,8 +249,8 @@ const STYLES = `
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 `
 
-// OpenMAMI wordmark — same path geometry as packages/ui/src/components/logo.tsx (Logo).
-const WORDMARK = `<svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 234 42" fill="none" aria-label="OpenMAMI" role="img">
+// Opencode++ wordmark — same path geometry as packages/ui/src/components/logo.tsx (Logo).
+const WORDMARK = `<svg class="wordmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 234 42" fill="none" aria-label="Opencode++" role="img">
         <path d="M18 30H6V18H18V30Z" fill="var(--oc-icon-weak)" />
         <path d="M18 12H6V30H18V12ZM24 36H0V6H24V36Z" fill="var(--oc-icon-base)" />
         <path d="M48 30H36V18H48V30Z" fill="var(--oc-icon-weak)" />

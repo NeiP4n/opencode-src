@@ -35,7 +35,7 @@ repo_state:
     записей, из них 47 untracked — среди них ядро Universal Tool Hub
     (packages/core/src/hub/, packages/core/src/tool/plugin/hub.ts, packages/core/test/hub.test.ts)
     и другие правки параллельных задач. Из трекаемых — правки лида
-    по пульту oc-hub и переименование OpenCode → OpenMAMI (packages/app/src/**,
+    по пульту oc-hub и переименование OpenCode → Opencode++ (packages/app/src/**,
     packages/cli/src/acp/*, packages/core/src/plugin/provider/opencode.ts,
     packages/core/src/oauth/page.ts, packages/core/src/plugin/skill.ts,
     packages/core/src/tool/plugin/*, packages/desktop/src/**, packages/enterprise/src/**).
@@ -200,7 +200,7 @@ oracles:
       detects:
         - "сборка объявляет версию < 1.18.0: провайдер opencode.ai отвечает 403 «OpenCode 1.18.0 or newer is required to use the free tier»"
         - "любая из 10 бесплатных моделей перестала отвечать после замены бинаря (регрессия)"
-        - "патчи OpenMAMI потеряны: провайдер называется иначе или роли не грузятся"
+        - "патчи Opencode++ потеряны: провайдер называется иначе или роли не грузятся"
       misses:
         - "модели, недоступные в регионе (fledge-alpha-free отдаёт RegionError при прямой пробе, но работает через клиент) — это не дефект сборки"
         - "качество ответов моделей и лимиты запросов: оракул проверяет доступность, а не ум"

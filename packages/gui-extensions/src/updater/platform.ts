@@ -39,10 +39,10 @@ export const make = Effect.fn("Updater.platform")(function* (channel: string) {
         if (external) {
           const response = await fetch(stableArtifact, { headers: { "User-Agent": userAgent } })
 
-          if (!response.ok) throw new Error(`Stable OpenMAMI update check failed: ${response.status}`)
+          if (!response.ok) throw new Error(`Stable Opencode++ update check failed: ${response.status}`)
           const download = stableMacDownload(await response.json(), process.arch)
 
-          if (!download) throw new Error("Stable OpenMAMI download is unavailable")
+          if (!download) throw new Error("Stable Opencode++ download is unavailable")
 
           return { mode: "external", ...download } as const
         }

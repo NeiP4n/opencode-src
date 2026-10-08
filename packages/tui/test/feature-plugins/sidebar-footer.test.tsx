@@ -86,7 +86,7 @@ test("sidebar shows onboarding without a connected integration", async () => {
   try {
     const frame = app.captureCharFrame()
     expect(frame).toContain("Getting started")
-    expect(frame).toContain("OpenMAMI includes free models")
+    expect(frame).toContain("Opencode++ includes free models")
     expect(frame).toContain("Connect provider")
     expect(frame).toContain("/connect")
   } finally {

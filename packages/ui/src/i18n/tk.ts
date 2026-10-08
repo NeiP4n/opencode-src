@@ -69,7 +69,7 @@ export const dict: Record<string, string> = {
   "ui.sessionTurn.error.addCredits": "Karz goşuň",
   "dialog.usageExceeded.freeTier.title": "Mugt çäk ýetdi",
   "dialog.usageExceeded.freeTier.description":
-    "Iň oňat açyk çeşme modellerine ygtybarly girmek üçin aýda 10 $ töläp, OpenMAMI Go-a ýazylyň.",
+    "Iň oňat açyk çeşme modellerine ygtybarly girmek üçin aýda 10 $ töläp, Opencode++ Go-a ýazylyň.",
   "dialog.usageExceeded.freeTier.actionLabel": "Abuna ýazylyň",
   "dialog.usageExceeded.accountRateLimit.title": "Çäklendirildi",
   "dialog.usageExceeded.accountRateLimit.description":

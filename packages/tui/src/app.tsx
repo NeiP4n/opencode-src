@@ -601,14 +601,14 @@ function App() {
     if (!terminalTitleEnabled()) return
 
     if (route.data.type === "home") {
-      renderer.setTerminalTitle("OpenMAMI")
+      renderer.setTerminalTitle("Opencode++")
       return
     }
 
     if (route.data.type === "session") {
       const title = session?.title
       if (!title || isFallbackTitle(title)) {
-        renderer.setTerminalTitle("OpenMAMI")
+        renderer.setTerminalTitle("Opencode++")
         return
       }
 
@@ -979,7 +979,7 @@ function App() {
         ? [
             {
               name: "opencode.update",
-              title: "Update OpenMAMI",
+              title: "Update Opencode++",
               slash: { name: "update" },
               run: () => updater.open?.("manual"),
               category: "System",

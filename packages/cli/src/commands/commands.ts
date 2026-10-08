@@ -36,12 +36,12 @@ const PermissionParams = {
 }
 
 const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME : "opencode", {
-  description: "OpenMAMI command line interface",
+  description: "Opencode++ command line interface",
   params: {
     ...ServerParams,
     ...PermissionParams,
     directory: Argument.string("directory").pipe(
-      Argument.withDescription("Directory to start OpenMAMI in"),
+      Argument.withDescription("Directory to start Opencode++ in"),
       Argument.optional,
     ),
     continue: Flag.boolean("continue").pipe(
@@ -58,7 +58,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
   },
   commands: [
     Spec.make("upgrade", {
-      description: "Upgrade OpenMAMI to the latest or a specific version",
+      description: "Upgrade Opencode++ to the latest or a specific version",
       aliases: ["update"],
       params: {
         target: Argument.string("target").pipe(
@@ -73,7 +73,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       },
     }),
     Spec.make("uninstall", {
-      description: "Uninstall OpenMAMI, keeping session data, configuration, and state",
+      description: "Uninstall Opencode++, keeping session data, configuration, and state",
       params: {
         dryRun: Flag.boolean("dry-run").pipe(
           Flag.withDescription("Show what would be removed without removing"),
@@ -372,7 +372,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       },
     }),
     Spec.make("run", {
-      description: "Run OpenMAMI with a message",
+      description: "Run Opencode++ with a message",
       params: {
         ...ServerParams,
         message: Argument.string("message").pipe(

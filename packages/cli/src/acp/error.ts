@@ -125,7 +125,7 @@ export function toRequestError(error: Error): RequestError {
         error.safeMessage,
       )
     case "ACPServerUnavailableError":
-      return RequestError.internalError({ errorName: "ServerUnavailable" }, "OpenMAMI server is unavailable")
+      return RequestError.internalError({ errorName: "ServerUnavailable" }, "Opencode++ server is unavailable")
   }
   const exhaustive: never = error
   return exhaustive

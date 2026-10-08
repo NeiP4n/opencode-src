@@ -11,7 +11,7 @@ const fixtures = [
     id: "deployment",
     title: "Deployment architecture",
     source: `flowchart LR
-  Client[OpenMAMI client]
+  Client[Opencode++ client]
 
   subgraph CF[Cloudflare]
     DNS[opencode.ai]

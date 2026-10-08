@@ -231,7 +231,7 @@ export const OpencodePlugin = define<HttpClient.HttpClient | Bus.Service | Manag
             // Only well-formed Console errors change the connection status; anything else may be transient.
             const next = connectionStatus(cause)
             if (next) yield* status(next)
-            yield* Effect.logWarning("failed to load OpenMAMI provider config", { cause })
+            yield* Effect.logWarning("failed to load Opencode++ provider config", { cause })
             // A load that fails for the connection already in place keeps its last config: dropping it
             // would lift organization policy while personal credentials keep working.
             return IntegrationConnection.key(connection) === IntegrationConnection.key(snapshot.connection)
@@ -360,7 +360,7 @@ export const OpencodePlugin = define<HttpClient.HttpClient | Bus.Service | Manag
       if (!descriptor || !connection) return
       editor.add({
         id: descriptor.providerID,
-        name: "OpenMAMI Web Search",
+        name: "Opencode++ Web Search",
         execute: (input) =>
           Effect.gen(function* () {
             const active = yield* ctx.integration.connection.active("opencode")
@@ -396,13 +396,13 @@ export const OpencodePlugin = define<HttpClient.HttpClient | Bus.Service | Manag
                 Effect.scoped,
                 Effect.timeoutOrElse({
                   duration: Duration.seconds(25),
-                  orElse: () => Effect.fail(new Error("OpenMAMI web search request timed out")),
+                  orElse: () => Effect.fail(new Error("Opencode++ web search request timed out")),
                 }),
               )
             if (response.providerID !== descriptor.providerID) {
               return yield* Effect.fail(
                 new Error(
-                  `OpenMAMI web search returned provider ${response.providerID} instead of ${descriptor.providerID}`,
+                  `Opencode++ web search returned provider ${response.providerID} instead of ${descriptor.providerID}`,
                 ),
               )
             }
@@ -570,7 +570,7 @@ function normalizeServer(input: unknown) {
       return `${url.origin}${url.pathname.replace(/\/+$/, "")}`
     },
     catch: (cause) =>
-      new Error(`Invalid OpenMAMI server URL: ${cause instanceof Error ? cause.message : String(cause)}`),
+      new Error(`Invalid Opencode++ server URL: ${cause instanceof Error ? cause.message : String(cause)}`),
   })
 }
 
@@ -613,7 +613,7 @@ function credential(http: HttpClient.HttpClient, server: string, token: typeof T
         ? orgs.toSorted((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))[0]
         : orgs.find((org) => org.id === token.org_id)
     if (token.org_id != null && !org) {
-      return yield* Effect.fail(new Error(`OpenMAMI organization not found: ${token.org_id}`))
+      return yield* Effect.fail(new Error(`Opencode++ organization not found: ${token.org_id}`))
     }
     return Credential.OAuth.make({
       type: "oauth" as const,

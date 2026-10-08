@@ -172,7 +172,7 @@ User-Agent, уходящий провайдеру opencode.ai, содержал 
 Пересобрать CLI из текущего грязного дерева с `OPENCODE_VERSION=2.0.22
 OPENCODE_CHANNEL=local` (канал `local` сохраняет БД `opencode-local.db`, имена баз,
 логи и поведение, к которым привык владелец). Релизную установку через
-`~/.config/opencode/bin/oc-update` не делаем: она потеряла бы патчи OpenMAMI.
+`~/.config/opencode/bin/oc-update` не делаем: она потеряла бы патчи Opencode++.
 
 ## Критерии готовности (команда → ожидаемый результат)
 1. `opencode --version` → `opencode v2.0.22`.

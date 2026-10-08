@@ -50,7 +50,7 @@ function knownThemes() {
 }
 
 const names: Record<string, string> = {
-  "oc-2": "OpenMAMI",
+  "oc-2": "Opencode++",
   amoled: "AMOLED",
   aura: "Aura",
   ayu: "Ayu",

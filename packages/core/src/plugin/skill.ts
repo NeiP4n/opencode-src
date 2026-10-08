@@ -18,7 +18,7 @@ export const ReportContent = reportContent
 export const HubContent = hubContent
 
 export const OpencodeDescription =
-  "Use this skill for any question about OpenMAMI itself, including how OpenMAMI works, using or configuring it, migrating from V1 to V2, troubleshooting it, developing plugins or integrations, using the OpenMAMI SDK, clients, server, or API, and contributing to the OpenMAMI codebase. Also use it for OpenMAMI agents, commands, skills, tools, permissions, MCP servers, providers, models, themes, keybinds, formatters, the CLI, TUI, desktop app, and web app."
+  "Use this skill for any question about Opencode++ itself, including how Opencode++ works, using or configuring it, migrating from V1 to V2, troubleshooting it, developing plugins or integrations, using the Opencode++ SDK, clients, server, or API, and contributing to the Opencode++ codebase. Also use it for Opencode++ agents, commands, skills, tools, permissions, MCP servers, providers, models, themes, keybinds, formatters, the CLI, TUI, desktop app, and web app."
 const REPORT_DESCRIPTION =
   "Use when the user wants to report an opencode issue or bug. Collect standard diagnostics, add user-specific reproduction context, and publish the issue with GitHub CLI."
 export const HubDescription =
@@ -32,7 +32,7 @@ export const Plugin = define({
       editor.add(
         Skill.Info.make({
           id: Skill.ID.make("opencode"),
-          name: Skill.Name.make("OpenMAMI"),
+          name: Skill.Name.make("Opencode++"),
           description: OpencodeDescription,
           path: AbsolutePath.make("/builtin/opencode.md"),
           content: OpencodeContent,

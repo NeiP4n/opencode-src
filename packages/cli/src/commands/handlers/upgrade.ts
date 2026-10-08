@@ -16,14 +16,14 @@ export default Runtime.handler(
       const method = Option.getOrUndefined(input.method) ?? (yield* updater.method())
       if (!method)
         return yield* Effect.fail(
-          new Error("Could not detect the installation method. Pass --method to choose how to upgrade OpenMAMI."),
+          new Error("Could not detect the installation method. Pass --method to choose how to upgrade Opencode++."),
         )
 
       log.info(`Using method: ${method}`)
       const target = Option.getOrUndefined(input.target) ?? (yield* updater.latest(method))
       const version = target.trim().replace(/^v/, "")
       if (version === OPENCODE_VERSION) {
-        log.warn(`OpenMAMI upgrade skipped: ${version} is already installed`)
+        log.warn(`Opencode++ upgrade skipped: ${version} is already installed`)
         outro("Done")
         return
       }

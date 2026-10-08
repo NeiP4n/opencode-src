@@ -227,7 +227,7 @@ describe("WebSearchTool registration", () => {
           fields: [
             {
               key: "choice",
-              description: "Allow OpenMAMI to search the web for up-to-date information?",
+              description: "Allow Opencode++ to search the web for up-to-date information?",
               type: "string",
               required: true,
               custom: false,

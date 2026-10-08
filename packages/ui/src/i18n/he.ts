@@ -69,7 +69,7 @@ export const dict = {
   "ui.sessionTurn.error.addCredits": "הוסף קרדיטים",
   "dialog.usageExceeded.freeTier.title": "הגעת למגבלה החינמית",
   "dialog.usageExceeded.freeTier.description":
-    "הירשם ל-OpenMAMI Go לקבלת גישה אמינה למודלי הקוד הפתוח הטובים ביותר, החל מ-$5 לחודש.",
+    "הירשם ל-Opencode++ Go לקבלת גישה אמינה למודלי הקוד הפתוח הטובים ביותר, החל מ-$5 לחודש.",
   "dialog.usageExceeded.freeTier.actionLabel": "הירשם",
   "dialog.usageExceeded.accountRateLimit.title": "הגעת למגבלת Go",
   "dialog.usageExceeded.accountRateLimit.description":

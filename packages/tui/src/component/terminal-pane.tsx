@@ -240,7 +240,7 @@ export function TerminalPane(props: {
       }
       if (message.type !== "attached") return
       if (!("inputProtocol" in message) || message.inputProtocol !== 1) {
-        setFailure("Persistent terminal server is out of date; restart OpenMAMI")
+        setFailure("Persistent terminal server is out of date; restart Opencode++")
         next.close()
         return
       }

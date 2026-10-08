@@ -139,7 +139,7 @@ export function failure(state: TurnState) {
   if (error?.type === "provider.auth") return new ACPError.AuthRequiredError()
   if (error && error.type !== "aborted" && error.type !== "provider.content-filter") {
     return new ACPError.ServiceFailureError({
-      safeMessage: error.message || "OpenMAMI prompt failed",
+      safeMessage: error.message || "Opencode++ prompt failed",
       service: "session",
       errorName: error.type,
     })

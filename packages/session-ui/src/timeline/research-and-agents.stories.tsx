@@ -198,7 +198,7 @@ const LoadingSpecializedSkills = {
       description="Active and completed skills display their identifier or resolved name."
       document={storyDocument([
         storyTool("tool_skill_id", "skill", "running", { id: "frontend-design" }),
-        storyTool("tool_skill_name", "skill", "completed", { id: "opencode" }, { metadata: { name: "OpenMAMI" } }),
+        storyTool("tool_skill_name", "skill", "completed", { id: "opencode" }, { metadata: { name: "Opencode++" } }),
       ])}
     />
   ),
