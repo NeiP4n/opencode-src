@@ -32,7 +32,7 @@ test("one absent tool blocks its entries and produces an install command", () =>
 test("installed and missing partition every requirement for any probe", () => {
   const probes = [(tool: string) => true, (tool: string) => tool !== "jq", (tool: string) => tool === "rg"]
   for (const probe of probes) {
-    const status = hubRegistryStatus({ probe })
+    const status = hubRegistryStatus({ probe, manager: "apt" })
     const accounted = new Set([...status.installed, ...status.missing.map((entry) => entry.tool)])
     expect([...accounted].sort()).toEqual([...requiredTools()].sort())
     expect(status.installed.filter((tool) => status.missing.some((entry) => entry.tool === tool))).toEqual([])
@@ -53,7 +53,7 @@ test("installed and missing partition every requirement for any probe", () => {
 })
 
 test("default probe mirrors which() on PATH", () => {
-  const status = hubRegistryStatus()
+  const status = hubRegistryStatus({ manager: "apt" })
   expect(status.total).toBe(platformEntries().length)
   const missing = new Set(status.missing.map((entry) => entry.tool))
   const required = requiredTools()
@@ -127,4 +127,15 @@ test("absent tools with no package manager for the platform leave install undefi
   expect(status.ready).toBeLessThan(status.total)
   expect(status.install).toBeUndefined()
   expect(status.terminals.every((terminal) => terminal.present)).toBe(false)
+})
+
+test("tools the package manager cannot provide are not offered", () => {
+  const probe = (tool: string) => tool !== "apt-cache" && tool !== "dpkg-query"
+  const pacman = hubRegistryStatus({ platform: "linux", probe, manager: "pacman" })
+  expect(pacman.tools.map((row) => row.tool)).not.toContain("apt-cache")
+  expect(pacman.missing).toEqual([])
+  expect(pacman.ready).toBe(pacman.total)
+  // on Debian the same tools stay installable
+  const apt = hubRegistryStatus({ platform: "linux", probe, manager: "apt" })
+  expect(apt.missing.map((entry) => entry.tool).sort()).toEqual(["apt-cache", "dpkg-query"])
 })

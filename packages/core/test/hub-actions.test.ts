@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { symlink, writeFile } from "node:fs/promises"
 import path from "path"
-import { installTool, removeTool, type RunResult, type Runner } from "@opencode/core/hub/actions"
+import { failureReason, installTool, removeTool, type RunResult, type Runner } from "@opencode/core/hub/actions"
 import { tmpdir } from "./fixture/tmpdir"
 
 // A PATH holding only fake manager binaries: detection still sees the manager,
@@ -139,5 +139,19 @@ describe("Hub install/remove actions", () => {
     expect(result.ok).toBe(true)
     expect(result.exit).toBe(0)
     expect(result.output).toContain("fake-sudo ran")
+  })
+})
+
+describe("failureReason", () => {
+  test("explains a held pacman lock instead of echoing the advice line", () => {
+    const output =
+      "sudo pacman -S --noconfirm go-yq\nошибка: не удалось заблокировать базу данных: Файл существует\n  можно удалить '/var/lib/pacman/db.lck'"
+    expect(failureReason(output)).toContain("pacman database is locked")
+  })
+
+  test("prefers the first error line over trailing hints", () => {
+    expect(failureReason("cmd\nerror: target not found: foo\nhint: try again")).toBe(
+      "error: target not found: foo",
+    )
   })
 })

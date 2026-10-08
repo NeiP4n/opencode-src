@@ -25,13 +25,7 @@ async function render(options: RegistryPanelOptions) {
           <ThemeProvider mode="dark" source={emptyThemeSource}>
             <Keymap.Provider>
               <ToastProvider>
-                {/* the bar sits on the bottom row in production, so the panel grows upward from there */}
-                <box width="100%" height="100%" flexDirection="column">
-                  <box flexGrow={1} />
-                  <box position="relative" height={1}>
-                    <RegistryPanel options={options} />
-                  </box>
-                </box>
+                <RegistryPanel options={options} />
                 <Toast />
               </ToastProvider>
             </Keymap.Provider>
@@ -56,11 +50,9 @@ async function untilEnabled(directory: string, tool: string, expected: boolean) 
   return false
 }
 
-// Value of a label/value row. Rows stretch their value to the right edge, so
-// the rendered text between label and value is padding and cannot be matched.
+// Value printed right after a summary label.
 function rowValue(frame: string, label: string) {
-  const line = frame.split("\n").find((candidate) => candidate.includes(label))
-  return line?.trim().slice(label.length).trim()
+  return frame.match(new RegExp(`${label} (\\S+)`))?.[1]
 }
 
 // Cell of `needle` on the row naming `tool`: the tool's own row carries both —
@@ -85,9 +77,7 @@ test("registry panel shows readiness, terminals and a paged tool list", async ()
     expect(frame).toContain(`${status.ready}/${status.total}`)
     expect(frame).toContain("Terminals")
     expect(frame).toContain("bash")
-    // stage-8 sections survive the button rework
-    expect(frame).toContain("Categories")
-    expect(frame).toContain(`${status.categories[0].name} `)
+        expect(frame).toContain(`${status.categories[0].name} `)
     expect(frame).toContain("Tools")
     // the hint block is opt-in: a fresh state file advertises nothing
     expect(rowValue(frame, "For the model")).toBe(`0/${status.tools.length}`)
@@ -96,7 +86,7 @@ test("registry panel shows readiness, terminals and a paged tool list", async ()
     // first page is the ten most actionable rows, absent tools first
     expect(frame).toContain(status.tools[0].tool)
     expect(app.captureCharFrame()).toContain("Install")
-    expect(app.captureCharFrame()).toContain("Rm")
+    expect(app.captureCharFrame()).toContain("Remove")
   } finally {
     app.renderer.destroy()
   }
@@ -186,7 +176,7 @@ test("remove needs a second click on the same button before it runs", async () =
   try {
     const target = hubRegistryStatus({ probe }).tools.find((row) => row.installed)
     expect(target).toBeDefined()
-    const { x, y } = cell(app, target!.tool, "Rm")
+    const { x, y } = cell(app, target!.tool, "Remove")
     await app.mockMouse.click(x, y)
     await app.waitForFrame((frame) => frame.includes("Remove?"))
     // the first click only armed the button
@@ -227,7 +217,7 @@ test("pager moves to the second page of tools", async () => {
   const app = await render({ probe, directory: tmp.path })
   try {
     const status = hubRegistryStatus({ probe })
-    const secondPage = status.tools[10].tool
+    const secondPage = status.tools[12].tool
     await app.waitForFrame((frame) => !frame.includes(secondPage))
     const { x, y } = cell(app, "Tools", "›")
     await app.mockMouse.click(x, y)
@@ -246,4 +236,16 @@ test("every catalog tool gets exactly one row", async () => {
   expect(new Set(status.tools.map((row) => row.tool)).size).toBe(status.tools.length)
   // installed/missing stays a partition of the same set
   expect(new Set([...status.installed, ...status.missing.map((entry) => entry.tool)])).toEqual(required)
+})
+
+test("search narrows the tool list by name or by what a recipe does", async () => {
+  await using tmp = await tmpdir()
+  const app = await render({ probe, directory: tmp.path })
+  try {
+    await app.mockInput.typeText("yaml")
+    await app.waitForFrame((frame) => frame.includes("[off] yq") && !frame.includes("[off] rg"))
+    expect(app.captureCharFrame()).not.toContain("[off] git")
+  } finally {
+    app.renderer.destroy()
+  }
 })

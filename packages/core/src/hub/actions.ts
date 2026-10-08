@@ -48,6 +48,18 @@ export async function removeTool(tool: string, options: ActionOptions = {}): Pro
   return run(removeCommand(plan.manager, plan.tools), options)
 }
 
+// One line that says why a package-manager action failed. A held database lock
+// is the common case and its own output buries the cause under advice lines,
+// so it gets a direct explanation; otherwise the first error line wins over the
+// trailing hint lines managers print after it.
+export function failureReason(output: string) {
+  if (output.includes("/var/lib/pacman/db.lck"))
+    return "pacman database is locked: wait for the running pacman, or remove /var/lib/pacman/db.lck if none is running"
+  if (/Could not get lock .*dpkg/.test(output)) return "dpkg is locked by another apt or dpkg process"
+  const lines = output.split("\n").map((line) => line.trim()).filter((line) => line.length > 0)
+  return lines.find((line) => /^(error|ошибка|E:)/i.test(line)) ?? lines.at(-1) ?? "failed"
+}
+
 async function run(command: string, options: ActionOptions): Promise<ActionResult> {
   const result = await (options.runner ?? spawnRunner(options.platform ?? process.platform))(command)
   if (result.exit === 0) return { ok: true, exit: 0, output: result.stdout, command }

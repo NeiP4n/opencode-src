@@ -8,8 +8,9 @@ const PACKAGE: Record<string, Partial<Record<Manager, string>>> = {
   rg: { apt: "ripgrep", dnf: "ripgrep", pacman: "ripgrep", brew: "ripgrep", winget: "BurntSushi.ripgrep.MSVC" },
   fd: { apt: "fd-find", dnf: "fd-find", pacman: "fd", brew: "fd", winget: "sharkdp.fd" },
   jq: { winget: "jqlang.jq" },
-  yq: { apt: "yq", brew: "yq", winget: "mikefarah.yq" },
-  mlr: { apt: "miller", brew: "miller", winget: "johnkerl.miller" },
+  // The catalog uses mikefarah's yq syntax; Arch ships it as go-yq, while its `yq` is the Python wrapper.
+  yq: { apt: "yq", dnf: "yq", pacman: "go-yq", brew: "yq", winget: "mikefarah.yq" },
+  mlr: { apt: "miller", dnf: "miller", pacman: "miller", brew: "miller", winget: "johnkerl.miller" },
   nu: { apt: "nushell", brew: "nushell", winget: "nushell.nushell" },
   lsd: { apt: "lsd", brew: "lsd", winget: "Chemadic.lsd" },
   sd: { apt: "sd", brew: "sd" },
@@ -18,6 +19,19 @@ const PACKAGE: Record<string, Partial<Record<Manager, string>>> = {
   pstree: { apt: "psmisc", dnf: "psmisc", pacman: "psmisc" },
   nc: { apt: "netcat-openbsd", dnf: "nmap-ncat", pacman: "gnu-netcat" },
   traceroute: { apt: "traceroute", dnf: "traceroute", pacman: "traceroute" },
+}
+
+// Tools that only exist on some managers' systems: Debian's package tooling
+// cannot be installed through pacman or dnf, so offering it there only fails.
+const ONLY: Record<string, readonly Manager[]> = {
+  "apt-cache": ["apt"],
+  "dpkg-query": ["apt"],
+}
+
+export function installable(tool: string, manager: Manager | undefined) {
+  const only = ONLY[tool]
+  if (!only) return true
+  return manager !== undefined && only.includes(manager)
 }
 
 export type Manager = "apt" | "dnf" | "pacman" | "brew" | "winget" | "choco" | "scoop"

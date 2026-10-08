@@ -32,6 +32,8 @@ export type RegistryOptions = {
   // operator switched on is advertised to the model, so an absent key counts as
   // off and an empty state file shows every switch off.
   enabled?: Readonly<Record<string, boolean>>
+  // Package manager that installs missing tools; detected from PATH by default.
+  manager?: Hub.Manager
 }
 
 const TERMINALS: readonly Hub.Backend[] = ["bash", "nu", "pwsh"]
@@ -40,10 +42,18 @@ export function hubRegistryStatus(options?: RegistryOptions): RegistryStatus {
   const probe = options?.probe ?? ((tool: string) => which(tool) != null)
   const platform = options?.platform ?? process.platform
   const enabled = options?.enabled ?? {}
-  const entries = Hub.all.filter((entry) => Hub.supportsPlatform(entry, platform))
-  const tools = Array.from(new Set(entries.flatMap((entry) => entry.requires ?? []))).sort()
+  const manager = options?.manager ?? Hub.detectManager(platform)
+  const supported = Hub.all.filter((entry) => Hub.supportsPlatform(entry, platform))
   // Probe each distinct tool once: `which` walks PATH on every call
-  const present = new Set(tools.filter((tool) => probe(tool)))
+  const present = new Set(
+    Array.from(new Set(supported.flatMap((entry) => entry.requires ?? []))).filter((tool) => probe(tool)),
+  )
+  // An entry whose missing tool this machine's manager cannot provide (apt-cache
+  // on Arch) can never become ready, so it is not offered at all.
+  const entries = supported.filter((entry) =>
+    (entry.requires ?? []).every((tool) => present.has(tool) || Hub.installable(tool, manager)),
+  )
+  const tools = Array.from(new Set(entries.flatMap((entry) => entry.requires ?? []))).sort()
   const missing = blockedEntries(entries, present)
   const plan =
     missing.length > 0

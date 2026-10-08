@@ -24,7 +24,7 @@ const graphWidth = 23
 const sampleIntervalMilliseconds = 2_000
 const sampleRetentionMilliseconds = 30_000
 const statusWindowMilliseconds = 6_000
-type Panel = "server" | "theme" | "tools" | "ui" | "registry"
+type Panel = "server" | "theme" | "tools" | "ui"
 type ProcessSample = Readonly<{ cpu: number; memory: number; delay: number; time: number }>
 export type RuntimeStatus = "normal" | "medium" | "high"
 
@@ -428,11 +428,15 @@ export function DevToolsBar() {
           </PanelBox>
         </Show>
       </BarItem>
-      <BarItem active={panel() === "registry"} onClick={() => toggle("registry")}>
-        <text fg={panel() === "registry" ? theme.text.action.primary.focused : theme.text.muted}>Registry</text>
-        <Show when={panel() === "registry"}>
-          <RegistryPanel />
-        </Show>
+      <BarItem
+        active={false}
+        onClick={() => {
+          close()
+          dialog.replace(() => <RegistryPanel onClose={() => dialog.clear()} />, undefined, { size: "large" })
+          dialog.setCentered(true)
+        }}
+      >
+        <text fg={theme.text.muted}>Registry</text>
       </BarItem>
       <BarItem
         active={false}
