@@ -1,7 +1,7 @@
 export * as HubActions from "./actions.js"
 
 import { all } from "./catalog/index.js"
-import { planFor, removeCommand } from "./install.js"
+import { detectManager, planFor, removeCommand, updateCommand } from "./install.js"
 
 export type RunResult = {
   readonly exit: number
@@ -49,6 +49,27 @@ export async function removeTool(tool: string, options: ActionOptions = {}): Pro
   return run(removeCommand(plan.manager, plan.tools), options)
 }
 
+// The manager asked a mirror for a package version that is gone: its package
+// databases are older than the mirror, and installs keep failing until they are
+// refreshed.
+export function staleDatabase(output: string) {
+  return /\b404\b/.test(output) && /(failed retrieving file|не удалось получить файл|Failed to fetch)/i.test(output)
+}
+
+export async function updateSystem(options: ActionOptions = {}): Promise<ActionResult> {
+  const platform = options.platform ?? process.platform
+  const manager = detectManager(platform)
+  const command = manager ? updateCommand(manager) : undefined
+  if (!command)
+    return {
+      ok: false,
+      exit: NO_COMMAND_EXIT,
+      output: `no package database update for ${manager ?? platform}`,
+      command: "",
+    }
+  return run(command, options)
+}
+
 // One line that says why a package-manager action failed. A held database lock
 // is the common case and its own output buries the cause under advice lines,
 // so it gets a direct explanation; otherwise the first error line wins over the
@@ -57,6 +78,7 @@ export function failureReason(output: string) {
   if (output.includes("/var/lib/pacman/db.lck"))
     return "pacman database is locked: wait for the running pacman, or remove /var/lib/pacman/db.lck if none is running"
   if (/Could not get lock .*dpkg/.test(output)) return "dpkg is locked by another apt or dpkg process"
+  if (staleDatabase(output)) return "the package databases are outdated: update the system, then install again"
   const lines = output
     .split("\n")
     .map((line) => line.trim())

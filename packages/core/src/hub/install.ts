@@ -124,6 +124,28 @@ export function removeCommand(manager: Manager, tools: readonly string[]): strin
   }
 }
 
+// Refreshes the package databases the way each manager allows. On pacman that
+// is a full system upgrade: syncing databases without upgrading leaves a partial
+// upgrade, which Arch does not support.
+export function updateCommand(manager: Manager): string | undefined {
+  switch (manager) {
+    case "apt":
+      return "sudo apt-get update"
+    case "dnf":
+      return "sudo dnf makecache"
+    case "pacman":
+      return "sudo pacman -Syu --noconfirm"
+    case "brew":
+      return "brew update"
+    case "winget":
+      return "winget source update"
+    case "scoop":
+      return "scoop update"
+    case "choco":
+      return undefined
+  }
+}
+
 export type Plan = {
   readonly manager: Manager
   readonly command: string
