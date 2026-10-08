@@ -290,6 +290,12 @@ import type {
   RoomGuestPermissionListOutput,
   RoomGuestPermissionReplyInput,
   RoomGuestPermissionReplyOutput,
+  OrchestraGetInput,
+  OrchestraGetOutput,
+  OrchestraMainInput,
+  OrchestraMainOutput,
+  OrchestraAccessInput,
+  OrchestraAccessOutput,
 } from "../api/api.js"
 import { ClientError } from "./client-error.js"
 
@@ -1721,6 +1727,29 @@ const adaptGroupRoom = (raw: RawClient["server.room"]) => ({
   },
 })
 
+const EndpointOrchestraGet = (raw: RawClient["server.orchestra"]) => (input: OrchestraGetInput) =>
+  preserveEffect<OrchestraGetOutput>()(
+    raw["orchestra.get"]({ params: { projectID: input["projectID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointOrchestraMain = (raw: RawClient["server.orchestra"]) => (input: OrchestraMainInput) =>
+  preserveEffect<OrchestraMainOutput>()(
+    raw["orchestra.main"]({ params: { projectID: input["projectID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointOrchestraAccess = (raw: RawClient["server.orchestra"]) => (input: OrchestraAccessInput) =>
+  preserveEffect<OrchestraAccessOutput>()(
+    raw["orchestra.access"]({ params: { sessionID: input["sessionID"] }, payload: { access: input["access"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const adaptGroupOrchestra = (raw: RawClient["server.orchestra"]) => ({
+  get: EndpointOrchestraGet(raw),
+  main: EndpointOrchestraMain(raw),
+  access: EndpointOrchestraAccess(raw),
+})
+
 const adaptClient = (raw: RawClient) => ({
   server: adaptGroupServer(raw["server.server"]),
   location: adaptGroupLocation(raw["server.location"]),
@@ -1753,6 +1782,7 @@ const adaptClient = (raw: RawClient) => ({
   websearch: adaptGroupWebsearch(raw["server.websearch"]),
   config: adaptGroupConfig(raw["server.config"]),
   room: adaptGroupRoom(raw["server.room"]),
+  orchestra: adaptGroupOrchestra(raw["server.orchestra"]),
 })
 
 export const make = (options?: { readonly baseUrl?: URL | string }) =>

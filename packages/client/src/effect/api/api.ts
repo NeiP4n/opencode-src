@@ -39,6 +39,7 @@ import type { Vcs } from "@opencode/schema/vcs"
 import type { WebSearch } from "@opencode/schema/websearch"
 import type { Config } from "@opencode/schema/config"
 import type { Room } from "@opencode/schema/room"
+import type { Orchestra } from "@opencode/schema/orchestra"
 
 export type ServerInfoOutput = {
   readonly version: string
@@ -3434,6 +3435,26 @@ export interface RoomApi<E = never> {
   }
 }
 
+export type OrchestraGetInput = { readonly projectID: Project.ID }
+export type OrchestraGetOutput = Orchestra.State
+export type OrchestraGetOperation<E = never> = (input: OrchestraGetInput) => Effect.Effect<OrchestraGetOutput, E>
+
+export type OrchestraMainInput = { readonly projectID: Project.ID }
+export type OrchestraMainOutput = Session.Info
+export type OrchestraMainOperation<E = never> = (input: OrchestraMainInput) => Effect.Effect<OrchestraMainOutput, E>
+
+export type OrchestraAccessInput = { readonly sessionID: Session.ID; readonly access: Orchestra.Access }
+export type OrchestraAccessOutput = void
+export type OrchestraAccessOperation<E = never> = (
+  input: OrchestraAccessInput,
+) => Effect.Effect<OrchestraAccessOutput, E>
+
+export interface OrchestraApi<E = never> {
+  readonly get: OrchestraGetOperation<E>
+  readonly main: OrchestraMainOperation<E>
+  readonly access: OrchestraAccessOperation<E>
+}
+
 export interface AppApi<E = never> {
   readonly server: ServerApi<E>
   readonly location: LocationApi<E>
@@ -3466,4 +3487,5 @@ export interface AppApi<E = never> {
   readonly websearch: WebsearchApi<E>
   readonly config: ConfigApi<E>
   readonly room: RoomApi<E>
+  readonly orchestra: OrchestraApi<E>
 }

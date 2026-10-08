@@ -471,6 +471,8 @@ export type RoomInfo1 = {
   created: number | "Infinity" | "-Infinity" | "NaN"
 }
 
+export type OrchestraAccess = "hidden" | "read" | "write" | "full"
+
 export type SessionMessageLocationSwitched = {
   id: string
   metadata?: { [x: string]: JsonValue }
@@ -1719,6 +1721,8 @@ export type WorktreeList = Array<WorktreeDirectory>
 export type VcsInfo = { provider?: string; branch: VcsBranch }
 
 export type RoomJoined = { token: string; guest: RoomGuest; room: RoomInfo }
+
+export type OrchestraState = { main?: string | undefined; access: { [x: string]: OrchestraAccess } }
 
 export type SessionInboxMove = {
   id: string
@@ -6854,3 +6858,18 @@ export type RoomGuestPermissionReplyInput = {
 }
 
 export type RoomGuestPermissionReplyOutput = void
+
+export type OrchestraGetInput = { readonly projectID: { readonly projectID: string }["projectID"] }
+
+export type OrchestraGetOutput = OrchestraState
+
+export type OrchestraMainInput = { readonly projectID: { readonly projectID: string }["projectID"] }
+
+export type OrchestraMainOutput = SessionInfo1
+
+export type OrchestraAccessInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly access: { readonly access: "hidden" | "read" | "write" | "full" }["access"]
+}
+
+export type OrchestraAccessOutput = void

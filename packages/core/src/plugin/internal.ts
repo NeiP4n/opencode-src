@@ -74,6 +74,8 @@ import { GrepTool } from "../tool/plugin/grep.js"
 import { McpResourceTools } from "../tool/plugin/mcp-resource.js"
 import { OpenCodeTools } from "../tool/plugin/opencode.js"
 import { HubTool } from "../tool/plugin/hub.js"
+import { OrchestraTool } from "../tool/plugin/orchestra.js"
+import { Orchestra } from "../orchestra.js"
 import { QuestionTool } from "../tool/plugin/question.js"
 import { ReadToolFileSystem } from "../tool/read-filesystem.js"
 import { ReadTool } from "../tool/plugin/read.js"
@@ -128,6 +130,7 @@ const services = [
   Integration.Service,
   Job.Service,
   KV.Service,
+  Orchestra.Service,
   LLMClient.Service,
   Location.Service,
   ManagedPolicy.Service,
@@ -181,6 +184,7 @@ export const requirements = LayerNode.group([
   Integration.node,
   Job.node,
   KV.node,
+  Orchestra.node,
   llmClient,
   Location.node,
   ManagedPolicy.node,
@@ -239,6 +243,7 @@ const pre = [
   QuestionTool.Plugin,
   ReadTool.Plugin,
   HubTool.Plugin,
+  OrchestraTool.Plugin,
   ShellTool.Plugin,
   SkillTool.Plugin,
   SubagentTool.Plugin,

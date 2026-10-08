@@ -34,6 +34,7 @@ import { VcsGroup } from "./groups/vcs.js"
 import { MigrationGroup } from "./groups/migration.js"
 import { ConfigGroup } from "./groups/config.js"
 import { RoomGroup } from "./groups/room.js"
+import { OrchestraGroup } from "./groups/orchestra.js"
 
 type LocationGroups<LocationId extends HttpApiMiddleware.AnyId> =
   | HttpApiGroup.AddMiddleware<typeof AgentGroup, LocationId>
@@ -98,6 +99,7 @@ type ApiGroups<
   | typeof PersistentPtyGroup
   | typeof CredentialGroup
   | typeof RoomGroup
+  | typeof OrchestraGroup
   | LocationGroups<LocationId>
   | LocationGroup<LocationId, LocationService>
   | PtyGroups<LocationId, LocationService>
@@ -190,6 +192,7 @@ const makeApiFromGroup = <
     .add(WebSearchGroup.middleware(locationMiddleware))
     .add(ConfigGroup.middleware(locationMiddleware))
     .add(RoomGroup)
+    .add(OrchestraGroup)
     .annotateMerge(
       OpenApi.annotations({
         title: "opencode HttpApi",

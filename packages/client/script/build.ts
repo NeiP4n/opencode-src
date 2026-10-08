@@ -6,6 +6,7 @@ import { Command } from "@opencode/schema/command"
 import { Config } from "@opencode/schema/config"
 import { Credential } from "@opencode/schema/credential"
 import { Room } from "@opencode/schema/room"
+import { Orchestra } from "@opencode/schema/orchestra"
 import { Event } from "@opencode/schema/event"
 import { EventLog } from "@opencode/schema/event-log"
 import { FileDiff } from "@opencode/schema/file-diff"
@@ -69,6 +70,7 @@ const effectTypeReferences = [
   ...namespaceTypes("Question", "@opencode/schema/question", Question),
   ...namespaceTypes("Reference", "@opencode/schema/reference", Reference),
   ...namespaceTypes("Room", "@opencode/schema/room", Room),
+  ...namespaceTypes("Orchestra", "@opencode/schema/orchestra", Orchestra),
   ...namespaceTypes("Session", "@opencode/schema/session", Session),
   ...namespaceTypes("SessionMessage", "@opencode/schema/session-message", SessionMessage),
   ...namespaceTypes("SessionInbox", "@opencode/schema/session-inbox", SessionInbox),

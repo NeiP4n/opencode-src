@@ -288,6 +288,12 @@ import type {
   RoomGuestPermissionListOutput,
   RoomGuestPermissionReplyInput,
   RoomGuestPermissionReplyOutput,
+  OrchestraGetInput,
+  OrchestraGetOutput,
+  OrchestraMainInput,
+  OrchestraMainOutput,
+  OrchestraAccessInput,
+  OrchestraAccessOutput,
 } from "./types.js"
 import { ClientError } from "./client-error.js"
 
@@ -2390,6 +2396,42 @@ export function make(options: ClientOptions) {
             ),
         },
       },
+    },
+    orchestra: {
+      get: (input: OrchestraGetInput, requestOptions?: RequestOptions) =>
+        request<OrchestraGetOutput>(
+          {
+            method: "GET",
+            path: `/api/orchestra/${encodeURIComponent(input.projectID)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      main: (input: OrchestraMainInput, requestOptions?: RequestOptions) =>
+        request<OrchestraMainOutput>(
+          {
+            method: "POST",
+            path: `/api/orchestra/${encodeURIComponent(input.projectID)}/main`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      access: (input: OrchestraAccessInput, requestOptions?: RequestOptions) =>
+        request<OrchestraAccessOutput>(
+          {
+            method: "PUT",
+            path: `/api/orchestra/access/${encodeURIComponent(input.sessionID)}`,
+            body: { access: input["access"] },
+            successStatus: 204,
+            declaredStatuses: [400, 401, 404],
+            empty: true,
+          },
+          requestOptions,
+        ),
     },
   }
 }
