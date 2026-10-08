@@ -115,6 +115,8 @@ import { SessionLocationMissing } from "./location-missing"
 import { isRecord } from "../../util/record"
 import { roomAuthor } from "../../util/room"
 import { RoomIndicator } from "../../component/room-indicator"
+import { NoteChip, NoteQuickActions } from "../../component/note-canvas"
+import { useNotes } from "../../context/notes"
 import { createHistoryPrepend } from "./history"
 import { context, use, type PendingAction } from "./render-context"
 import { INLINE_TOOL_ICON_WIDTH, InlineToolRow, ReasoningPart, TextPart, toolDisplay } from "./message-parts"
@@ -149,6 +151,7 @@ export function Session(props: {
   width?: number
 }) {
   const setEpilogue = useEpilogue()
+  const notes = useNotes()
   const clipboard = useClipboard()
   const writeExport = async (file: string, content: string) => {
     await mkdir(path.dirname(file), { recursive: true })
@@ -1426,7 +1429,13 @@ export function Session(props: {
             </box>
             <box height={1} flexShrink={0} flexDirection="row" justifyContent="flex-end">
               <box flexGrow={1} flexShrink={1} minWidth={0} flexDirection="row">
-                <RoomIndicator sessionID={route.sessionID} />
+                <Show when={!notes.canvas(route.sessionID) && notes.bound(route.sessionID)}>
+                  {(note) => <NoteChip sessionID={route.sessionID} note={note()} />}
+                </Show>
+                {/* The note document carries the indicator while it is shown. */}
+                <Show when={!notes.canvas(route.sessionID)}>
+                  <RoomIndicator sessionID={route.sessionID} />
+                </Show>
               </box>
               <Show when={firstJump()}>
                 <text fg={theme.text.feedback.info.base}>Loading session history…</text>
@@ -1450,6 +1459,9 @@ export function Session(props: {
                 <QueuedPromptDock prompts={queuedPrompts()} onOpen={openQueuedPrompts} />
               </Show>
               <Slot path="session.composer.top" input={{ sessionID: route.sessionID }} />
+              <Show when={notes.canvas(route.sessionID)}>
+                <NoteQuickActions />
+              </Show>
               <Composer
                 sessionID={route.sessionID}
                 open={composer.open || (!!session()?.parentID && forms().length === 0)}

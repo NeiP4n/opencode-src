@@ -1,5 +1,4 @@
 import { Hub } from "@opencode/core/hub/index"
-import { which } from "@opencode/core/util/which"
 
 // One row of the Registry panel: a binary the catalog depends on, how many
 // platform entries it gates, whether it is on PATH and whether the operator
@@ -37,11 +36,16 @@ export type RegistryOptions = {
   manager?: Hub.Manager
 }
 
-const TERMINALS: readonly Hub.Backend[] = ["bash", "nu", "pwsh"]
-
 export function hubRegistryStatus(options?: RegistryOptions): RegistryStatus {
-  const probe = options?.probe ?? ((tool: string) => which(tool) != null)
   const platform = options?.platform ?? process.platform
+  // Alias-aware: fd counts when Debian installed it as fdfind, pwsh when only
+  // Windows PowerShell 5.1 is there, and fresh winget/scoop installs count
+  // before the process PATH learns about them.
+  const probe = options?.probe ?? ((tool: string) => Hub.HubHost.has(tool, { platform }))
+  // A terminal is present when its backend has a shell to run in: on Windows
+  // bash means Git Bash, never the WSL launcher in System32.
+  const terminal =
+    options?.probe ?? ((backend: Hub.Backend) => Hub.HubHost.shellFor(backend, { platform }) !== undefined)
   const enabled = options?.enabled ?? {}
   const manager = options?.manager ?? Hub.detectManager(platform)
   const supported = Hub.all.filter((entry) => Hub.supportsPlatform(entry, platform))
@@ -68,9 +72,9 @@ export function hubRegistryStatus(options?: RegistryOptions): RegistryStatus {
     total: entries.length,
     installed: tools.filter((tool) => present.has(tool)),
     missing,
-    terminals: TERMINALS.map((name) => ({
+    terminals: Hub.HubHost.order(platform).map((name) => ({
       name,
-      present: probe(name),
+      present: terminal(name),
       installable: name !== "bash" && Hub.installable(name, manager) && manager !== undefined,
       manual: Hub.manualInstall(name, manager),
     })),

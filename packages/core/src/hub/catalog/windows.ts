@@ -2,8 +2,10 @@ export * as HubWindows from "./windows.js"
 
 import type { Entry } from "../types.js"
 
-// PowerShell-flavoured entries for Windows hosts. Only the pwsh backend is
-// offered; on other platforms these entries are filtered out by `platforms`.
+// PowerShell-flavoured entries for Windows hosts, written for both Windows
+// PowerShell 5.1 (always present) and PowerShell 7. They are the Windows
+// counterparts of the Linux-only system/process/network entries; on other
+// platforms they are filtered out by `platforms`.
 export const entries: Entry[] = [
   {
     id: "windows.processes",
@@ -96,5 +98,84 @@ export const entries: Entry[] = [
     requires: ["pwsh"],
     danger: true,
     templates: { pwsh: "Remove-Item -Path \"$env:TEMP\\*\" -Recurse -Force -ErrorAction SilentlyContinue" },
+  },
+  {
+    id: "windows.os",
+    title: "Windows version",
+    description: "Edition, version, build and architecture of Windows",
+    category: "windows",
+    platforms: ["win32"],
+    requires: ["pwsh"],
+    templates: { pwsh: "Get-CimInstance Win32_OperatingSystem | Format-List Caption, Version, BuildNumber, OSArchitecture" },
+  },
+  {
+    id: "windows.memory",
+    title: "Memory usage",
+    description: "Total and free physical memory in GB",
+    category: "windows",
+    platforms: ["win32"],
+    requires: ["pwsh"],
+    templates: {
+      pwsh: "Get-CimInstance Win32_OperatingSystem | Format-List @{n='TotalGB';e={[math]::Round($_.TotalVisibleMemorySize/1MB,1)}}, @{n='FreeGB';e={[math]::Round($_.FreePhysicalMemory/1MB,1)}}",
+    },
+  },
+  {
+    id: "windows.cpu",
+    title: "CPU model and cores",
+    description: "Processor model, core and thread count, max clock",
+    category: "windows",
+    platforms: ["win32"],
+    requires: ["pwsh"],
+    templates: { pwsh: "Get-CimInstance Win32_Processor | Format-List Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed" },
+  },
+  {
+    id: "windows.uptime",
+    title: "System uptime",
+    description: "Last boot time and how long Windows has been running",
+    category: "windows",
+    platforms: ["win32"],
+    requires: ["pwsh"],
+    templates: {
+      pwsh: "$b = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime; \"Booted $b, up $((Get-Date) - $b)\"",
+    },
+  },
+  {
+    id: "windows.ping",
+    title: "Ping a host",
+    description: "ICMP reachability and round-trip times",
+    category: "windows",
+    platforms: ["win32"],
+    requires: ["pwsh"],
+    templates: { pwsh: "Test-Connection -Count {count} {host}" },
+  },
+  {
+    id: "windows.kill-pid",
+    title: "Terminate a process by PID",
+    description: "Force-stop the process with the given id",
+    category: "windows",
+    platforms: ["win32"],
+    requires: ["pwsh"],
+    danger: true,
+    templates: { pwsh: "Stop-Process -Id {pid} -Force" },
+  },
+  {
+    id: "windows.find-process",
+    title: "Find a process by name",
+    description: "Running processes whose name matches a wildcard pattern",
+    category: "windows",
+    platforms: ["win32"],
+    requires: ["pwsh"],
+    templates: { pwsh: "Get-Process -Name {pattern} | Select-Object Id, Name, CPU, WorkingSet, Path" },
+  },
+  {
+    id: "windows.port-owner",
+    title: "Process listening on a port",
+    description: "Which process owns a listening TCP port",
+    category: "windows",
+    platforms: ["win32"],
+    requires: ["pwsh"],
+    templates: {
+      pwsh: "Get-NetTCPConnection -State Listen -LocalPort {port} | Select-Object LocalAddress, LocalPort, OwningProcess, @{n='Process';e={(Get-Process -Id $_.OwningProcess).Name}}",
+    },
   },
 ]

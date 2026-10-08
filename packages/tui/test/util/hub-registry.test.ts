@@ -52,7 +52,7 @@ test("installed and missing partition every requirement for any probe", () => {
   }
 })
 
-test("default probe mirrors which() on PATH", () => {
+test("default probe mirrors the alias-aware host probe", () => {
   const status = hubRegistryStatus({ manager: "apt" })
   expect(status.total).toBe(platformEntries().length)
   const missing = new Set(status.missing.map((entry) => entry.tool))
@@ -62,7 +62,23 @@ test("default probe mirrors which() on PATH", () => {
     expect(status.installed.includes(tool) !== missing.has(tool)).toBe(true)
   }
   expect(status.installed).toEqual([...status.installed].sort())
-  expect(status.terminals.map((terminal) => terminal.name)).toEqual(["bash", "nu", "pwsh"])
+  // Native shell first: bash on Linux and macOS, PowerShell on Windows
+  expect(status.terminals.map((terminal) => terminal.name)).toEqual(Hub.HubHost.order())
+  for (const terminal of status.terminals)
+    expect(terminal.present).toBe(Hub.HubHost.shellFor(terminal.name) !== undefined)
+})
+
+test("terminal order follows the platform", () => {
+  expect(hubRegistryStatus({ platform: "win32", probe: () => true }).terminals.map((t) => t.name)).toEqual([
+    "pwsh",
+    "bash",
+    "nu",
+  ])
+  expect(hubRegistryStatus({ platform: "linux", probe: () => true }).terminals.map((t) => t.name)).toEqual([
+    "bash",
+    "nu",
+    "pwsh",
+  ])
 })
 
 test("tool rows default to off, stay unique and lead with the most actionable tool", () => {
@@ -113,15 +129,27 @@ test("win32 platform filter stays fully ready and only drops the entries another
   const onlyWin32 = Hub.all.filter(
     (entry) => Hub.supportsPlatform(entry, "win32") && !Hub.supportsPlatform(entry, "linux"),
   )
+  const onlyLinux = Hub.all.filter(
+    (entry) => Hub.supportsPlatform(entry, "linux") && !Hub.supportsPlatform(entry, "win32"),
+  )
   expect(onlyWin32.length).toBeGreaterThan(0)
-  expect(win32.total - linux.total).toBe(onlyWin32.length)
+  expect(onlyLinux.length).toBeGreaterThan(0)
+  expect(win32.total - linux.total).toBe(onlyWin32.length - onlyLinux.length)
   expect(linux.total).toBe(Hub.all.length - onlyWin32.length)
 })
 
 test("absent tools with no package manager for the platform leave install undefined", () => {
-  // Deterministic on this Linux box: planFor("win32") probes winget, scoop and
-  // choco through the real which(), and none of those binaries exist on PATH.
-  const status = hubRegistryStatus({ platform: "win32", probe: () => false })
+  // PATH is emptied so the real which() finds no winget, scoop or choco on any
+  // host, Windows included.
+  const previous = process.env.PATH
+  process.env.PATH = ""
+  const status = (() => {
+    try {
+      return hubRegistryStatus({ platform: "win32", probe: () => false })
+    } finally {
+      process.env.PATH = previous
+    }
+  })()
   expect(status.missing.length).toBeGreaterThan(0)
   expect(status.missing.some((entry) => entry.tool === "rg")).toBe(true)
   expect(status.ready).toBeLessThan(status.total)

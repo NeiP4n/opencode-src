@@ -82,6 +82,7 @@ export const entries: Entry[] = [
     title: "Largest files under a path",
     description: "Show the biggest files recursively, sorted by size",
     category: "search",
+    platforms: ["linux", "win32"],
     templates: { bash: "find {path} -type f -printf '%s %p\\n' | sort -rn | head -{limit}" },
   },
   {
@@ -89,6 +90,7 @@ export const entries: Entry[] = [
     title: "Most recently modified files",
     description: "List files modified in the last N days, newest first",
     category: "search",
+    platforms: ["linux", "win32"],
     templates: { bash: "find {path} -type f -mtime -{days} -printf '%T@ %p\\n' | sort -rn | head -{limit}" },
   },
   {

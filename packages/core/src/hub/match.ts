@@ -1,68 +1,77 @@
 export * as HubMatch from "./match.js"
 
-import { get } from "./catalog/index.js"
-import { render } from "./resolve.js"
+// Thin matcher: upgrades a shell string the model wrote by hand to the fast
+// tool, but only when the result is the same answer. Flags restore what the
+// modern tools change by default (rg and fd skip hidden and .gitignored
+// files, fd matches case-insensitively), and patterns whose meaning differs
+// between grep's BRE and rg's regex are left alone. Anything not fully
+// recognized passes through untouched, which is the bash fallback.
+//
+// Captured tokens are copied verbatim, quotes included, so the rewrite stays
+// valid in whatever shell the command was written for — bash, sh, Git Bash or
+// PowerShell all read `rg … 'TODO' src` the same way.
 
-// Thin matcher: proposes a catalog command for a shell string the model
-// wrote by hand. It only fires on fully recognized shapes, and only when the
-// target tool is installed — otherwise the original command passes through
-// untouched, which is the bash fallback.
+// One shell word without expansions, pipes or redirections: bare, '…' or "…".
+const WORD = String.raw`(?:'[^']*'|"[^"\\$\x60]*"|[^\s'"\\$\x60|&;<>()]+)`
 
 type Rule = {
   // Anchored on purpose: partial rewrites of compound commands are refused.
   readonly pattern: RegExp
   readonly id: string
-  readonly args: (match: RegExpMatchArray) => Record<string, string>
+  readonly tool: string
+  readonly build: (match: RegExpMatchArray, name: string) => string | undefined
 }
+
+const unquote = (word: string) => (/^(['"]).*\1$/.test(word) ? word.slice(1, -1) : word)
+
+// Metacharacters whose meaning differs between grep's basic regex and rg:
+// literal in BRE, operators in rg (and backslash escapes flip both ways).
+const DIALECT = /[+?|{}()\\]/
 
 const RULES: Rule[] = [
   {
-    // grep -r pattern path  ->  rg pattern path
-    pattern: /^grep\s+-r\s+(\S+)\s+(\S+)$/,
+    // grep -r PATTERN PATH  ->  rg with grep's own output and file set
+    pattern: new RegExp(`^grep\\s+-r\\s+(${WORD})\\s+(${WORD})$`),
     id: "search.content",
-    args: (m) => ({ pattern: m[1], path: m[2] }),
+    tool: "rg",
+    build: (m, name) => {
+      if (DIALECT.test(unquote(m[1])) || unquote(m[1]).startsWith("-")) return undefined
+      return `${name} --no-heading --with-filename --no-line-number --hidden --no-ignore --no-messages ${m[1]} ${m[2]}`
+    },
   },
   {
-    // find path -name '*.ext'  ->  fd --type f --extension ext path
-    pattern: /^find\s+(\S+)\s+-name\s+['"]\*\.(\w+)['"]$/,
+    // find PATH -name '*.ext'  ->  fd over the same files, case-sensitive like find
+    pattern: new RegExp(`^find\\s+(${WORD})\\s+-name\\s+(['"])\\*\\.(\\w+)\\2$`),
     id: "search.glob-extension",
-    args: (m) => ({ path: m[1], extension: m[2] }),
+    tool: "fd",
+    build: (m, name) => `${name} --hidden --no-ignore --case-sensitive --glob '*.${m[3]}' ${m[1]}`,
   },
   {
-    // cat file | jq .  ->  jq . file (pretty-print via the dedicated entry)
-    pattern: /^cat\s+(\S+)\s*\|\s*jq\s+\.$/,
+    // cat file | jq .  ->  jq . file
+    pattern: new RegExp(`^cat\\s+(${WORD})\\s*\\|\\s*jq\\s+\\.$`),
     id: "json.pretty",
-    args: (m) => ({ file: m[1] }),
-  },
-  {
-    // cat file | sort | uniq -c | sort -rn  ->  catalog duplicate counter
-    pattern: /^cat\s+(\S+)\s*\|\s*sort\s*\|\s*uniq\s+-c\s*\|\s*sort\s+-rn$/,
-    id: "text.unique-count",
-    args: (m) => ({ file: m[1] }),
+    tool: "jq",
+    build: (m, name) => `${name} . ${m[1]}`,
   },
 ]
 
 // Returns a rewritten command plus its entry id, or undefined when nothing
-// safe matched. The rewritten command is still permission-checked by the
-// shell tool itself — this only swaps the string before the scan.
+// safe matched. `available` answers whether a tool resolves, optionally with
+// the name it has on this machine (`fdfind` on Debian). The rewritten command
+// is still permission-checked by the shell tool itself — this only swaps the
+// string before the scan.
 export function rewrite(
   command: string,
-  available: (tool: string) => boolean,
+  available: (tool: string) => boolean | string | undefined,
 ): { command: string; id: string } | undefined {
   const trimmed = command.trim()
   for (const rule of RULES) {
     const match = trimmed.match(rule.pattern)
     if (!match) continue
-    const entry = get(rule.id)
-    if (!entry) continue
-    const tool = (entry.requires ?? [])[0]
-    if (!tool || !available(tool)) continue
-    try {
-      return { command: render(entry, "bash", rule.args(match)), id: rule.id }
-    } catch {
-      // Args do not fit the template — refuse rather than guess.
-      continue
-    }
+    const found = available(rule.tool)
+    if (!found) continue
+    const built = rule.build(match, typeof found === "string" ? found : rule.tool)
+    if (built) return { command: built, id: rule.id }
   }
   return undefined
 }

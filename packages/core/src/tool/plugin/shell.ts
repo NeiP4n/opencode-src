@@ -19,7 +19,7 @@ import { ShellParse } from "../../shell/parse.js"
 import { ShellSelect } from "../../shell/select.js"
 import { ShellResult } from "../../shell/result.js"
 import { rewrite as hubRewrite } from "../../hub/match.js"
-import { which } from "../../util/which.js"
+import { HubHost } from "../../hub/host.js"
 
 export const name = "shell"
 export const DEFAULT_TIMEOUT_MS = 2 * 60 * 1_000
@@ -121,11 +121,11 @@ export const Plugin = {
 
     const prepare = Effect.fn("ShellTool.prepare")(function* (invocation: ShellCreateBefore, context: Tool.Context) {
       // Hub fast path: a recognized hand-written shape is transparently
-      // upgraded to its catalog command when the target tool is installed.
-      // The rewrite only fires on fully matched, tool-available shapes;
-      // everything else passes through untouched (bash stays the fallback),
-      // and the swapped string still goes through the permission scan below.
-      const hit = hubRewrite(invocation.command, (tool: string) => which(tool) !== undefined)
+      // upgraded to the fast tool when it gives the same answer and the tool
+      // is on the PATH the user's own shell sees (under its local name, e.g.
+      // fdfind on Debian). Everything else passes through untouched, and the
+      // swapped string still goes through the permission scan below.
+      const hit = hubRewrite(invocation.command, (tool: string) => HubHost.locate(tool, { extras: false })?.name)
       if (hit) invocation.command = hit.command
       const source = {
         type: "tool" as const,

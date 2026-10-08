@@ -9,7 +9,7 @@ export const entries: Entry[] = [
     title: "Sort lines",
     description: "Sort input lines, optionally numerically or uniquely",
     category: "text",
-    templates: { bash: "sort {flags} {file}" },
+    templates: { bash: "sort {flags*} {file}" },
   },
   {
     id: "text.unique-count",

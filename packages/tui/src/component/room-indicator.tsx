@@ -11,8 +11,6 @@ export function RoomIndicator(props: { sessionID: string }) {
   const client = useClient()
   const data = useData()
   const dialog = useDialog()
-  const theme = useTheme()
-  const [hovered, setHovered] = createSignal(false)
   const [rooms] = createResource(
     () => ({ sessionID: props.sessionID, revision: roomListRevision() }),
     () => client.api.room.list().catch(() => []),
@@ -21,30 +19,39 @@ export function RoomIndicator(props: { sessionID: string }) {
 
   return (
     <Show when={room()}>
-      {(room) => {
-        const guests = createMemo(() => roomGuests(data.session.message.list(props.sessionID), room().id))
-        return (
-          <box
-            id="session-room-indicator"
-            flexShrink={1}
-            minWidth={0}
-            onMouseOver={() => setHovered(true)}
-            onMouseOut={() => setHovered(false)}
-            onMouseUp={() => {
-              dialog.replace(() => <DialogHost onClose={() => dialog.clear()} />, undefined, { size: "large" })
-              dialog.setCentered(true)
-            }}
-          >
-            <text
-              fg={hovered() ? theme.text.action.secondary.hovered : theme.text.action.secondary.base}
-              wrapMode="none"
-              truncate
-            >
-              {`⇄ Multiplayer · ${room().name} · ${guests() === 0 ? "no guests yet" : `${guests()} guest${guests() === 1 ? "" : "s"}`}`}
-            </text>
-          </box>
-        )
-      }}
+      {(room) => (
+        <MultiplayerBadge
+          room={room().name}
+          guests={roomGuests(data.session.message.list(props.sessionID), room().id)}
+          onClick={() => {
+            dialog.replace(() => <DialogHost onClose={() => dialog.clear()} />, undefined, { size: "large" })
+            dialog.setCentered(true)
+          }}
+        />
+      )}
     </Show>
+  )
+}
+
+export function MultiplayerBadge(props: { room: string; guests: number; onClick: () => void }) {
+  const theme = useTheme()
+  const [hovered, setHovered] = createSignal(false)
+  return (
+    <box
+      id="session-room-indicator"
+      flexShrink={1}
+      minWidth={0}
+      onMouseOver={() => setHovered(true)}
+      onMouseOut={() => setHovered(false)}
+      onMouseUp={props.onClick}
+    >
+      <text
+        fg={hovered() ? theme.text.action.secondary.hovered : theme.text.action.secondary.base}
+        wrapMode="none"
+        truncate
+      >
+        {`⇄ Multiplayer · ${props.room} · ${props.guests === 0 ? "no guests yet" : `${props.guests} guest${props.guests === 1 ? "" : "s"}`}`}
+      </text>
+    </box>
   )
 }

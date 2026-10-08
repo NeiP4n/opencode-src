@@ -42,7 +42,7 @@ export const entries: Entry[] = [
     description: "Execute a command inside a running container",
     category: "docker",
     requires: ["docker"],
-    templates: { bash: "docker exec {container} {command}" },
+    templates: { bash: "docker exec {container} sh -c {command}" },
   },
   {
     id: "docker.images",

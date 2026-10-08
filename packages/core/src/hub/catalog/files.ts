@@ -55,6 +55,7 @@ export const entries: Entry[] = [
     title: "Make file executable",
     description: "Add execute permission for user, group and others",
     category: "files",
+    platforms: ["linux", "darwin"],
     templates: { bash: "chmod +x {path}" },
   },
   {
@@ -62,6 +63,7 @@ export const entries: Entry[] = [
     title: "Change file ownership",
     description: "Reassign user and group ownership of a path",
     category: "files",
+    platforms: ["linux", "darwin"],
     danger: true,
     templates: { bash: "chown {user}:{group} {path}" },
   },
