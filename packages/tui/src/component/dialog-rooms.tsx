@@ -1,5 +1,5 @@
 import { TextAttributes, type InputRenderable } from "@opentui/core"
-import { createResource, createSignal, For, Show, type JSX } from "solid-js"
+import { createResource, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js"
 import type { RoomInfo, RoomJoinCode } from "@opencode/client/promise"
 import { hostname } from "node:os"
 import { useConfig } from "../config"
@@ -11,6 +11,7 @@ import { useTheme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
+import { roomListChanged } from "../util/room"
 import { Button } from "./devtools-registry"
 import { DialogRoomChat, roomClient, type JoinedRoom } from "./dialog-room-chat"
 import { scanRooms, type FoundRoom } from "@opencode/client/room-discovery"
@@ -28,6 +29,12 @@ export function DialogHost(props: { onClose?: () => void }) {
   const [codes, setCodes] = createSignal<Readonly<Record<string, RoomJoinCode & { until: number }>>>({})
   const [armed, setArmed] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
+  // Drives the join code countdown while the window is open.
+  const [now, setNow] = createSignal(Date.now())
+  onMount(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    onCleanup(() => clearInterval(timer))
+  })
 
   const sessionID = () => (route.data.type === "session" ? route.data.sessionID : undefined)
   const shared = () => rooms()?.some((room) => room.sessionID === sessionID()) ?? false
@@ -45,20 +52,25 @@ export function DialogHost(props: { onClose?: () => void }) {
     await action()
       .then(() => refetch())
       .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
+    roomListChanged()
     setBusy(false)
   }
 
+  const issue = async (roomID: string) => {
+    const issued = await client.api.room.code({ roomID })
+    setNow(Date.now())
+    setCodes((previous) => ({ ...previous, [roomID]: { ...issued, until: Date.now() + issued.expires_in * 1000 } }))
+  }
+
+  // A new room is useless without a code, so hosting hands one out right away.
   const share = () => {
     const id = sessionID()
     if (!id) return
-    void run(() => client.api.room.create({ sessionID: id, name: data.session.get(id)?.title || undefined }))
-  }
-
-  const code = (room: RoomInfo) =>
     void run(async () => {
-      const issued = await client.api.room.code({ roomID: room.id })
-      setCodes((previous) => ({ ...previous, [room.id]: { ...issued, until: Date.now() + issued.expires_in * 1000 } }))
+      const room = await client.api.room.create({ sessionID: id, name: data.session.get(id)?.title || undefined })
+      await issue(room.id)
     })
+  }
 
   const close = (room: RoomInfo) => {
     if (armed() !== room.id) return setArmed(room.id)
@@ -106,7 +118,42 @@ export function DialogHost(props: { onClose?: () => void }) {
                 {room.name}
               </text>
             </Labeled>
-            <Labeled label="AI messages">
+            <Show
+              when={codes()[room.id]}
+              fallback={
+                <Labeled label="Join code">
+                  <text fg={theme.text.muted}>none yet</text>
+                </Labeled>
+              }
+            >
+              {(issued) => (
+                <Labeled label="Join code">
+                  <text fg={theme.text.base}>
+                    <span style={{ bold: true }}>{issued().code}</span>
+                    <Show
+                      when={issued().until > now()}
+                      fallback={<span style={{ fg: theme.text.feedback.warning.base }}>{"  expired"}</span>}
+                    >
+                      <span style={{ fg: theme.text.muted }}>{"  expires in " + countdown(issued().until - now())}</span>
+                    </Show>
+                  </text>
+                </Labeled>
+              )}
+            </Show>
+            <Setting label="Approvals" help="Who may allow or deny the AI when it asks to edit files or run commands.">
+              <Button
+                disabled={busy()}
+                onClick={() =>
+                  void run(() => client.api.room.update({ roomID: room.id, guestApprovals: !room.guestApprovals }))
+                }
+              >
+                {room.guestApprovals ? "Me and guests" : "Only me"}
+              </Button>
+            </Setting>
+            <Setting
+              label="AI outreach"
+              help="Where this session's AI may post on its own: rooms you linked, or any room it finds, asking you before each send."
+            >
               <Button
                 disabled={busy()}
                 onClick={() =>
@@ -115,33 +162,11 @@ export function DialogHost(props: { onClose?: () => void }) {
                   )
                 }
               >
-                {room.ai === "linked" ? "linked rooms only" : "any room, asking first"}
+                {room.ai === "linked" ? "Linked rooms only" : "Any room it finds"}
               </Button>
-            </Labeled>
-            <Labeled label="Approvals">
-              <Button
-                disabled={busy()}
-                onClick={() =>
-                  void run(() => client.api.room.update({ roomID: room.id, guestApprovals: !room.guestApprovals }))
-                }
-              >
-                {room.guestApprovals ? "me and guests" : "me only"}
-              </Button>
-            </Labeled>
-            <Show when={codes()[room.id]}>
-              {(issued) => (
-                <Labeled label="Join code">
-                  <text fg={theme.text.base}>
-                    <span style={{ bold: true }}>{issued().code}</span>
-                    <span style={{ fg: theme.text.muted }}>
-                      {`  valid until ${new Date(issued().until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
-                    </span>
-                  </text>
-                </Labeled>
-              )}
-            </Show>
+            </Setting>
             <box flexDirection="row" gap={1} paddingTop={1}>
-              <Button variant="primary" disabled={busy()} onClick={() => code(room)}>
+              <Button variant="primary" disabled={busy()} onClick={() => void run(() => issue(room.id))}>
                 {codes()[room.id] ? "New join code" : "Get join code"}
               </Button>
               <Button disabled={busy()} onLeave={() => setArmed()} onClick={() => close(room)}>
@@ -336,6 +361,28 @@ function Labeled(props: { label: string; children: JSX.Element }) {
       {props.children}
     </box>
   )
+}
+
+function Setting(props: { label: string; help: string; children: JSX.Element }) {
+  const theme = useTheme().surface("dialog")
+  return (
+    <box flexDirection="row">
+      <box width={LABEL_WIDTH} flexShrink={0}>
+        <text fg={theme.text.muted}>{props.label}</text>
+      </box>
+      <box flexShrink={1} minWidth={0}>
+        <box flexDirection="row">{props.children}</box>
+        <text fg={theme.text.muted} wrapMode="word">
+          {props.help}
+        </text>
+      </box>
+    </box>
+  )
+}
+
+function countdown(ms: number) {
+  const seconds = Math.floor(ms / 1000)
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
 }
 
 function Section(props: { title: string }) {

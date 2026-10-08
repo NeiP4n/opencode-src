@@ -113,6 +113,8 @@ import { createSingleFlight } from "../../util/single-flight"
 import { createDelayedPresence } from "../../util/delayed-presence"
 import { SessionLocationMissing } from "./location-missing"
 import { isRecord } from "../../util/record"
+import { roomAuthor } from "../../util/room"
+import { RoomIndicator } from "../../component/room-indicator"
 import { createHistoryPrepend } from "./history"
 import { context, use, type PendingAction } from "./render-context"
 import { INLINE_TOOL_ICON_WIDTH, InlineToolRow, ReasoningPart, TextPart, toolDisplay } from "./message-parts"
@@ -1423,6 +1425,9 @@ export function Session(props: {
               </scrollbox>
             </box>
             <box height={1} flexShrink={0} flexDirection="row" justifyContent="flex-end">
+              <box flexGrow={1} flexShrink={1} minWidth={0} flexDirection="row">
+                <RoomIndicator sessionID={route.sessionID} />
+              </box>
               <Show when={firstJump()}>
                 <text fg={theme.text.feedback.info.base}>Loading session history…</text>
               </Show>
@@ -2200,6 +2205,7 @@ function UserMessage(props: { message: SessionMessageUser }) {
   const [hover, setHover] = createSignal(false)
   const color = createMemo(() => local.agent.color(data.session.get(ctx.sessionID)?.agent ?? "build"))
   const delivery = createMemo(() => ctx.pendingDelivery(props.message.id))
+  const guest = createMemo(() => roomAuthor(props.message.metadata)?.guest.name)
   const dialog = useDialog()
   const renderer = useRenderer()
   const promptRef = usePromptRef()
@@ -2257,6 +2263,13 @@ function UserMessage(props: { message: SessionMessageUser }) {
           backgroundColor={hover() ? theme.decrease(theme.background.raised.base) : theme.background.raised.base}
           flexShrink={0}
         >
+          <Show when={guest()}>
+            {(name) => (
+              <text fg={theme.text.muted} wrapMode="none" truncate>
+                {`${name()} · via room`}
+              </text>
+            )}
+          </Show>
           <text fg={theme.text.base}>{props.message.text}</text>
           <Show when={skills().length}>
             <box flexDirection="row" paddingTop={1} gap={1} flexWrap="wrap">

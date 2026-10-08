@@ -229,7 +229,7 @@ test("pager moves to the second page of tools", async () => {
 })
 
 test("every catalog tool gets exactly one row", async () => {
-  await using tmp = await tmpdir()
+  await using _tmp = await tmpdir()
   const status = hubRegistryStatus({ probe })
   const required = new Set(
     Hub.all.filter((entry) => Hub.supportsPlatform(entry)).flatMap((entry) => entry.requires ?? []),
@@ -283,6 +283,40 @@ test("the AI terminal can be installed and chosen", async () => {
     await app.waitForFrame((frame) => frame.includes("● bash"))
     expect((await HubState.read({ directory: tmp.path })).terminal).toBe("bash")
     expect(shells).toEqual(["bash"])
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
+test("a mirror 404 offers a system update that clears the warning", async () => {
+  await using tmp = await tmpdir()
+  let updates = 0
+  const app = await render({
+    probe,
+    directory: tmp.path,
+    install: async () => ({
+      ok: false,
+      exit: 1,
+      output:
+        "sudo pacman -S --noconfirm ripgrep\nerror: failed retrieving file 'ripgrep.pkg.tar.zst' from mirror : The requested URL returned error: 404",
+      command: "sudo pacman -S --noconfirm ripgrep",
+    }),
+    update: async () => {
+      updates++
+      return { ok: true, exit: 0, output: "", command: "sudo pacman -Syu --noconfirm" }
+    },
+  })
+  try {
+    const { x, y } = cell(app, "rg", "Install")
+    await app.mockMouse.click(x, y)
+    const frame = await app.waitForFrame((frame) => frame.includes("Update system"))
+    expect(frame).toContain("The package databases are outdated")
+
+    const lines = frame.split("\n")
+    const row = lines.findIndex((line) => line.includes("Update system"))
+    await app.mockMouse.click(lines[row].indexOf("Update system") + 2, row)
+    await app.waitForFrame((frame) => frame.includes("system updated") && !frame.includes("databases are outdated"))
+    expect(updates).toBe(1)
   } finally {
     app.renderer.destroy()
   }

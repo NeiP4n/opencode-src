@@ -12,9 +12,10 @@ export function selfCommand() {
 
 // A source checkout started from another directory finds its bunfig (and the JSX
 // preload in it) only through --config; children start in the caller's directory
-// too, so they need the same flag.
+// too, so they need the same flag. A preload given by absolute path travels the
+// same way, for launchers that start from a directory owning a foreign node_modules.
 function bunFlags() {
-  return process.execArgv.filter((arg) => arg.startsWith("--config="))
+  return process.execArgv.filter((arg) => arg.startsWith("--config=") || arg.startsWith("--preload="))
 }
 
 function nodeFlags() {

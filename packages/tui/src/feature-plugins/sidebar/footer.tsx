@@ -5,6 +5,7 @@ import { FilePath } from "../../ui/file-path"
 import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
 import { usePromptMove } from "../../component/prompt/move"
 import { hasConnectedProvider } from "../../util/connected-provider"
+import { SESSION_SIDEBAR_WIDTH } from "../../ui/layout"
 
 export function SidebarOnboarding(props: { context: Plugin.Context; sessionID: string }) {
   const dimensions = useTerminalDimensions()
@@ -56,7 +57,7 @@ export function SidebarOnboarding(props: { context: Plugin.Context; sessionID: s
           </box>
           <text fg={props.context.theme.text.muted}>Opencode++ includes free models so you can start immediately.</text>
           <text fg={props.context.theme.text.muted}>
-            Connect from 75+ providers to use other models, including Claude, GPT, Gemini etc
+            Connect one of 75+ providers to use other models, including Claude, GPT and Gemini.
           </text>
           <box
             id="sidebar.footer.getting-started.connect"
@@ -103,7 +104,7 @@ function SidebarFooter(props: { context: Plugin.Context; sessionID: string }) {
           >
             <FilePath
               value={value()}
-              maxWidth={38}
+              maxWidth={SESSION_SIDEBAR_WIDTH - 4}
               fg={actions.hovered() ? props.context.theme.text.base : props.context.theme.text.muted}
             />
           </box>

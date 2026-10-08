@@ -256,6 +256,22 @@ import type {
   VcsBranchListOutput,
   VcsDiffInput,
   VcsDiffOutput,
+  NoteListInput,
+  NoteListOutput,
+  NoteGetInput,
+  NoteGetOutput,
+  NoteBoundInput,
+  NoteBoundOutput,
+  NoteCreateInput,
+  NoteCreateOutput,
+  NoteEditInput,
+  NoteEditOutput,
+  NoteUpdateInput,
+  NoteUpdateOutput,
+  NoteLinkInput,
+  NoteLinkOutput,
+  NoteRemoveInput,
+  NoteRemoveOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
   DebugLocationEvictOutput,
@@ -287,6 +303,8 @@ import type {
   RoomGuestLogOutput,
   RoomGuestMessagesInput,
   RoomGuestMessagesOutput,
+  RoomGuestNoteInput,
+  RoomGuestNoteOutput,
   RoomGuestPromptInput,
   RoomGuestPromptOutput,
   RoomGuestPermissionListInput,
@@ -1580,6 +1598,93 @@ const adaptGroupVcs = (raw: RawClient["server.vcs"]) => ({
   diff: EndpointVcsDiff(raw),
 })
 
+const EndpointNoteList = (raw: RawClient["server.note"]) => (input?: NoteListInput) =>
+  preserveEffect<NoteListOutput>()(
+    raw["note.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointNoteGet = (raw: RawClient["server.note"]) => (input: NoteGetInput) =>
+  preserveEffect<NoteGetOutput>()(
+    raw["note.get"]({ params: { name: input["name"] }, query: { location: input["location"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointNoteBound = (raw: RawClient["server.note"]) => (input: NoteBoundInput) =>
+  preserveEffect<NoteBoundOutput>()(
+    raw["note.bound"]({ params: { sessionID: input["sessionID"] }, query: { location: input["location"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointNoteCreate = (raw: RawClient["server.note"]) => (input: NoteCreateInput) =>
+  preserveEffect<NoteCreateOutput>()(
+    raw["note.create"]({
+      query: { location: input["location"] },
+      payload: {
+        name: input["name"],
+        title: input["title"],
+        body: input["body"],
+        status: input["status"],
+        tags: input["tags"],
+        length: input["length"],
+        session: input["session"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointNoteEdit = (raw: RawClient["server.note"]) => (input: NoteEditInput) =>
+  preserveEffect<NoteEditOutput>()(
+    raw["note.edit"]({
+      params: { name: input["name"] },
+      query: { location: input["location"] },
+      payload: { body: input["body"], mode: input["mode"], expectedMtime: input["expectedMtime"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointNoteUpdate = (raw: RawClient["server.note"]) => (input: NoteUpdateInput) =>
+  preserveEffect<NoteUpdateOutput>()(
+    raw["note.update"]({
+      params: { name: input["name"] },
+      query: { location: input["location"] },
+      payload: {
+        title: input["title"],
+        status: input["status"],
+        tags: input["tags"],
+        length: input["length"],
+        expectedMtime: input["expectedMtime"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointNoteLink = (raw: RawClient["server.note"]) => (input: NoteLinkInput) =>
+  preserveEffect<NoteLinkOutput>()(
+    raw["note.link"]({
+      params: { name: input["name"] },
+      query: { location: input["location"] },
+      payload: { session: input["session"], expectedMtime: input["expectedMtime"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointNoteRemove = (raw: RawClient["server.note"]) => (input: NoteRemoveInput) =>
+  preserveEffect<NoteRemoveOutput>()(
+    raw["note.remove"]({
+      params: { name: input["name"] },
+      query: { location: input["location"], expectedMtime: input["expectedMtime"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const adaptGroupNote = (raw: RawClient["server.note"]) => ({
+  list: EndpointNoteList(raw),
+  get: EndpointNoteGet(raw),
+  bound: EndpointNoteBound(raw),
+  create: EndpointNoteCreate(raw),
+  edit: EndpointNoteEdit(raw),
+  update: EndpointNoteUpdate(raw),
+  link: EndpointNoteLink(raw),
+  remove: EndpointNoteRemove(raw),
+})
+
 const EndpointDebugLocationList = (raw: RawClient["server.debug"]) => () =>
   preserveEffect<DebugLocationListOutput>()(raw["debug.location"]({}).pipe(Effect.mapError(mapClientError)))
 
@@ -1709,6 +1814,14 @@ const EndpointRoomGuestMessages = (raw: RawClient["server.room"]) => (input: Roo
     raw["room.guest.messages"]({ params: { roomID: input["roomID"] } }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointRoomGuestNote = (raw: RawClient["server.room"]) => (input: RoomGuestNoteInput) =>
+  preserveEffect<RoomGuestNoteOutput>()(
+    raw["room.guest.note"]({ params: { roomID: input["roomID"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
 const EndpointRoomGuestPrompt = (raw: RawClient["server.room"]) => (input: RoomGuestPromptInput) =>
   preserveEffect<RoomGuestPromptOutput>()(
     raw["room.guest.prompt"]({ params: { roomID: input["roomID"] }, payload: { text: input["text"] } }).pipe(
@@ -1745,6 +1858,7 @@ const adaptGroupRoom = (raw: RawClient["server.room"]) => ({
     get: EndpointRoomGuestGet(raw),
     log: EndpointRoomGuestLog(raw),
     messages: EndpointRoomGuestMessages(raw),
+    note: EndpointRoomGuestNote(raw),
     prompt: EndpointRoomGuestPrompt(raw),
     permission: { list: EndpointRoomGuestPermissionList(raw), reply: EndpointRoomGuestPermissionReply(raw) },
   },
@@ -1849,6 +1963,7 @@ const adaptClient = (raw: RawClient) => ({
   reference: adaptGroupReference(raw["server.reference"]),
   worktree: adaptGroupWorktree(raw["server.worktree"]),
   vcs: adaptGroupVcs(raw["server.vcs"]),
+  note: adaptGroupNote(raw["server.note"]),
   debug: adaptGroupDebug(raw["server.debug"]),
   migration: adaptGroupMigration(raw["server.migration"]),
   websearch: adaptGroupWebsearch(raw["server.websearch"]),

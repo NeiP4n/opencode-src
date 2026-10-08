@@ -8,6 +8,7 @@ import { parse, type ParseError } from "jsonc-parser"
 import path from "node:path"
 import { stripVTControlCharacters } from "node:util"
 import { RetainedImage } from "./retained-image"
+import { SourceRelease } from "./source-release"
 import { action, parseReleaseVersion, type Policy } from "./updater-action"
 import { errorMessage } from "../util/error"
 
@@ -453,6 +454,11 @@ const make = Effect.gen(function* () {
   })
 
   const inspect = Effect.fnUntraced(function* () {
+    if (OPENCODE_LOCAL) {
+      // A release checkout only announces new releases; installing waits for the operator.
+      const release = yield* sourceRelease()
+      if (release?.available) return { policy: "notify" as const, version: release.available }
+    }
     if (OPENCODE_LOCAL || ["1", "true"].includes(process.env.OPENCODE_DISABLE_AUTOUPDATE?.toLowerCase() ?? "")) {
       yield* Effect.logInfo("update check skipped", {
         reason: OPENCODE_LOCAL ? "local-install" : "disabled",
@@ -496,10 +502,25 @@ const make = Effect.gen(function* () {
   })
 
   const apply = Effect.fn("cli.updater.apply")(function* (version: string) {
+    if (OPENCODE_LOCAL && (yield* sourceRelease()))
+      return yield* Effect.tryPromise({
+        try: () => SourceRelease.apply(version),
+        catch: (cause) =>
+          new UpgradeError(
+            {
+              title: "Could not update Opencode++",
+              detail: errorDetail(cause),
+              retry: "Check the internet connection, then try the update again.",
+            },
+            { cause },
+          ),
+      })
     if (!(yield* install(version))) return yield* Effect.fail(new Error("Installation method not found"))
   })
 
   const check = Effect.fn("cli.updater.check")(function* () {
+    const release = OPENCODE_LOCAL ? yield* sourceRelease() : undefined
+    if (release) return release.available ? { type: "available" as const, version: release.available } : undefined
     if (OPENCODE_LOCAL)
       return {
         type: "unavailable" as const,
@@ -528,6 +549,15 @@ const make = Effect.gen(function* () {
     },
     Effect.catch((error) => Effect.logWarning("update check failed", { error }).pipe(Effect.as(undefined))),
   )
+
+  // The release this source checkout is pinned to and a newer published one, if any.
+  // Undefined for development trees, which never update themselves.
+  const sourceRelease = Effect.fnUntraced(function* () {
+    const pinned = yield* Effect.promise(() => SourceRelease.current())
+    if (!pinned) return undefined
+    const newest = yield* Effect.tryPromise(() => SourceRelease.latest()).pipe(Effect.orElseSucceed(() => undefined))
+    return { current: pinned, available: newest && Bun.semver.order(newest, pinned) > 0 ? newest : undefined }
+  })
 
   return Service.of({ run, check, apply, method, latest, upgrade, removal })
 })

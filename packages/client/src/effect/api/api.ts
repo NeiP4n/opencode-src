@@ -36,6 +36,7 @@ import type { PtyTicket } from "@opencode/schema/pty-ticket"
 import type { Reference } from "@opencode/schema/reference"
 import type { Worktree } from "@opencode/schema/worktree"
 import type { Vcs } from "@opencode/schema/vcs"
+import type { Note } from "@opencode/schema/note"
 import type { WebSearch } from "@opencode/schema/websearch"
 import type { Config } from "@opencode/schema/config"
 import type { Room } from "@opencode/schema/room"
@@ -2333,6 +2334,87 @@ export interface VcsApi<E = never> {
   readonly diff: VcsDiffOperation<E>
 }
 
+export type NoteListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type NoteListOutput = { readonly location: Location.PublicRef; readonly data: ReadonlyArray<Note.Info> }
+export type NoteListOperation<E = never> = (input?: NoteListInput) => Effect.Effect<NoteListOutput, E>
+
+export type NoteGetInput = {
+  readonly name: string
+  readonly location?: { readonly directory?: string | undefined } | undefined
+}
+export type NoteGetOutput = { readonly location: Location.PublicRef; readonly data: Note.Info }
+export type NoteGetOperation<E = never> = (input: NoteGetInput) => Effect.Effect<NoteGetOutput, E>
+
+export type NoteBoundInput = {
+  readonly sessionID: Session.ID
+  readonly location?: { readonly directory?: string | undefined } | undefined
+}
+export type NoteBoundOutput = { readonly location: Location.PublicRef; readonly data: Note.Info | null }
+export type NoteBoundOperation<E = never> = (input: NoteBoundInput) => Effect.Effect<NoteBoundOutput, E>
+
+export type NoteCreateInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly name?: string | undefined
+  readonly title: string
+  readonly body?: string | undefined
+  readonly status?: Note.Status | undefined
+  readonly tags?: ReadonlyArray<Note.Tag> | undefined
+  readonly length?: Note.Length | undefined
+  readonly session?: Session.ID | undefined
+}
+export type NoteCreateOutput = { readonly location: Location.PublicRef; readonly data: Note.Info }
+export type NoteCreateOperation<E = never> = (input: NoteCreateInput) => Effect.Effect<NoteCreateOutput, E>
+
+export type NoteEditInput = {
+  readonly name: string
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly body: string
+  readonly mode?: "replace" | "append" | undefined
+  readonly expectedMtime: number
+}
+export type NoteEditOutput = { readonly location: Location.PublicRef; readonly data: Note.Info }
+export type NoteEditOperation<E = never> = (input: NoteEditInput) => Effect.Effect<NoteEditOutput, E>
+
+export type NoteUpdateInput = {
+  readonly name: string
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly title?: string | undefined
+  readonly status?: Note.Status | undefined
+  readonly tags?: ReadonlyArray<Note.Tag> | undefined
+  readonly length?: Note.Length | undefined
+  readonly expectedMtime: number
+}
+export type NoteUpdateOutput = { readonly location: Location.PublicRef; readonly data: Note.Info }
+export type NoteUpdateOperation<E = never> = (input: NoteUpdateInput) => Effect.Effect<NoteUpdateOutput, E>
+
+export type NoteLinkInput = {
+  readonly name: string
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly session?: Session.ID | undefined
+  readonly expectedMtime: number
+}
+export type NoteLinkOutput = { readonly location: Location.PublicRef; readonly data: Note.Info }
+export type NoteLinkOperation<E = never> = (input: NoteLinkInput) => Effect.Effect<NoteLinkOutput, E>
+
+export type NoteRemoveInput = {
+  readonly name: string
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly expectedMtime: number
+}
+export type NoteRemoveOutput = void
+export type NoteRemoveOperation<E = never> = (input: NoteRemoveInput) => Effect.Effect<NoteRemoveOutput, E>
+
+export interface NoteApi<E = never> {
+  readonly list: NoteListOperation<E>
+  readonly get: NoteGetOperation<E>
+  readonly bound: NoteBoundOperation<E>
+  readonly create: NoteCreateOperation<E>
+  readonly edit: NoteEditOperation<E>
+  readonly update: NoteUpdateOperation<E>
+  readonly link: NoteLinkOperation<E>
+  readonly remove: NoteRemoveOperation<E>
+}
+
 export type DebugLocationListOutput = ReadonlyArray<Location.PublicRef>
 export type DebugLocationListOperation<E = never> = () => Effect.Effect<DebugLocationListOutput, E>
 
@@ -3401,10 +3483,18 @@ export type RoomGuestLogOutput =
 export type RoomGuestLogOperation<E = never> = (input: RoomGuestLogInput) => Stream.Stream<RoomGuestLogOutput, E>
 
 export type RoomGuestMessagesInput = { readonly roomID: Room.ID }
-export type RoomGuestMessagesOutput = { readonly data: ReadonlyArray<Room.Message>; readonly running: boolean }
+export type RoomGuestMessagesOutput = {
+  readonly data: ReadonlyArray<Room.Message>
+  readonly running: boolean
+  readonly note?: { readonly name: Note.Slug; readonly title: string } | undefined
+}
 export type RoomGuestMessagesOperation<E = never> = (
   input: RoomGuestMessagesInput,
 ) => Effect.Effect<RoomGuestMessagesOutput, E>
+
+export type RoomGuestNoteInput = { readonly roomID: Room.ID }
+export type RoomGuestNoteOutput = Note.Info | null
+export type RoomGuestNoteOperation<E = never> = (input: RoomGuestNoteInput) => Effect.Effect<RoomGuestNoteOutput, E>
 
 export type RoomGuestPromptInput = { readonly roomID: Room.ID; readonly text: string }
 export type RoomGuestPromptOutput = SessionInbox.User
@@ -3441,6 +3531,7 @@ export interface RoomApi<E = never> {
     readonly get: RoomGuestGetOperation<E>
     readonly log: RoomGuestLogOperation<E>
     readonly messages: RoomGuestMessagesOperation<E>
+    readonly note: RoomGuestNoteOperation<E>
     readonly prompt: RoomGuestPromptOperation<E>
     readonly permission: {
       readonly list: RoomGuestPermissionListOperation<E>
@@ -3550,6 +3641,7 @@ export interface AppApi<E = never> {
   readonly reference: ReferenceApi<E>
   readonly worktree: WorktreeApi<E>
   readonly vcs: VcsApi<E>
+  readonly note: NoteApi<E>
   readonly debug: DebugApi<E>
   readonly migration: MigrationApi<E>
   readonly websearch: WebsearchApi<E>

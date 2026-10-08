@@ -44,6 +44,13 @@ describe("InstructionBuiltIns", () => {
         [
           `Today's date: ${localDate(timestamp)}`,
           "",
+          "<notes>",
+          "  Notes are markdown files in .opencode/notes/, one file per note; the file name is the note id.",
+          "  Write a note when a plan, decision, spec or summary has to outlive this chat.",
+          "  Do not write a note that only restates the chat or answers a trivial question.",
+          "  A note can be bound to the current chat so the session opens it later.",
+          "</notes>",
+          "",
           "Here is some useful information about the environment you are running in:",
           "<env>",
           `  Working directory: ${directory}`,

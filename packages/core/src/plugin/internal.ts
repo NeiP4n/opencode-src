@@ -80,6 +80,8 @@ import { QuestionTool } from "../tool/plugin/question.js"
 import { ReadToolFileSystem } from "../tool/read-filesystem.js"
 import { ReadTool } from "../tool/plugin/read.js"
 import { ShellTool } from "../tool/plugin/shell.js"
+import { NoteTool } from "../tool/plugin/note.js"
+import { NoteStore } from "../note.js"
 import { SkillTool } from "../tool/plugin/skill.js"
 import { SubagentTool } from "../tool/plugin/subagent.js"
 import { Tool } from "../tool.js"
@@ -149,6 +151,7 @@ const services = [
   Shell.Service,
   ShellSelect.Service,
   Snapshot.Service,
+  NoteStore.Service,
   Skill.Service,
   SkillDiscovery.Service,
   Tool.Service,
@@ -203,6 +206,7 @@ export const requirements = LayerNode.group([
   Shell.node,
   ShellSelect.node,
   Snapshot.node,
+  NoteStore.node,
   Skill.node,
   SkillDiscovery.node,
   Tool.node,
@@ -246,6 +250,7 @@ const pre = [
   OrchestraTool.Plugin,
   ShellTool.Plugin,
   SkillTool.Plugin,
+  NoteTool.Plugin,
   SubagentTool.Plugin,
   WebFetchTool.Plugin,
   WebSearchTool.Plugin,

@@ -35,6 +35,7 @@ export type RegistryPanelOptions = RegistryOptions & {
   // Package-manager actions; tests replace them so no command ever runs.
   install?: (tool: string) => Promise<Hub.ActionResult>
   remove?: (tool: string) => Promise<Hub.ActionResult>
+  update?: () => Promise<Hub.ActionResult>
 }
 
 export function RegistryPanel(props: {
@@ -59,6 +60,7 @@ export function RegistryPanel(props: {
   const [cursor, setCursor] = createSignal(0)
   const [query, setQuery] = createSignal("")
   const [terminal, setTerminal] = createSignal<Hub.Backend>()
+  const [stale, setStale] = createSignal(false)
   const config = useConfig().data
 
   // A click that lands before the state file resolves is the operator's newest
@@ -123,7 +125,7 @@ export function RegistryPanel(props: {
 
   const runAction = async (
     tool: string,
-    verb: "installed" | "removed",
+    verb: "installed" | "removed" | "updated",
     action: (tool: string) => Promise<Hub.ActionResult>,
   ) => {
     setBusy(tool)
@@ -134,6 +136,8 @@ export function RegistryPanel(props: {
       output: error instanceof Error ? error.message : String(error),
       command: "",
     }))
+    // A mirror 404 means the databases are stale; only a system update fixes the next install.
+    setStale(!result.ok && Hub.HubActions.staleDatabase(result.output))
     // The note pins the command to rerun by hand, while the toast says why it failed.
     const reason = Hub.HubActions.failureReason(result.output)
     setMessage(result.ok ? `${tool} ${verb}` : `${tool}: ${result.command || reason}`)
@@ -382,6 +386,20 @@ export function RegistryPanel(props: {
         </Show>
       </box>
 
+      <Show when={stale()}>
+        <text fg={theme.text.feedback.warning.base} wrapMode="word">
+          The package databases are outdated, so installs fail. Update the system, then install again.
+        </text>
+        <box flexDirection="row">
+          <Button
+            variant="primary"
+            disabled={busy() !== undefined}
+            onClick={() => void runAction("system", "updated", () => (options.update ?? Hub.HubActions.updateSystem)())}
+          >
+            Update system
+          </Button>
+        </box>
+      </Show>
       <Show when={message()}>
         {(text) => (
           <text fg={theme.text.muted} wrapMode="word">

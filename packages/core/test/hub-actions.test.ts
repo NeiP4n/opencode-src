@@ -3,7 +3,7 @@ import { symlink, writeFile } from "node:fs/promises"
 import path from "path"
 import { failureReason, installTool, removeTool, type RunResult, type Runner } from "@opencode/core/hub/actions"
 import { tmpdir } from "./fixture/tmpdir"
-import { Hub } from "@opencode/core/hub/index"
+import { Hub, HubActions } from "@opencode/core/hub/index"
 
 // A PATH holding only fake manager binaries: detection still sees the manager,
 // but no real package manager can ever be executed from a test.
@@ -167,5 +167,22 @@ describe("terminal installs", () => {
     expect(Hub.installable("pwsh", "pacman")).toBe(false)
     expect(Hub.manualInstall("pwsh", "pacman")).toContain("powershell-bin")
     expect(Hub.installable("pwsh", "apt")).toBe(true)
+  })
+})
+
+describe("stale package databases", () => {
+  test("a mirror 404 is recognised and explained", () => {
+    const output =
+      "sudo pacman -S --noconfirm nushell\nошибка: не удалось получить файл 'nushell-0.115.1-1.1-x86_64_v4.pkg.tar.zst' из cdn77.cachyos.org : The requested URL returned error: 404"
+    expect(HubActions.staleDatabase(output)).toBe(true)
+    expect(failureReason(output)).toBe("the package databases are outdated: update the system, then install again")
+    expect(HubActions.staleDatabase("error: target not found: foo")).toBe(false)
+  })
+
+  test("updating the system on Arch is a full upgrade, never a bare database sync", async () => {
+    await using bin = await fakeBin({ pacman: "exit 0" })
+    const { runner, calls } = recorder({ exit: 0, stdout: "", stderr: "" })
+    await withPath(bin.path, () => HubActions.updateSystem({ platform: "linux", runner }))
+    expect(calls).toEqual(["sudo pacman -Syu --noconfirm"])
   })
 })

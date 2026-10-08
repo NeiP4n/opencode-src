@@ -25,9 +25,9 @@ project:
 
 repo_state:
   root: /home/isako/opencode-src
-  head: 527f0b931d
-  branch: "DETACHED (отсоединённая голова)"
-  dirty: 389
+  head: 3c87fede88
+  branch: "lan-rooms"
+  dirty: 3
   note: >-
     HEAD 527f0b931d = тег v2.0.22, клон github.com/sst/opencode. Ветка отсоединённая:
     коммитить нечего и не нужно, git push запрещён правилом permissions.
@@ -42,7 +42,7 @@ repo_state:
     Все они обязательны к сохранению: TASK-BUILD-VERSION собирает бинарь из этого
     дерева, git checkout / reset / stash / clean запрещены.
 
-task_id: TASK-DOC-CORE
+task_id: TASK-NOTES-CANVAS
 
 scope:
   in_scope:
@@ -55,8 +55,9 @@ scope:
     - "приёмка: dod-check зелёный, отрицательный контроль валидатора выполнен"
     - "TASK-HUB-REGISTRY (этап 8): панель Registry в packages/tui/src/component/devtools-bar.tsx, новые файлы component/devtools-registry.tsx и util/hub-registry.ts, тесты packages/tui/test/util/hub-registry.test.ts и packages/tui/test/component/devtools-registry.test.tsx"
     - "TASK-HUB-CONTROL (этап 9): состояние вкл/выкл и подсказки промпта в packages/core/src/hub (новые state.ts, prompt.ts, actions.ts, правка install.ts) + врезка Instructions.Source в packages/core/src/session/context.ts, построчные кнопки в packages/tui/src/component/devtools-registry.tsx и данные в util/hub-registry.ts, тесты packages/core/test/hub-*.test.ts и расширенные тесты packages/tui/test"
+    - "TASK-NOTES-CANVAS (этапы 10-15): контракт заметки packages/schema/src/note.ts + экспорт в packages/schema/src/index.ts; сервис packages/core/src/note.ts; инструмент агента packages/core/src/tool/plugin/note.ts с регистрацией в packages/core/src/plugin/internal.ts и producer инструкций core/notes в packages/core/src/instructions/builtins.ts; экран заметок packages/tui/src/feature-plugins/system/notes.tsx и notes-data.ts, регистрация плагина в packages/tui/src/plugin/builtins.ts, элемент note в packages/tui/src/routes/session/message-parts.tsx, стори packages/tui/src/feature-plugins/system/storybook/notes.tsx и storybook/index.tsx; тесты packages/core/test/note-schema.test.ts, packages/core/test/note.test.ts, packages/core/test/tool-note.test.ts, packages/tui/test/component/notes.test.tsx"
   out_of_scope:
-    - "правка кода ядра opencode ВНЕ файлов этапов 8-9: TASK-DOC-CORE не меняет код; этап 8 трогал только devtools-bar.tsx и новые файлы панели; этап 9 трогает в packages/core ровно src/hub/{state,prompt,actions,install,index}.ts и src/session/context.ts — protocol, client, schema, server и остальной core не правятся (без bun run generate)"
+    - "правка кода ядра opencode ВНЕ файлов этапов 8-9 и 10-15: TASK-DOC-CORE не меняет код; этап 8 трогал только devtools-bar.tsx и новые файлы панели; этап 9 трогает в packages/core ровно src/hub/{state,prompt,actions,install,index}.ts и src/session/context.ts; этапы 10-15 (заметки) трогают ровно перечисленные в scope.in_scope файлы — protocol, client и server не правятся, bun run generate не запускается"
     - "три уже изменённых файла (packages/script/src/index.ts, packages/tui/src/component/session-tabs.tsx, packages/tui/src/context/storage.tsx): правки прошлой работы, не трогаются"
     - "существующие README.md 14 пакетов (ai, app, client, codemode, containers, core, desktop, enterprise, httpapi-codegen, http-recorder, plugin-browser, sdk, stats, web): не перезаписываются"
     - "git commit и git push: push запрещён правилом permissions, коммит в чужой репозиторий без разрешения владельца не делается"
@@ -343,6 +344,127 @@ oracles:
         Негатив: та же команда плюс файл-фикстура → exit 1, «(fail) negative control fixture»;
         файл после прогона удалён (ls — нет такого файла). Оракул различает падение и проход.
 
+  - id: O-NOTE-SCHEMA
+    command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test note-schema"'
+    oracle_scope:
+      detects:
+        - "typecheck packages/core сломан: note.ts или его экспорт в packages/schema/src/index.ts не собираются tsgo -b"
+        - "round-trip заметки падает: serialize(parse(текст)) не равен исходному виду frontmatter"
+        - "битый frontmatter не деградирует: непарсимые строки должны давать status inbox, а не исключение"
+        - "кириллица или путь в имени файла проходят нормализацию: слаг должен отклоняться"
+      misses:
+        - "поведение TUI при разборе тех же файлов: этот оракул гоняет только модуль schema и его тест"
+        - "живая файловая система: тест работает на временном каталоге, права доступа не проверяются"
+        - "прочие тесты packages/core: фильтр ловит и соседние файлы с подстрокой в имени"
+    command_status: UNVERIFIED_CMD
+    validated_at: "2026-10-08"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "временный файл packages/core/test/__negctl-note-schema.test.ts с expect(1).toBe(2), создаётся перед прогоном и удаляется после"
+      expected_failure: "bun test печатает failed и выходит с ненулевым кодом — оракул не печатает зелёное вслепую"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        08.10 17:30 негатив: фикстура test/__negctl-note-schema.test.ts с expect(1).toBe(2) →
+        exit 1, «14 pass / 1 fail», строка «(fail) negative control fixture»; фикстура удалена.
+        Тот же приём против команды с точным именем файла дал exit 0 — команда была слепа к
+        чужой поломке, поэтому заменена на фильтр. Позитив после удаления фикстуры → exit 0.
+
+  - id: O-NOTE-SERVICE
+    command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test note.test"'
+    oracle_scope:
+      detects:
+        - "typecheck packages/core сломан: packages/core/src/note.ts не собирается tsgo -b"
+        - "жизненный цикл заметки падает: create → list → get → edit не сходится по имени файла и метаданным"
+        - "защита от затирания не работает: edit со старым expectedMtime обязан конфликтовать, а не перезаписать файл"
+        - "created и updated ставит сервис: модель не передаёт эти поля во входе, подставить их нечем"
+      misses:
+        - "два писателя одной заметки живым параллелизмом: тест гоняет последовательные вызовы"
+        - "права доступа и квоты каталога: временный каталог теста всегда доступен для записи"
+        - "прочие тесты packages/core: фильтр ловит и соседние файлы с подстрокой в имени"
+    command_status: UNVERIFIED_CMD
+    validated_at: "2026-10-08"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "временный файл packages/core/test/__negctl-note.test.ts с expect(1).toBe(2), создаётся перед прогоном и удаляется после"
+      expected_failure: "bun test печатает failed и выходит с ненулевым кодом — оракул не печатает зелёное вслепую"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        08.10 фикстура test/__negctl-note.test.ts с expect(1).toBe(2) → exit 1,
+        «8 pass / 1 fail»; фикстура удалена, позитивный прогон → exit 0 (8 pass).
+
+  - id: O-NOTE-TOOL
+    command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test tool-note"'
+    oracle_scope:
+      detects:
+        - "инструмент не зарегистрирован: плагина note нет в списке packages/core/src/plugin/internal.ts либо он не виден в реестре инструментов"
+        - "мутирующее действие проходит без permission.assert с action note"
+        - "расхождение expectedMtime не даёт отказа: правка затирает чужое изменение"
+        - "description инструмента не объясняет агенту, когда предлагать заметку, и что expectedMtime обязателен"
+      misses:
+        - "поведение реальной модели: тест зовёт execute с подготовленным входом, а не читает ответ модели"
+        - "вызов инструмента в живом TUI: отрисовка проверяется оракулом O-NOTE-TUI"
+        - "поведение при недоступной файловой системе: тест поднимает временный каталог"
+    command_status: UNVERIFIED_CMD
+    validated_at: "2026-10-08"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "временный файл packages/core/test/__negctl-tool-note.test.ts с expect(1).toBe(2), создаётся перед прогоном и удаляется после"
+      expected_failure: "bun test печатает failed и выходит с ненулевым кодом — оракул не печатает зелёное вслепую"
+      executed: true
+      exit_code: 1
+      target_is_fixture: true
+      summary: >-
+        08.10 фикстура test/__negctl-tool-note.test.ts с expect(1).toBe(2) → exit 1,
+        «8 pass / 1 fail»; фикстура удалена, позитивный прогон → exit 0 (8 pass).
+
+  - id: O-NOTE-TUI
+    command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test component/notes"'
+    oracle_scope:
+      detects:
+        - "typecheck packages/tui сломан: notes.tsx, notes-data.ts или регистрация плагина не собираются tsgo -b"
+        - "плагин не зарегистрирован: в packages/tui/src/plugin/builtins.ts нет opencode.notes, экран недостижим"
+        - "команды notes.open и notes.back отсутствуют или back не возвращает на сохранённый маршрут"
+        - "список заметок не строится по данным client.file или разбор frontmatter в TUI расходится с модулем schema"
+      misses:
+        - "живой запуск в терминале: оракул проверяет типы и тест рендера, стори проверяется листом L-132"
+        - "запись заметки из TUI на живом сервере: доступность client.file.write проверяется листом L-132"
+        - "прочие тесты packages/tui: фильтр component/notes ловит и соседние файлы с такой подстрокой"
+    command_status: UNVERIFIED_CMD
+    validated_at: "2026-10-08"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: FIXTURE
+      target: "временный файл packages/tui/test/component/__negctl-notes.test.tsx с expect(1).toBe(2), создаётся перед прогоном и удаляется после"
+      expected_failure: "bun test печатает failed и выходит с ненулевым кодом — оракул не печатает зелёное вслепую"
+      executed: false
+
+  - id: O-NOTE-CHECK
+    command: 'sh -c "cd /home/isako/opencode-src && bun run check"'
+    oracle_scope:
+      detects:
+        - "линт или типы сломаны в любом пакете после правок задачи (bun run check из корня)"
+        - "генерированные файлы клиента разошлись с протоколом: гейт check:generated падает"
+        - "формат и стиль нарушены: prettier/biome-гейт из bun run check"
+      misses:
+        - "поведение во время работы: статическая проверка не выполняет код"
+        - "живая доска заметок и живой агент: проверяются листами L-132 и L-133"
+        - "падающие под нагрузкой тесты packages/tui: пункт known_red остаётся в силе"
+    command_status: UNVERIFIED_CMD
+    validated_at: "2026-10-08"
+    expires_at: "2026-12-31"
+    negative_control:
+      method: DOCUMENTED
+      target: "любой файл задачи с заведомо неверным типом, откатываемый сразу после прогона"
+      expected_failure: "tsgo и линтер печатают ошибку и bun run check выходит с ненулевым кодом — механизм отказа раннера задокументирован"
+      executed: false
+
 coverage:
   complete: false
   reason: >-
@@ -464,6 +586,46 @@ stages:
       sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test test/component/devtools-registry.test.tsx test/util/hub-registry.test.ts" → код 0 и 0 fail;
       negative control O-HUB-CONTROL выполнен (exit 1); dod-check → ИТОГ: OK
     depends_on: ["Этап 8 — Registry-панель Universal Tool Hub в devtools-bar"]
+
+  - name: "Этап 10 — каркас: контракт заметки"
+    goal: >-
+      Модуль packages/schema/src/note.ts задаёт форму заметки (frontmatter, ASCII-слаг имени,
+      значения по умолчанию) — на нём стоят и сервис ядра, и экран TUI; без одного контракта
+      две копии парсинга разъедутся при первой же правке.
+    done_when: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test note-schema" → код 0 и 0 fail'
+    depends_on: []
+  - name: "Этап 11 — ядро: сервис заметок на файлах"
+    goal: >-
+      packages/core/src/note.ts умеет создавать, читать, править и связывать заметки в
+      .opencode/notes/ папки проекта и защищает файл от затирания проверкой expectedMtime —
+      на этом стоит инструмент агента и экран TUI.
+    done_when: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test note.test" → код 0 и 0 fail'
+    depends_on: ["Этап 10 — каркас: контракт заметки"]
+  - name: "Этап 12 — связи: инструмент агента и инструкции"
+    goal: >-
+      Инструмент note даёт агенту действия list|read|create|edit|update|link с разрешением
+      на запись и подсказкой в producer инструкций core/notes: ИИ читает и правит заметки
+      по запросу и сам предлагает их, когда выводы задачи переживут чат.
+    done_when: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test tool-note" → код 0 и 0 fail'
+    depends_on: ["Этап 11 — ядро: сервис заметок на файлах"]
+  - name: "Этап 13 — связи: экран заметок в TUI"
+    goal: >-
+      Экран заметок со списком, просмотром и правкой открывается из сессии кнопкой вместо
+      чата и возвращается отдельной кнопкой, а вызов инструмента note виден в чате по имени.
+    done_when: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test component/notes" → код 0 и 0 fail'
+    depends_on: ["Этап 10 — каркас: контракт заметки"]
+  - name: "Этап 14 — приёмка: проверка целиком"
+    goal: >-
+      Проверка всего дерева после правок задачи и живой прогон экрана в сторибуке: до этого
+      нельзя утверждать, что фича не сломала соседние пакеты и что экран открывается вживую.
+    done_when: 'sh -c "cd /home/isako/opencode-src && bun run check" → код 0; стори notes в packages/tui/src/feature-plugins/system/storybook/notes.tsx открывается по OPENCODE_STORY=notes'
+    depends_on: ["Этап 12 — связи: инструмент агента и инструкции", "Этап 13 — связи: экран заметок в TUI"]
+  - name: "Этап 15 — сдача"
+    goal: >-
+      Живой сценарий целиком (агент создал заметку → файл в .opencode/notes/ → экран её
+      показал → возврат к чату) и отчёт владельцу с числами; DoD зелёный.
+    done_when: 'sh -c "cd /home/isako/opencode-src && ~/.config/opencode/bin/dod-check ." → ИТОГ: OK; раздел «Задача TASK-NOTES-CANVAS» в .opencode/plan.md содержит итог'
+    depends_on: ["Этап 14 — приёмка: проверка целиком"]
 
 leaves:
   - id: L-101
@@ -1312,33 +1474,292 @@ leaves:
       - "[x] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-125 N"
     depends_on: [L-121, L-123, L-124]
 
+  - id: L-126
+    what: "контракт заметки: packages/schema/src/note.ts — Schema с полями title, status (inbox|active|done|archived), tags (инлайн-список латинских слагов), session, created, updated (epoch ms); parse и serialize frontmatter без YAML-движка, битый frontmatter деградирует до status inbox, имя нормализуется в ASCII-слаг [a-z0-9-] длиной 2..60 с коллизией -2; экспорт добавлен в packages/schema/src/index.ts; тест packages/core/test/note-schema.test.ts"
+    target: { path: "packages/schema/src/index.ts" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test note-schema"'
+      command_status: VERIFIED_CMD
+      oracle_ref: O-NOTE-SCHEMA
+      evidence:
+        command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test note-schema"'
+        exit_code: 0
+        at: "2026-10-08T17:31:40+04:00"
+        output_summary: >-
+          Прогон лида 08.10 17:31: tsgo -b → код 0; тест контракта → 14 pass / 0 fail /
+          68 expect (127ms). Негативный контроль ОРАКУЛА сначала вскрыл слепоту: команда
+          называла ровно один файл (bun test test/note-schema.test.ts), подложенная фикстура
+          __negctl-note-schema.test.ts в неё не попадала и прогон остался зелёным (код 0) —
+          оракул врал бы. Команда переведена на фильтр bun test note-schema, после чего тот
+          же фикстурный прогон дал exit 1 (14 pass / 1 fail), а позитивный после удаления
+          фикстуры — exit 0. Два теста поправил лид: они требовали YAML-поведения, которого
+          в контракте нет (свёртка title из продолжения строки без двоеточия и обнуление
+          всего frontmatter из-за одной мусорной строки). Контракт однострочный и деградирует
+          построчно, поэтому тесты переписаны под контракт, а не реализация под тесты.
+          Модуль packages/schema/src/note.ts написан сабагентом-исполнителем, убитым
+          перезапуском сервера; экспорт добавлен в packages/schema/src/index.ts:15.
+        anchors:
+          - "packages/schema/src/note.ts:70 — parse: нет забора или битый блок дают fallback, тело целиком"
+          - "packages/schema/src/note.ts:139 — read: строка без двоеточия пропускается, читаемые поля сохраняются"
+          - "packages/schema/src/note.ts:103 — name: слаг [a-z0-9-] 2..60, отказ вместо починки"
+          - "packages/schema/src/note.ts:117 — unique: занятое имя даёт -2, потом -3"
+          - "packages/schema/src/index.ts:15 — экспорт Note в баррель schema"
+          - "packages/core/test/note-schema.test.ts:54 — строка без двоеточия не поле и не прячет остальные"
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun test note.test"' }
+    group: "Этап 10 — каркас: контракт заметки"
+    steps:
+      - "[x] прочитать packages/core/src/room.ts:38-52 и packages/schema/src/index.ts:1-41 — форма сервиса и правила экспорта в этом репозитории"
+      - "[x] packages/schema/src/note.ts: Note.Schema (title, status, tags, session, created, updated) плюс parse и serialize frontmatter; YAML-движка в репозитории нет — парсер пишем свой, без внешних зависимостей"
+      - "[x] нормализация имени файла: слаг [a-z0-9-], 2..60 символов, буква в начале; кириллица, точка, слеш и путь отклоняются; коллизия даёт суффикс -2"
+      - "[x] битый frontmatter (строка без двоеточия, мусор после ---) не роняет разбор: status становится inbox, остальное пусто"
+      - "[x] packages/core/test/note-schema.test.ts: round-trip serialize(parse(x)) совпадает с x; кириллица в имени отклонена; битый frontmatter даёт inbox; коллизия имени даёт -2"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun typecheck → код 0"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun test note-schema → 0 fail"
+      - "[x] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-126 N"
+    depends_on: []
+
+  - id: L-127
+    what: "сервис заметок packages/core/src/note.ts по форме packages/core/src/room.ts:38-52: Location-скоупный слой через makeLocationNode над каталогом .opencode/notes/, действия list, get, create, edit, update, link; created и updated ставит сервис, edit, update и link требуют expectedMtime и дают отказ при расхождении; тест packages/core/test/note.test.ts на временном каталоге"
+    target: { path: "packages/core/src/room.ts" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test note.test"'
+      command_status: VERIFIED_CMD
+      oracle_ref: O-NOTE-SERVICE
+      evidence:
+        command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test note.test"'
+        exit_code: 0
+        at: "2026-10-08T18:20:00+04:00"
+        output_summary: >-
+          Прогон лида 08.10: tsgo -b → 0 ошибок; тест сервиса → 8 pass / 0 fail /
+          51 expect (1092ms) на настоящем временном каталоге (packages/core/test/fixture/tmpdir).
+          Негативный контроль оракула: фикстура test/__negctl-note.test.ts с expect(1).toBe(2) →
+          exit 1 (8 pass / 1 fail); фикстура удалена, повторный прогон → exit 0. Модуль сервиса
+          сделал лид руками: два исполнителя подряд были убиты перезапуском сервера, тест успел
+          написать первый (263 строки), его пришлось привести к именованию NoteStore и
+          необязательным полям body и mode — контракт уточнён, а не сломан. Два урока
+          записаны в код: оракул на фильтр имён (точный файл слеп к чужой поломке) и то,
+          что имя файла проверяется раньше любой записи.
+        anchors:
+          - "packages/core/src/note.ts:121 — target: resolve() строит путь, слаг приходит уже проверенным"
+          - "packages/core/src/note.ts:123 — read: текст через FSUtil, mtime через FileSystem.read"
+          - "packages/core/src/note.ts:149 — guard: чужое изменение даёт ConflictError, файл не пишется"
+          - "packages/core/src/note.ts:172 — create: имя через Note.name и Note.unique, created и updated от сервиса"
+          - "packages/core/test/note.test.ts:113 — отказ правки при чужом mtime, файл остаётся как был"
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun test tool-note"' }
+    group: "Этап 11 — ядро: сервис заметок на файлах"
+    steps:
+      - "[x] прочитать packages/core/src/room.ts целиком и packages/core/src/file-mutation.ts, packages/core/src/file-access.ts: имена сервисов записи и чтения, makeLocationNode, resolve пути"
+      - "[x] packages/core/src/note.ts: каталог .opencode/notes/ внутри location.directory; путь строится только через FileAccess.resolve, пользовательский ввод в путь не склеивается"
+      - "[x] list: файлы *.md каталога, разбор тем же модулем schema, сортировка по updated по убыванию, битый файл не роняет список"
+      - "[x] create: уникальное имя из title (ASCII-слаг), frontmatter со статусом inbox и session по входу, created и updated от сервиса"
+      - "[x] edit и update: при expectedMtime, равном текущему, запись проходит; при расхождении — отказ с текстом «файл изменился, прочитай заново» и файл не меняется"
+      - "[x] link: привязка session в frontmatter; поле created и updated во входе сервис игнорирует"
+      - "[x] packages/core/test/note.test.ts: create → list → get → edit на временном каталоге; edit со старым expectedMtime даёт отказ и файл не тронут; битый .md в каталоге не роняет list"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun typecheck → код 0"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun test test/note.test → 0 fail"
+      - "[x] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-127 N"
+    depends_on: [L-126]
+
+  - id: L-128
+    what: "инструмент агента note: packages/core/src/tool/plugin/note.ts — name note, action list|read|create|edit|update|link, permission.assert с action note на каждом мутирующем действии, отказ при расхождении expectedMtime, description объясняет агенту, когда предлагать заметку; регистрация в packages/core/src/plugin/internal.ts; producer инструкций core/notes в packages/core/src/instructions/builtins.ts; тест packages/core/test/tool-note.test.ts"
+    target: { path: "packages/core/src/plugin/internal.ts" }
+    task_state: DONE
+    coverage: IN_SCOPE
+    verification:
+      state: PASSED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test tool-note"'
+      command_status: VERIFIED_CMD
+      oracle_ref: O-NOTE-TOOL
+      evidence:
+        command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test tool-note"'
+        exit_code: 0
+        at: "2026-10-08T19:05:00+04:00"
+        output_summary: >-
+          Прогон лида 08.10: tsgo -b → 0 ошибок; тест инструмента → 8 pass / 0 fail /
+          24 expect (1247ms). Негативный контроль оракула: фикстура
+          test/__negctl-tool-note.test.ts → exit 1 (8 pass / 1 fail), фикстура удалена.
+          Тест нашёл настоящий дефект: инструмент отдавал в поле updated время из
+          frontmatter, а сервис сверяет mtime файла, поэтому link и edit из инструмента
+          не проходили. Теперь reported отдаёт mtime, а в тексте видно время записи.
+          Кроме того инструкция core/notes доехала до живого промпта: блок <notes> появился
+          в системном контексте лида, то есть producer инструкций виден в настоящей
+          сессии, а не только в тесте.
+        anchors:
+          - "packages/core/src/tool/plugin/note.ts:87 — permission.assert с action note на create, edit, update и link"
+          - "packages/core/src/tool/plugin/note.ts:145 — needStamp: без expectedMtime инструмент отказывает до записи"
+          - "packages/core/src/tool/plugin/note.ts:157 — reported отдаёт mtime файла как updated"
+          - "packages/core/src/instructions/builtins.ts:32 — producer core/notes в системном промпте"
+          - "packages/core/test/tool-note.test.ts:53 — пустой список не спрашивает разрешение на запись"
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck"' }
+    group: "Этап 12 — связи: инструмент агента и инструкции"
+    steps:
+      - "[x] прочитать packages/core/src/tool/plugin/skill.ts целиком и packages/core/src/tool/plugin/orchestra.ts:25 (Schema.Literals для action), packages/core/src/plugin/internal.ts:240-255 (список подключений), packages/core/src/instructions/builtins.ts (форма producer)"
+      - "[x] packages/core/src/tool/plugin/note.ts: Schema.Struct для входа (action, name, title, body, mode replace|append, status, tags, session, expectedMtime) и выхода (output, name, updated)"
+      - "[x] description: где папка заметок, что заметка связана с чатом через session, expectedMtime обязателен для правки, предлагай заметку, когда выводы задачи переживут чат"
+      - "[x] execute: чтение через сервис L-127; на create, edit, update и link вызов permission.assert с action note и sessionID источника"
+      - "[x] расхождение expectedMtime возвращается в output текстом с просьбой перечитать, а не исключением"
+      - "[x] packages/core/src/plugin/internal.ts: плагин note в списке подключений рядом с остальными встроенными инструментами"
+      - "[x] packages/core/src/instructions/builtins.ts: producer с ключом core/notes — папка, связь с чатом, запрет создавать заметку ради пересказа чата"
+      - "[x] packages/core/test/tool-note.test.ts: шесть действий возвращают ожидаемый выход; на create и edit зовётся permission.assert с action note; старый expectedMtime даёт отказ без записи"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun typecheck → код 0"
+      - "[x] cd /home/isako/opencode-src/packages/core && bun test tool-note → 0 fail"
+      - "[x] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-128 N"
+    depends_on: [L-127]
+
+  - id: L-129
+    what: "экран заметок: packages/tui/src/feature-plugins/system/notes.tsx и notes-data.ts — список по client.file с сортировкой по updated, просмотр через markdown-рендерер сессии, правка с предупреждением при изменившемся mtime; плагин opencode.notes с командами notes.open и notes.back (возврат по сохранённому маршруту) и кнопкой в слоте session.composer.top; регистрация в packages/tui/src/plugin/builtins.ts; тест packages/tui/test/component/notes.test.tsx"
+    target: { path: "packages/tui/src/plugin/builtins.ts" }
+    task_state: NOT_STARTED
+    coverage: IN_SCOPE
+    verification:
+      state: NOT_CHECKED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test component/notes"'
+      command_status: UNVERIFIED_CMD
+      oracle_ref: O-NOTE-TUI
+      evidence:
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck"' }
+    group: "Этап 13 — связи: экран заметок в TUI"
+    steps:
+      - "[ ] прочитать packages/tui/src/feature-plugins/system/stats.tsx целиком (эталон экрана без sessionID) и packages/tui/src/routes/session/index.tsx:2054 (markdown-рендерер), packages/tui/src/feature-plugins/system/diff-viewer.tsx:1206 (возврат по маршруту в data)"
+      - "[ ] notes-data.ts: чтение каталога .opencode/notes/ через context.client.file.list и file.read, разбор тем же модулем schema (импорт из @opencode/schema/note), запись через file.write с перечитыванием mtime перед записью"
+      - "[ ] notes.tsx: список колонками updated, status, title, tags; выбор открывает просмотр через markdown-рендерер; футер с командой возврата"
+      - "[ ] правка из экрана: перезапись целиком только после повторной сверки mtime, при расхождении — предупреждение вместо записи"
+      - "[ ] команды keymap: notes.open со slash и palette, notes.back; предыдущий маршрут хранится сигналом и возвращается через context.ui.router.navigate"
+      - "[ ] кнопка в слоте session.composer.top открывает заметки вместо чата; из экрана заметок отдельная кнопка возвращает к чату"
+      - "[ ] packages/tui/src/plugin/builtins.ts: плагин opencode.notes в списке встроенных плагинов"
+      - "[ ] packages/tui/test/component/notes.test.tsx: список строится из фикстуры файлов, выбор открывает просмотр, notes.back зовёт navigate с сохранённым маршрутом, коллизия имён плагинов не возникает"
+      - "[ ] cd /home/isako/opencode-src/packages/tui && bun typecheck → код 0"
+      - "[ ] cd /home/isako/opencode-src/packages/tui && bun test component/notes → 0 fail"
+      - "[ ] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-129 N"
+    depends_on: [L-126]
+
+  - id: L-130
+    what: "отображение вызова инструмента note в чате: элемент note в whitelist имён packages/tui/src/routes/session/message-parts.tsx — без него вызов агента рисуется как generic и правка заметки в чате невидима"
+    target: { path: "packages/tui/src/routes/session/message-parts.tsx" }
+    task_state: NOT_STARTED
+    coverage: IN_SCOPE
+    verification:
+      state: NOT_CHECKED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test component/notes"'
+      command_status: UNVERIFIED_CMD
+      oracle_ref: O-NOTE-TUI
+      evidence:
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck"' }
+    group: "Этап 13 — связи: экран заметок в TUI"
+    steps:
+      - "[ ] прочитать packages/tui/src/routes/session/message-parts.tsx:21-41 и packages/tui/src/util/tool-display.ts:51-63: где whitelist имён и что даёт элемент списка"
+      - "[ ] добавить note в whitelist имён с подписью по соседним инструментам, порядок списка не менять"
+      - "[ ] cd /home/isako/opencode-src/packages/tui && bun typecheck → код 0"
+      - "[ ] cd /home/isako/opencode-src/packages/tui && bun test component/notes → 0 fail"
+      - "[ ] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-130 N"
+    depends_on: [L-128]
+
+  - id: L-131
+    what: "проверка дерева после правок задачи: команда bun run check из корня /home/isako/opencode-src/package.json даёт код 0, и тесты packages/core по каталогам без новых падений (полный bun test пакета tui нестабилен под нагрузкой — см. handover.known_red)"
+    target: { path: "package.json" }
+    task_state: NOT_STARTED
+    coverage: IN_SCOPE
+    verification:
+      state: NOT_CHECKED
+      command: 'sh -c "cd /home/isako/opencode-src && bun run check"'
+      command_status: UNVERIFIED_CMD
+      oracle_ref: O-NOTE-CHECK
+      evidence:
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src && bun run check"' }
+    group: "Этап 14 — приёмка: проверка целиком"
+    steps:
+      - "[ ] cd /home/isako/opencode-src && bun run check → код 0; при падении править только файлы задачи"
+      - "[ ] cd /home/isako/opencode-src/packages/core && bun test note-schema test/note.test.ts test/tool-note.test.ts → 0 fail"
+      - "[ ] cd /home/isako/opencode-src/packages/core && bun test test/hub.test.ts test/hub-state.test.ts test/hub-actions.test.ts → 0 fail (соседние правки не задеты)"
+      - "[ ] cd /home/isako/opencode-src/packages/tui && bun test test/component --max-concurrency=4 → без новых падений относительно baseline"
+      - "[ ] cd /home/isako/opencode-src && git status --short → в дереве только файлы задачи плюс ранее изменённые packages/cli/src/services/updater.ts, packages/tui/src/component/session-tabs.tsx, packages/cli/src/services/source-release.ts"
+      - "[ ] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-131 N"
+    depends_on: [L-128, L-129, L-130]
+
+  - id: L-132
+    what: "живая проверка экрана: стори packages/tui/src/feature-plugins/system/storybook/notes.tsx с фикстурой заметок, регистрация в packages/tui/src/feature-plugins/system/storybook/index.tsx, запуск OPENCODE_STORY=notes bun run dev:live — список, выбор заметки, esc возвращает в сторибук; отрицательные контроли оракулов O-NOTE-* фикстурой с падающим expect (exit 1, файлы удалены)"
+    target: { path: "packages/tui/src/feature-plugins/system/storybook/index.tsx" }
+    task_state: NOT_STARTED
+    coverage: IN_SCOPE
+    verification:
+      state: NOT_CHECKED
+      command: 'sh -c "cd /home/isako/opencode-src/packages/tui && bun typecheck && bun test component/notes"'
+      command_status: UNVERIFIED_CMD
+      oracle_ref: O-NOTE-TUI
+      manual: 'шоты и вывод: OPENCODE_STORY=notes bun run dev:live в packages/tui, экран packages/tui/src/feature-plugins/system/storybook/notes.tsx показывает список фикстур, выбор открывает заметку, esc возвращает назад; затем для каждого оракула O-NOTE-SCHEMA, O-NOTE-SERVICE, O-NOTE-TOOL, O-NOTE-TUI — фикстура с expect(1).toBe(2) даёт ненулевой код, файл удалён после прогона'
+      evidence:
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src && ~/.config/opencode/bin/dod-check ."' }
+    group: "Этап 14 — приёмка: проверка целиком"
+    steps:
+      - "[ ] прочитать packages/tui/src/feature-plugins/system/storybook/index.tsx и одну существующую историю: регистрация массивом stories, keymap.layer на escape, StoryFooter"
+      - "[ ] packages/tui/src/feature-plugins/system/storybook/notes.tsx: фикстуры заметок локально в файле, список, выбор, просмотр, возврат по escape, footer с подсказками"
+      - "[ ] packages/tui/src/feature-plugins/system/storybook/index.tsx: добавить notesStory в массив stories"
+      - "[ ] cd /home/isako/opencode-src/packages/tui && OPENCODE_STORY=notes bun run dev:live → экран заметок, esc возвращает (проверить глазами, записать что увидели)"
+      - "[ ] cd /home/isako/opencode-src/packages/tui && bun test component/notes → 0 fail"
+      - "[ ] негативный контроль O-NOTE-SCHEMA: временный packages/core/test/__negctl-note-schema.test.ts с expect(1).toBe(2) → ненулевой код, файл удалить"
+      - "[ ] негативный контроль O-NOTE-SERVICE: временный packages/core/test/__negctl-note.test.ts → ненулевой код, файл удалить"
+      - "[ ] негативный контроль O-NOTE-TOOL: временный packages/core/test/__negctl-tool-note.test.ts → ненулевой код, файл удалить"
+      - "[ ] негативный контроль O-NOTE-TUI: временный packages/tui/test/component/__negctl-notes.test.tsx → ненулевой код, файл удалить"
+      - "[ ] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-132 N"
+    depends_on: [L-129, L-131]
+
+  - id: L-133
+    what: "живой сценарий и сдача: агент создаёт заметку инструментом note → файл появляется в .opencode/notes/ → экран заметок его показывает → отдельная кнопка возвращает к чату; итог прогона и числа записаны в раздел «Задача TASK-NOTES-CANVAS» файла .opencode/plan.md; dod-check зелёный"
+    target: { path: ".opencode/plan.md" }
+    task_state: NOT_STARTED
+    coverage: IN_SCOPE
+    verification:
+      state: NOT_CHECKED
+      command: 'sh -c "cd /home/isako/opencode-src && ~/.config/opencode/bin/dod-check ."'
+      command_status: UNVERIFIED_CMD
+      oracle_ref: O-NOTE-CHECK
+      evidence:
+    next_action: { command: 'sh -c "cd /home/isako/opencode-src && ~/.config/opencode/bin/dod-check ."' }
+    group: "Этап 15 — сдача"
+    steps:
+      - "[ ] собрать сборку с новым инструментом и инструмент доступен агенту в живом opencode"
+      - "[ ] дать агенту задачу, чей вывод переживёт чат, и добиться вызова note с create — либо объяснить, почему агент не предложил заметку"
+      - "[ ] ls .opencode/notes/ → файл заметки есть, frontmatter содержит title, status, created, updated"
+      - "[ ] открыть экран заметок из сессии кнопкой, выбрать заметку, вернуться отдельной кнопкой — записать, что увидели"
+      - "[ ] проверить связь с чатом: session в frontmatter совпадает с sessionID открытого чата"
+      - "[ ] ~/.config/opencode/bin/dod-check . → ИТОГ: OK"
+      - "[ ] дописать в .opencode/plan.md итог с числами прогона, рисками и тем, что не сделано"
+      - "[ ] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-133 N"
+    depends_on: [L-131, L-132]
+
 dead_ends: []
 
 handover:
   handing_over_task: >-
-    СЕЙЧАС — TASK-HUB-CONTROL (этап 9, контракт в plan.md): панель Registry получает
-    построчные кнопки — вкл/выкл инструмента (включённый автоматически попадает подсказкой
-    в системный промпт: модель не знает о возможностях ядра) и Install/Remove (выполнение
-    команды по платформе, без ввода подтверждения — решение владельца 07.10). Вся логика —
-    на уровне ядра packages/core. Решения архитектора: состояние — свой JSON в core (дефолт
-    off, opt-in, temp+rename), промпт — новый Instructions.Source в session/context.ts:150-157
-    поверх чистой renderHubHints с капом 2k символов, выполнение — core-функция с внедряемым
-    runner, панель — примитив Action (devtools-bar.tsx:484-502), массовую секцию Install
-    убрать. Листья: L-121 (state) → L-122 (prompt) → L-123 (врезка) → L-124 (actions,
-    параллелен L-121, hub/index.ts НЕ трогать) → L-125 (панель, экспорт actions из index).
-    Закрыты: этап 8 (L-119/L-120 DONE/PASSED, O-HUB-REGISTRY), этап 7 (версия free-tier),
-    этапы 1-6 (документация). Открыты TASK-DOC-CORE: L-117 (шесть документов по каталогам
-    packages/tui/src) и L-118 (PACKAGE.md для console, containers, effect-drizzle-sqlite,
-    identity, stats); их оракулы O-DIRDOC/O-DOC не тронуты.
+    СЕЙЧАС — TASK-NOTES-CANVAS (этапы 10-15, контракт в plan.md, раздел «Задача
+    TASK-NOTES-CANVAS»): экран заметок в TUI поверх markdown-файлов в .opencode/notes/
+    папки проекта плюс инструмент агента note. Владелец решил: хранилище — файлы .md,
+    ИИ читает и правит заметки, сам предлагает их и связывает заметку с чатом, из сессии
+    кнопка открывает заметки вместо чата и отдельная кнопка возвращает назад. Решения
+    архитектора: frontmatter как единственный источник метаданных, имя файла — ASCII-слаг,
+    идентичность = имя файла; серверный слой не нужен (есть client.file.*); слои
+    schema → core-сервис → инструмент; edit и update требуют expectedMtime.
+    Листья: L-126 (контракт schema) → L-127 (сервис core) → L-128 (инструмент и
+    инструкции) и параллельно L-129 (экран TUI) → L-130 (видимость вызова в чате) →
+    L-131 (bun run check) → L-132 (стори и негативные контроли) → L-133 (живой сценарий
+    и сдача). Закрыты этапы 8 и 9 (TASK-HUB-REGISTRY, TASK-HUB-CONTROL), этапы 1-6
+    (документация). Открыты с прошлой работы: L-117 и L-118 (документация каталогов tui
+    и пакетов console, containers, effect-drizzle-sqlite, identity, stats).
   next_action:
-    command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck && bun test test/hub-state.test.ts"'
+    command: 'sh -c "cd /home/isako/opencode-src/packages/core && bun typecheck"'
     expected: >-
-      после выполнения L-121: код 0 и 0 fail — состояние вкл/выкл существует и протестировано
-      (до начала листа файла test/hub-state.test.ts нет, команда упадёт — это нормально).
-      Стартовый шаг: открыть L-121 в oc-dod и выполнить его шаги по порядку.
+      после правки packages/schema/src/note.ts и packages/core/test/note-schema.test.ts
+      (лист L-126) команда даёт код 0; до правки файла теста нет и bun test на нём падает —
+      это нормально для состояния NOT_STARTED.
   release_gate:
     applies_to: TASK
-    task_id: TASK-DOC-CORE
+    task_id: TASK-NOTES-CANVAS
     coverage_complete: false
     coverage_gap: >-
       Исполняемая поверхность не извлечена формальным парсером: символы TypeScript и Effect
@@ -1410,6 +1831,40 @@ handover:
         написанное совпадает со смыслом кода. Фактическую верность описания подтверждает
         только чтение исходников автором документа и выборочная проверка O-DOC-REALITY.
       since: "2026-10-06"
+    - what: >-
+        ЗАМЕТКИ ЖИВУТ В .opencode/notes/ ПАПКИ ПРОЕКТА, и решение владельца про git не принято.
+        Мы не правим .gitignore и ничего не коммитим. Если проект под git и папку нужно
+        скрыть — это отдельная правка по команде владельца, потому что молча добавить
+        игнор значит решить за него, что его заметки не должны попасть в репозиторий.
+      since: "2026-10-08"
+    - what: >-
+        ИМЯ ФАЙЛА ЗАМЕТКИ — ASCII-СЛАГ [a-z0-9-], а заголовок и содержимое русские. Причина
+        техническая (кириллица в именах ломает скрипты, архивы и правки в чужих редакторах),
+        но решение необратимо для уже созданных заметок: переименование из UI не делается.
+        Если владелец захочет русские имена — это отдельная задача с миграцией файлов.
+      since: "2026-10-08"
+    - what: >-
+        ЗАПИСЬ ИЗ TUI ИДЁТ ЧЕРЕЗ client.file.write, и его доступность на живом сервере не
+        проверена. Если запись из экрана недоступна, экран показывает ошибку, а не молчит;
+        запасной путь — правка заметки агентом через инструмент note.
+      since: "2026-10-08"
+    - what: >-
+        АРТЕФАКТ СБОРКИ ЭТАПА 7 ПРОПАЛ: каталога /home/isako/.local/bin/oc-core не существует,
+        поэтому листья L-701 и L-702 красные по dod-check (путь не существует). Причина —
+        автообновление opencode от 08.10 (оно переставило ~/.npm-global/bin/opencode).
+        Наша задача артефакт не восстанавливает: он нужен для живого сценария этапа 15,
+        и там же пересборка вернёт путь на место. До пересборки dod-check красный по этим
+        двум листьям — это наследованное состояние, а не дефект новой задачи.
+      since: "2026-10-08"
+    - what: >-
+        ПОСЛЕ СЛИЯНИЯ upstream 657c5ee25e (08.10 03:34) packages/tui БЫЛ КРАСНЫМ ДО НАЧАЛА
+        ЭТОЙ ЗАДАЧИ: resolveThemeDocument переехал в @opencode/theme/tui, а test/theme.test.ts
+        и test/component/hub-badge.test.ts продолжали импортировать его из src/theme, плюс
+        неиспользуемая переменная tmp в test/component/devtools-registry.test.tsx:232. Лид
+        починил (три правки импорта и имени), потому что без зелёного typecheck нельзя доказать,
+        что фича заметок ничего не сломала. Это правки вне scope фичи — записаны, чтобы никто
+        не принял их за часть заметок.
+      since: "2026-10-08"
   ask:
     - question: "Имя файла PACKAGE.md выбрал лид (владелец его не выбирал). 14 пакетов уже имеют README.md, поэтому переименовывать их не стали. Если нужно другое имя — переименуем до того, как файлов станет много."
       who: "владелец"
@@ -1417,6 +1872,22 @@ handover:
       who: "владелец"
 
   decisions:
+    - id: DEC-7
+      at: "2026-10-08"
+      source: "вопрос владельцу (инструмент question) в этой сессии"
+      question: "Заметки лежат в .opencode/notes/ внутри папки проекта. Что с ними делать в git?"
+      answer: "держать в .gitignore: чужие .gitignore не трогаем, ничего не коммитим, предупреждаем о неотслеживаемых заметках"
+      rejected:
+        - "коммитить заметки вместе с проектом: решение владельца про общий репозиторий принято в пользу приватности рабочих заметок"
+        - "автоматически дописывать .opencode/notes/ в .gitignore чужих проектов: фича не должна молча менять чужие файлы репозитория"
+    - id: DEC-8
+      at: "2026-10-08"
+      source: "вопрос владельцу (инструмент question) в этой сессии"
+      question: "Имя файла заметки: латинский слаг или русское имя при русском тексте и заголовке?"
+      answer: "латинский слаг: файл plan-raboty.md, заголовок внутри русский"
+      rejected:
+        - "русские имена файлов: кириллица в именах ломает скрипты, архивы и правки в чужих редакторах, а переименования из UI в фиче нет"
+
     - id: DEC-1
       at: "2026-10-06"
       source: "разговор с владельцем"

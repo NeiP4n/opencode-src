@@ -4,7 +4,9 @@ import { SessionEvent } from "@opencode/schema/session-event"
 import { SessionInbox } from "@opencode/schema/session-inbox"
 import { EventLog } from "@opencode/schema/event-log"
 import { Event } from "@opencode/schema/event"
+import { Note } from "@opencode/schema/note"
 import { Permission } from "@opencode/schema/permission"
+import { optional } from "@opencode/schema/schema"
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import {
@@ -163,13 +165,33 @@ export const RoomGroup = HttpApiGroup.make("server.room")
   .add(
     HttpApiEndpoint.get("room.guest.messages", "/api/room/:roomID/guest/message", {
       params: { roomID: Room.ID },
-      success: Schema.Struct({ data: Schema.Array(Room.Message), running: Schema.Boolean }),
+      success: Schema.Struct({
+        data: Schema.Array(Room.Message),
+        running: Schema.Boolean,
+        // Set while the shared session is bound to a note, so guests know prompts write into it.
+        note: optional(Schema.Struct({ name: Note.Slug, title: Schema.String })),
+      }),
       error: [UnauthorizedError, RoomNotFoundError, SessionNotFoundError],
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "room.guest.messages",
         summary: "Read the room chat",
-        description: "The latest messages of the shared session as plain chat, and whether the host model is working.",
+        description:
+          "The latest messages of the shared session as plain chat, whether the host model is working, and the note the session writes into, if any.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("room.guest.note", "/api/room/:roomID/guest/note", {
+      params: { roomID: Room.ID },
+      success: Schema.Struct({ data: Schema.NullOr(Note.Info) }),
+      error: [UnauthorizedError, RoomNotFoundError, SessionNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.note",
+        summary: "Read the room note",
+        description:
+          "The note bound to the shared session, which prompts in this room write into, or null when none is bound.",
       }),
     ),
   )

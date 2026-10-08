@@ -10,6 +10,7 @@ import { useTheme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
+import { roomListRevision } from "../util/room"
 import { openProjectDialog } from "./dialog-project"
 import { useProjects } from "../context/projects"
 import { DialogPrompt } from "../ui/dialog-prompt"
@@ -31,7 +32,7 @@ export function ProjectTree(props: { width: number }) {
   const dialog = useDialog()
   const projectList = useProjects()
   const projects = projectList.list
-  const [rooms] = createResource(() => client.api.room.list().catch(() => []))
+  const [rooms] = createResource(roomListRevision, () => client.api.room.list().catch(() => []))
   const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
   const [access, setAccess] = createStore<Record<string, OrchestraAccess>>({})
   const [category, setCategory] = createStore<Record<string, string | undefined>>({})
@@ -42,7 +43,7 @@ export function ProjectTree(props: { width: number }) {
   const [removed, setRemoved] = createStore<Record<string, boolean>>({})
 
   const current = () => (route.data.type === "session" ? data.session.get(route.data.sessionID) : undefined)
-  const shared = createMemo(() => new Set((rooms() ?? []).map((room) => room.sessionID)))
+  const shared = createMemo(() => new Set((rooms.latest ?? []).map((room) => room.sessionID)))
   const owner = (directory: string) =>
     // The deepest project wins when one project directory sits inside another.
     projects()
