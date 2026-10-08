@@ -288,7 +288,8 @@ export function RegistryPanel(props: {
       </box>
       <Show when={aiTerminal() === "nu"}>
         <text fg={theme.text.muted} wrapMode="word">
-          Hub commands run in nu. Other shell commands stay in bash, where they can be permission-checked.
+          Hub commands run in nu. Other shell commands stay in your regular shell, where they can be permission-checked;
+          each command shows the shell that ran it.
         </text>
       </Show>
 

@@ -65,6 +65,8 @@ const StructuredOutput = Schema.Struct({
   exit: Schema.optionalKey(Schema.Number),
   signal: Schema.optionalKey(Schema.String),
   shellID: Schema.optionalKey(Schema.String),
+  // Which shell ran the command (bash, zsh, pwsh…): the operator sees it on the tool block.
+  shell: Schema.optionalKey(Schema.String),
   truncated: Schema.Boolean,
   timeout: Schema.optionalKey(Schema.Boolean),
 })
@@ -90,13 +92,15 @@ const toolResult = (output: Output) => {
       status: output.status,
       ...ShellResult.metadata(output),
       ...(output.shellID !== undefined ? { shellID: output.shellID } : {}),
+      ...(output.shell !== undefined ? { shell: output.shell } : {}),
     },
   }
 }
 
-const backgroundResult = (shellID: string, file: string) => ({
+const backgroundResult = (shellID: string, file: string, shell: string) => ({
   output: `Command moved to the background (shell ID: ${shellID}).\nOutput is streaming to: ${file}`,
   shellID,
+  shell,
   truncated: false,
   status: "running" as const,
 })
@@ -208,12 +212,14 @@ export const Plugin = {
             Effect.gen(function* () {
               const timeout = input.background === true ? (input.timeout ?? 0) : (input.timeout ?? DEFAULT_TIMEOUT_MS)
               let finalTimeout = timeout
+              const shellPath = yield* compatibleShell
+              const used = ShellSelect.name(shellPath)
               const info = yield* shell.create(
                 {
                   command: input.command,
                   cwd: input.workdir,
                   timeout,
-                  shell: yield* compatibleShell,
+                  shell: shellPath,
                   metadata: { sessionID: context.sessionID },
                 },
                 (invocation) =>
@@ -225,7 +231,7 @@ export const Plugin = {
                     finalTimeout = yield* prepare(invocation, context)
                   }),
               )
-              yield* context.progress({ shellID: info.id })
+              yield* context.progress({ shellID: info.id, shell: used })
 
               const settled = yield* Deferred.make<Output>()
               const run = Effect.gen(function* () {
@@ -238,6 +244,7 @@ export const Plugin = {
                     ? `${output.output}\n\nCommand exceeded timeout of ${finalTimeout} ms. Retry with a larger timeout if the command is expected to take longer.`
                     : output.output,
                   status: "completed" as const,
+                  shell: used,
                 }
               }).pipe(
                 Effect.tap((output) => Deferred.succeed(settled, output)),
@@ -262,7 +269,7 @@ export const Plugin = {
               if (input.background === true) {
                 yield* jobs.background(job.id)
                 yield* notifyWhenDone(context.sessionID, job.id, info.id, info.command, settled)
-                return backgroundResult(info.id, info.file)
+                return backgroundResult(info.id, info.file, used)
               }
 
               const result = yield* jobs
@@ -271,7 +278,7 @@ export const Plugin = {
               if (result?.type === "backgrounded") {
                 yield* shell.timeout(info.id, 0)
                 yield* notifyWhenDone(context.sessionID, job.id, info.id, info.command, settled)
-                return backgroundResult(info.id, info.file)
+                return backgroundResult(info.id, info.file, used)
               }
               if (result?.info.status === "error")
                 return yield* Effect.fail(new Error(result.info.error ?? "Command failed"))

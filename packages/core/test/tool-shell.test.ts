@@ -873,8 +873,8 @@ describe("ShellTool", () => {
             }).pipe(Effect.timeout("3 seconds"))
             expect(result.status).toBe("completed")
             expect(JSON.parse(result.output.output)).toEqual([
-              { output: "one", exit: 0, truncated: false, status: "completed" },
-              { output: "two", exit: 0, truncated: false, status: "completed" },
+              { output: "one", exit: 0, truncated: false, status: "completed", shell: expect.any(String) },
+              { output: "two", exit: 0, truncated: false, status: "completed", shell: expect.any(String) },
             ])
           }),
         )
@@ -907,6 +907,8 @@ describe("ShellTool", () => {
               const settled = yield* executeTool(registry, call({ command: helloCommand }))
               expect(settled.status).toBe("completed")
               expect(settled.metadata).toMatchObject({ exit: 0, truncated: false })
+              // the block names the shell that ran the command
+              expect(settled.metadata?.shell).toBeString()
               expect(settled.content).toEqual([{ type: "text", text: "hello" }])
               expect(assertions).toMatchObject([
                 {

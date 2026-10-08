@@ -1439,9 +1439,7 @@ export function Session(props: {
                   onMouseOut={() => setLatestHovered(false)}
                   onMouseUp={toBottom}
                 >
-                  <text
-                    fg={latestHovered() ? theme.text.action.secondary.hovered : theme.text.action.secondary.base}
-                  >
+                  <text fg={latestHovered() ? theme.text.action.secondary.hovered : theme.text.action.secondary.base}>
                     Jump to latest ↓
                   </text>
                 </box>
@@ -1487,12 +1485,7 @@ export function Session(props: {
                     }}
                   </Show>
                 </Match>
-                <Match
-                  when={
-                    session() &&
-                    currentLocation.error?.location.directory === session()!.location.directory
-                  }
-                >
+                <Match when={session() && currentLocation.error?.location.directory === session()!.location.directory}>
                   <SessionLocationMissing
                     directory={session()!.location.directory}
                     projectID={session()!.projectID}
@@ -2747,9 +2740,7 @@ function BlockTool(props: BlockToolProps) {
               <Show
                 when={props.spinner}
                 fallback={
-                  <text
-                    fg={permission() ? theme.text.feedback.warning.base : (props.headerColor ?? theme.text.muted)}
-                  >
+                  <text fg={permission() ? theme.text.feedback.warning.base : (props.headerColor ?? theme.text.muted)}>
                     {title()}
                   </text>
                 }
@@ -2798,6 +2789,9 @@ function BlockTool(props: BlockToolProps) {
 const SHELL_DISPLAY_LIMIT = 1024 * 1024
 
 function Shell(props: ToolProps) {
+  const theme = useTheme()
+  // The shell that ran the command, so the operator can tell bash from the hub's terminal.
+  const used = () => stringValue(props.metadata.shell)
   return (
     <ShellDisplay
       part={props.part}
@@ -2807,6 +2801,8 @@ function Shell(props: ToolProps) {
       status={props.part.state.status}
       background={props.part.state.status === "completed" && props.metadata.status === "running"}
       output={stringValue(props.metadata.shellID) ? undefined : props.output}
+      badge={used()}
+      badgeColor={hubBadgeColor(theme, used())}
     />
   )
 }
@@ -2972,13 +2968,21 @@ function ShellDisplay(props: {
           <Show
             when={isRunning()}
             fallback={
-              <text
-                fg={theme.text.base}
-                wrapMode={expanded() ? "word" : "char"}
-                maxHeight={expanded() ? undefined : 2}
-              >
-                {limitedInput()}
-              </text>
+              // The shell (or hub terminal) that ran the command sits in the block's top-right corner.
+              <box flexDirection="row" gap={1}>
+                <text
+                  fg={theme.text.base}
+                  wrapMode={expanded() ? "word" : "char"}
+                  maxHeight={expanded() ? undefined : 2}
+                  flexGrow={1}
+                  minWidth={0}
+                >
+                  {limitedInput()}
+                </text>
+                <Show when={props.badge}>
+                  {(badge) => <StatusBadge color={props.badgeColor}>{badge()}</StatusBadge>}
+                </Show>
+              </box>
             }
           >
             <box flexDirection="row" gap={1}>
@@ -2992,6 +2996,7 @@ function ShellDisplay(props: {
               >
                 {limitedInput()}
               </text>
+              <Show when={props.badge}>{(badge) => <StatusBadge color={props.badgeColor}>{badge()}</StatusBadge>}</Show>
             </box>
           </Show>
           <Show when={limitedOutput()}>
@@ -3000,9 +3005,6 @@ function ShellDisplay(props: {
         </Show>
         <Show when={props.background}>
           <StatusBadge raised>Background</StatusBadge>
-        </Show>
-        <Show when={props.badge}>
-          {(badge) => <StatusBadge color={props.badgeColor}>{badge()}</StatusBadge>}
         </Show>
       </box>
     </BlockTool>
@@ -3080,7 +3082,9 @@ function Read(props: ToolProps) {
         Read {pathFormatter.format(stringValue(props.input.path))}
         <Show when={props.input.offset !== undefined || props.input.limit !== undefined}>
           :{finiteNumber(props.input.offset) || 1}-
-          {props.input.limit ? (finiteNumber(props.input.offset) || 1) + (finiteNumber(props.input.limit) || 0) - 1 : ""}
+          {props.input.limit
+            ? (finiteNumber(props.input.offset) || 1) + (finiteNumber(props.input.limit) || 0) - 1
+            : ""}
         </Show>
       </InlineTool>
       <For each={loaded()}>
