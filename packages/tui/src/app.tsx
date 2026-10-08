@@ -71,6 +71,8 @@ import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogOpen, DialogOpenKey, moveOpenSession } from "./component/dialog-open"
 import { ProjectTree } from "./component/project-tree"
 import { ProjectsProvider, useProjects } from "./context/projects"
+import { NotesProvider } from "./context/notes"
+import { NotesCommands } from "./component/notes-commands"
 import { clampSessionTabsWidth, sessionTabsFitVertically, SESSION_SIDEBAR_WIDTH } from "./ui/layout"
 import { createPaneResize } from "./ui/pane-resize"
 import { PaneResizeHandle } from "./ui/pane-resize-handle"
@@ -376,44 +378,46 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                 <DataProvider directory={directory}>
                                                   <LocationProvider>
                                                     <ProjectsProvider>
-                                                      <SessionTabsProvider>
-                                                        <SessionTerminalsProvider>
-                                                          <ThemeProvider
-                                                            mode={mode}
-                                                            source={createThemeSource(global.config)}
-                                                          >
-                                                            <ThemeErrorToast />
-                                                            <LocalProvider>
-                                                              <PromptStashProvider>
-                                                                <DialogProvider>
-                                                                  <FrecencyProvider>
-                                                                    <PromptHistoryProvider>
-                                                                      <PromptRefProvider>
-                                                                        <EditorContextProvider>
-                                                                          <AttentionProvider>
-                                                                            <UpdateNotificationProvider
-                                                                              updater={input.updater}
-                                                                            >
-                                                                              <PanelProvider>
-                                                                                <PluginProvider
-                                                                                  packages={input.packages}
-                                                                                  directories={pluginDirectories}
-                                                                                >
-                                                                                  <App />
-                                                                                </PluginProvider>
-                                                                              </PanelProvider>
-                                                                            </UpdateNotificationProvider>
-                                                                          </AttentionProvider>
-                                                                        </EditorContextProvider>
-                                                                      </PromptRefProvider>
-                                                                    </PromptHistoryProvider>
-                                                                  </FrecencyProvider>
-                                                                </DialogProvider>
-                                                              </PromptStashProvider>
-                                                            </LocalProvider>
-                                                          </ThemeProvider>
-                                                        </SessionTerminalsProvider>
-                                                      </SessionTabsProvider>
+                                                      <NotesProvider>
+                                                        <SessionTabsProvider>
+                                                          <SessionTerminalsProvider>
+                                                            <ThemeProvider
+                                                              mode={mode}
+                                                              source={createThemeSource(global.config)}
+                                                            >
+                                                              <ThemeErrorToast />
+                                                              <LocalProvider>
+                                                                <PromptStashProvider>
+                                                                  <DialogProvider>
+                                                                    <FrecencyProvider>
+                                                                      <PromptHistoryProvider>
+                                                                        <PromptRefProvider>
+                                                                          <EditorContextProvider>
+                                                                            <AttentionProvider>
+                                                                              <UpdateNotificationProvider
+                                                                                updater={input.updater}
+                                                                              >
+                                                                                <PanelProvider>
+                                                                                  <PluginProvider
+                                                                                    packages={input.packages}
+                                                                                    directories={pluginDirectories}
+                                                                                  >
+                                                                                    <App />
+                                                                                  </PluginProvider>
+                                                                                </PanelProvider>
+                                                                              </UpdateNotificationProvider>
+                                                                            </AttentionProvider>
+                                                                          </EditorContextProvider>
+                                                                        </PromptRefProvider>
+                                                                      </PromptHistoryProvider>
+                                                                    </FrecencyProvider>
+                                                                  </DialogProvider>
+                                                                </PromptStashProvider>
+                                                              </LocalProvider>
+                                                            </ThemeProvider>
+                                                          </SessionTerminalsProvider>
+                                                        </SessionTabsProvider>
+                                                      </NotesProvider>
                                                     </ProjectsProvider>
                                                   </LocationProvider>
                                                 </DataProvider>
@@ -1378,6 +1382,7 @@ function App() {
               </Switch>
             </box>
             <Slot path="app" />
+            <NotesCommands />
           </Show>
         </box>
         <Show when={verticalTabsVisible()}>

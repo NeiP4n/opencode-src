@@ -1,5 +1,5 @@
 import { TextAttributes } from "@opentui/core"
-import { createEffect, createMemo, createResource, createSignal, For, Show, type JSX } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, For, on, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { OrchestraAccess, OrchestraProject } from "@opencode/client/promise"
 import { Orchestra } from "@opencode/schema/orchestra"
@@ -13,11 +13,16 @@ import { errorMessage } from "../util/error"
 import { roomListRevision } from "../util/room"
 import { openProjectDialog } from "./dialog-project"
 import { useProjects } from "../context/projects"
+import { useNotes, type NotesTab } from "../context/notes"
+import { NotesPanel } from "./notes-panel"
+import { Row } from "./panel-row"
+import { useNow } from "./note-canvas"
 
 // The left panel: the operator's own projects, each a name and a directory,
 // with its main session (the orchestra) and the sessions opened in that
 // directory under it. The chip after a session is the access the orchestra
-// has to it; clicking it steps through the levels.
+// has to it; clicking it steps through the levels. The Notes tab swaps the tree
+// for the notes of one project.
 
 const ACCESS_ORDER: readonly OrchestraAccess[] = ["hidden", "read", "write", "full"]
 
@@ -30,6 +35,7 @@ export function ProjectTree(props: { width: number }) {
   const dialog = useDialog()
   const projectList = useProjects()
   const projects = projectList.list
+  const notes = useNotes()
   const [rooms] = createResource(roomListRevision, () => client.api.room.list().catch(() => []))
   const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
   const [access, setAccess] = createStore<Record<string, OrchestraAccess>>({})
@@ -47,14 +53,29 @@ export function ProjectTree(props: { width: number }) {
       .filter((project) => Orchestra.contains(project.directory, directory))
       .toSorted((a, b) => b.directory.length - a.directory.length)[0]
 
-  // The project of the open session starts expanded so the tree shows where you are.
-  createEffect(() => {
+  const sessionProject = () => {
     const session = current()
-    const project =
+    return (
       session &&
       projects().find((item) => item.main === session.id || owner(session.location.directory)?.id === item.id)
+    )
+  }
+
+  // The project of the open session starts expanded so the tree shows where you are.
+  createEffect(() => {
+    const project = sessionProject()
     if (project && expanded[project.id] === undefined) void expand(project.id)
   })
+
+  // Opening a session makes its project the one the Notes tab shows.
+  createEffect(
+    on(
+      () => sessionProject()?.id,
+      (projectID) => {
+        if (projectID && projectID !== notes.project()) notes.setProject(projectID)
+      },
+    ),
+  )
 
   const expand = async (projectID: string) => {
     setExpanded(projectID, true)
@@ -68,6 +89,7 @@ export function ProjectTree(props: { width: number }) {
   }
 
   const toggle = (projectID: string) => {
+    notes.setProject(projectID)
     if (expanded[projectID]) return setExpanded(projectID, false)
     void expand(projectID)
   }
@@ -122,16 +144,29 @@ export function ProjectTree(props: { width: number }) {
 
   return (
     <box width={props.width} height="100%" flexShrink={0} backgroundColor={theme.background.raised.base} paddingTop={1}>
-      <box flexDirection="row" paddingLeft={2} paddingRight={1} paddingBottom={1}>
-        <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
-          Projects
-        </text>
+      <box flexDirection="row" paddingLeft={1} paddingRight={1} paddingBottom={1}>
+        <Tab tab="projects" label="Projects" hover={hover} setHover={setHover} />
+        <text fg={theme.text.muted}>│</text>
+        <Tab tab="notes" label="Notes" hover={hover} setHover={setHover} />
         <box flexGrow={1} />
-        <Row id="new-project" hover={hover} setHover={setHover} onClick={() => edit()}>
-          <text fg={theme.text.action.primary.base}>+ New</text>
+        <Row
+          id="new"
+          hover={hover}
+          setHover={setHover}
+          onClick={() => (notes.tab() === "notes" ? notes.setCreating(true) : edit())}
+        >
+          <text fg={hover() === "new" ? theme.text.action.primary.hovered : theme.text.action.primary.base}>+ New</text>
         </Row>
       </box>
-      <scrollbox flexGrow={1} minHeight={0} horizontalScrollbarOptions={{ visible: false }}>
+      <Show when={notes.tab() === "notes"}>
+        <ProjectNotes />
+      </Show>
+      <scrollbox
+        visible={notes.tab() === "projects"}
+        flexGrow={notes.tab() === "projects" ? 1 : 0}
+        minHeight={0}
+        horizontalScrollbarOptions={{ visible: false }}
+      >
         <For each={projects()}>
           {(project) => (
             <box>
@@ -228,32 +263,78 @@ export function ProjectTree(props: { width: number }) {
   )
 }
 
-function Row(props: {
-  id: string
+function Tab(props: {
+  tab: NotesTab
+  label: string
   hover: () => string | undefined
   setHover: (id: string | undefined) => void
-  selected?: boolean
-  onClick: () => void
-  children: JSX.Element
 }) {
   const theme = useTheme()
+  const notes = useNotes()
+  const id = `tab:${props.tab}`
+  const active = () => notes.tab() === props.tab
   return (
     <box
-      flexDirection="row"
       paddingLeft={1}
       paddingRight={1}
-      backgroundColor={
-        props.selected
-          ? theme.background.action.primary.focused
-          : props.hover() === props.id
-            ? theme.background.action.primary.hovered
-            : undefined
-      }
-      onMouseOver={() => props.setHover(props.id)}
+      onMouseOver={() => props.setHover(id)}
       onMouseOut={() => props.setHover(undefined)}
-      onMouseUp={props.onClick}
+      onMouseUp={() => notes.setTab(props.tab)}
     >
-      {props.children}
+      <text
+        fg={
+          active()
+            ? theme.text.action.primary.selected
+            : props.hover() === id
+              ? theme.text.action.secondary.hovered
+              : theme.text.muted
+        }
+        attributes={active() ? TextAttributes.BOLD | TextAttributes.UNDERLINE : undefined}
+      >
+        {props.label}
+      </text>
     </box>
+  )
+}
+
+// The Notes tab: the notes of the project of the open session, or of the project
+// last picked, or of the first one.
+function ProjectNotes() {
+  const notes = useNotes()
+  const route = useRoute()
+  const toast = useToast()
+  const projects = useProjects().list
+  const now = useNow()
+  const project = createMemo(() => projects().find((item) => item.id === notes.project()) ?? projects()[0])
+  const directory = () => project()?.directory
+  const openName = () => (route.data.type === "session" ? notes.bound(route.data.sessionID)?.name : undefined)
+  const fail = (error: unknown) => toast.show({ variant: "error", message: errorMessage(error) })
+
+  return (
+    <NotesPanel
+      project={project()}
+      projects={projects()}
+      notes={directory() ? notes.list(directory()!) : []}
+      loaded={directory() ? notes.loaded(directory()!) : true}
+      error={directory() ? notes.error(directory()!) : undefined}
+      openName={openName()}
+      now={now()}
+      creating={notes.creating()}
+      onCreating={notes.setCreating}
+      onPickProject={notes.setProject}
+      onOpen={(note) => {
+        const target = directory()
+        if (target) void notes.open(target, note).catch(fail)
+      }}
+      onCreate={(title) => {
+        const target = directory()
+        if (target) void notes.start(target, title).catch(fail)
+      }}
+      onRemove={(note) => {
+        const target = directory()
+        if (!target) return
+        void notes.remove(target, note).catch(fail)
+      }}
+    />
   )
 }

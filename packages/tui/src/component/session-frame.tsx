@@ -16,6 +16,8 @@ import { useSessionTerminals } from "../context/session-terminals"
 import { usePromptRef } from "../context/prompt"
 import { usePanel } from "../context/panel"
 import { useStorage } from "../context/storage"
+import { useNotes } from "../context/notes"
+import { useTheme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
 import { Session } from "../routes/session"
 import { Sidebar } from "../routes/session/sidebar"
@@ -25,6 +27,7 @@ import { PaneResizeHandle } from "../ui/pane-resize-handle"
 import { useToast } from "../ui/toast"
 import { TerminalPane } from "./terminal-pane"
 import { PanelHost } from "./panel-host"
+import { NoteCanvas } from "./note-canvas"
 
 export function SessionFrame(props: { sessionID: string; verticalTabsWidth: number }) {
   const sessions = useSessionTerminals()
@@ -37,6 +40,8 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
   const dimensions = useTerminalDimensions()
   const panels = usePanel()
   const dialog = useDialog()
+  const notes = useNotes()
+  const theme = useTheme()
   const availableWidth = () => Math.max(0, dimensions().width - props.verticalTabsWidth)
   const defaultPaneWidth = () => Math.max(1, Math.floor(panels.width() / 2))
   const [layout, updateLayout] = useStorage().store<{ paneWidth?: number; terminalWidth?: number }>("layout", {
@@ -90,6 +95,10 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
     if (current?.sessionID === props.sessionID) return current
   })
   const fullscreen = () => activePanel() !== undefined && panels.presentation() === "fullscreen"
+  // A session bound to a note in Notes mode shows the note as its document, with the chat beside it.
+  const canvas = createMemo(() => (fullscreen() ? undefined : notes.canvas(props.sessionID)))
+  // Too narrow for side by side: the document goes on top of the chat.
+  const stacked = () => availableWidth() < 100
   createEffect(
     on([activePanel, () => selectedTerminal()?.id], ([panel, terminal], previous) => {
       if (panel && panel !== previous?.[0]) {
@@ -107,6 +116,8 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
   const sidebarVisible = createMemo(() => {
     if (data.session.get(props.sessionID)?.parentID) return false
     if (sidebarOpen()) return true
+    // The document and its chat need the room the automatic sidebar would take.
+    if (canvas()) return false
     return (config.data.session?.sidebar ?? "auto") === "auto" && wide()
   })
   const rightPane = createMemo(() => {
@@ -270,57 +281,92 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
       onMouseUp={finishPaneResize}
     >
       <box
-        id="session-pane"
-        ref={(value: BoxRenderable) => (sessionNode = value)}
         flexGrow={1}
         flexBasis={0}
         minWidth={0}
         minHeight={0}
-        position={fullscreen() ? "absolute" : "relative"}
-        visible={!fullscreen()}
-        width={fullscreen() ? Math.max(0, panels.width() - paneResize.size()) : undefined}
-        height="100%"
-        onSizeChange={function () {
-          setSessionWidth(this.width)
-        }}
+        flexDirection={stacked() ? "column" : "row"}
+        position="relative"
       >
-        <InteractivityProvider enabled={activePane() === "session" && !fullscreen()}>
-          <Session
-            scrollRef={(value) => (sessionScroll = value)}
-            verticalTabsWidth={props.verticalTabsWidth}
-            promptMuted={activePane() !== "session"}
-            sidebarVisible={rightPane() === "sidebar"}
-            onToggleSidebar={toggleSidebar}
-            terminals={sessions.available()}
-            visibleTerminalID={rightPane() === "terminal" ? selectedTerminal()?.id : undefined}
-            onTerminalPicker={(show) => (showTerminals = show)}
-            width={sessionWidth()}
-          />
-        </InteractivityProvider>
-        <Show when={activePane() === "right"}>
-          <box
-            position="absolute"
-            left={0}
-            top={0}
-            width="100%"
-            height="100%"
-            zIndex={1}
-            onMouseScroll={(event) => {
-              if (!sessionScroll || sessionScroll.isDestroyed) return
-              const viewport = sessionScroll.viewport
-              if (event.x < viewport.x || event.x >= viewport.x + viewport.width) return
-              if (event.y < viewport.y || event.y >= viewport.y + viewport.height) return
-              // Keep the focus-only click guard, but let the transcript handle its own wheel events.
-              event.stopPropagation()
-              sessionScroll.processMouseEvent(new MouseEvent(sessionScroll, event))
-            }}
-            // Consume the release before revealing permission buttons underneath.
-            onMouseUp={() => {
-              if (paneResize.resizing() || resizeRelease) return
-              focusSession()
-            }}
-          />
-        </Show>
+        {/* Always mounted and only hidden, so the session pane next to it never re-anchors. */}
+        <box
+          id="note-canvas"
+          visible={canvas() !== undefined}
+          flexGrow={3}
+          flexBasis={0}
+          minWidth={0}
+          minHeight={0}
+          border={[stacked() ? "bottom" : "right"]}
+          borderColor={theme.border.base}
+        >
+          {/* Another note gets a fresh document, never the editor state of the previous one. */}
+          <Show when={canvas()?.name} keyed>
+            {(_) => (
+              <Show when={canvas()}>
+                {(note) => (
+                  <NoteCanvas
+                    sessionID={props.sessionID}
+                    note={note()}
+                    directory={data.session.get(props.sessionID)?.location.directory ?? ""}
+                  />
+                )}
+              </Show>
+            )}
+          </Show>
+        </box>
+        <box
+          id="session-pane"
+          ref={(value: BoxRenderable) => (sessionNode = value)}
+          flexGrow={canvas() ? 2 : 1}
+          flexBasis={0}
+          minWidth={0}
+          minHeight={0}
+          position={fullscreen() ? "absolute" : "relative"}
+          visible={!fullscreen()}
+          width={fullscreen() ? Math.max(0, panels.width() - paneResize.size()) : undefined}
+          height="100%"
+          onSizeChange={function () {
+            setSessionWidth(this.width)
+          }}
+        >
+          <InteractivityProvider enabled={activePane() === "session" && !fullscreen()}>
+            <Session
+              scrollRef={(value) => (sessionScroll = value)}
+              verticalTabsWidth={props.verticalTabsWidth}
+              promptMuted={activePane() !== "session"}
+              sidebarVisible={rightPane() === "sidebar"}
+              onToggleSidebar={toggleSidebar}
+              terminals={sessions.available()}
+              visibleTerminalID={rightPane() === "terminal" ? selectedTerminal()?.id : undefined}
+              onTerminalPicker={(show) => (showTerminals = show)}
+              width={sessionWidth()}
+            />
+          </InteractivityProvider>
+          <Show when={activePane() === "right"}>
+            <box
+              position="absolute"
+              left={0}
+              top={0}
+              width="100%"
+              height="100%"
+              zIndex={1}
+              onMouseScroll={(event) => {
+                if (!sessionScroll || sessionScroll.isDestroyed) return
+                const viewport = sessionScroll.viewport
+                if (event.x < viewport.x || event.x >= viewport.x + viewport.width) return
+                if (event.y < viewport.y || event.y >= viewport.y + viewport.height) return
+                // Keep the focus-only click guard, but let the transcript handle its own wheel events.
+                event.stopPropagation()
+                sessionScroll.processMouseEvent(new MouseEvent(sessionScroll, event))
+              }}
+              // Consume the release before revealing permission buttons underneath.
+              onMouseUp={() => {
+                if (paneResize.resizing() || resizeRelease) return
+                focusSession()
+              }}
+            />
+          </Show>
+        </box>
       </box>
       <Show when={rightPane() === "terminal" || rightPane() === "panel" || (rightPane() === "sidebar" && wide())}>
         <box
