@@ -1,5 +1,5 @@
-import { TextAttributes, type InputRenderable, type ScrollBoxRenderable } from "@opentui/core"
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import type { InputRenderable, ScrollBoxRenderable } from "@opentui/core"
+import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { OpenCode, type RoomMessage } from "@opencode/client"
 import { useConfig } from "../config"
 import { useTheme } from "../context/theme"
@@ -29,7 +29,22 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
   const [messages, setMessages] = createSignal<readonly RoomMessage[]>([])
   const [running, setRunning] = createSignal(false)
   const [error, setError] = createSignal<string>()
-  const [sending, setSending] = createSignal(false)
+  const [sending, setSending] = createSignal(0)
+  // The host's machine name; the address stands in until it answers.
+  const [host] = createResource(() =>
+    client.room.public().then(
+      (result) => result.host,
+      () => undefined,
+    ),
+  )
+  // Everyone who has posted, plus this device even before its first message.
+  const people = createMemo(
+    () =>
+      new Set([
+        props.room.guest,
+        ...messages().flatMap((message) => (message.role === "user" && message.author ? [message.author] : [])),
+      ]).size,
+  )
   let input: InputRenderable | undefined
   let scroll: ScrollBoxRenderable | undefined
 
@@ -52,25 +67,38 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
     setTimeout(() => input?.focus(), 1)
   })
 
+  // The field clears at once so the next message can be typed while this one
+  // posts or the host's AI is still answering; a failed post puts it back.
   const send = () => {
     const text = input?.value.trim()
-    if (!text || sending()) return
-    setSending(true)
+    if (!text || !input) return
+    input.value = ""
+    setSending((count) => count + 1)
     void client.room.guest
       .prompt({ roomID: props.room.roomID, text })
-      .then(() => {
-        if (input) input.value = ""
-        return refresh()
+      .then(() => refresh())
+      .catch((cause: unknown) => {
+        setError(errorMessage(cause))
+        if (input && !input.value) input.value = text
       })
-      .catch((cause: unknown) => setError(errorMessage(cause)))
-      .finally(() => setSending(false))
+      .finally(() => setSending((count) => count - 1))
+  }
+
+  const author = (message: RoomMessage) => {
+    if (message.role === "assistant") return "AI"
+    if (message.author === props.room.guest) return "You"
+    if (!message.author || message.author === "host") return "Host"
+    return message.author
   }
 
   return (
     <box paddingLeft={2} paddingRight={2} paddingBottom={1} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
-          {`${props.room.name} · ${new URL(props.room.url).host}`}
+        <text fg={theme.text.base} wrapMode="none" truncate>
+          <span style={{ bold: true }}>{`⇄ Multiplayer · ${props.room.name}`}</span>
+          <span style={{ fg: theme.text.muted }}>
+            {` · host ${host() ?? new URL(props.room.url).host} · ${people()} ${people() === 1 ? "person" : "people"}`}
+          </span>
         </text>
         <text fg={theme.text.muted} onMouseUp={props.onClose}>
           esc
@@ -89,7 +117,7 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
           {(message) => (
             <box paddingBottom={1}>
               <text fg={message.role === "assistant" ? theme.text.action.primary.base : theme.text.muted}>
-                {message.role === "assistant" ? "AI" : message.author === props.room.guest ? "You" : message.author}
+                {author(message)}
               </text>
               <text fg={theme.text.base} wrapMode="word">
                 {message.text}
@@ -99,7 +127,7 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
         </For>
       </scrollbox>
       <Show when={running()}>
-        <text fg={theme.text.muted}>The host's AI is working…</text>
+        <text fg={theme.text.muted}>The host's AI is answering… you can keep writing.</text>
       </Show>
       <Show when={error()}>
         {(message) => (
@@ -114,7 +142,7 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
           input = element
         }}
         onSubmit={send}
-        placeholder={sending() ? "Sending…" : "Message the room, enter to send"}
+        placeholder={sending() > 0 ? "Sending…" : "Message the room, enter to send"}
         placeholderColor={theme.text.muted}
         textColor={theme.text.formfield.base}
         focusedTextColor={theme.text.formfield.focused}
