@@ -167,6 +167,8 @@ export function createFetch(override?: FetchHandler, events?: ReturnType<typeof 
     if (url.pathname === "/session") return json([])
     if (url.pathname === "/vcs") return json({ branch: "main" })
     if (url.pathname === "/api/experimental/migration/v1") return json({ status: "completed" })
+    if (url.pathname === "/api/room") return json({ data: [] })
+    if (/^\/api\/orchestra\/[^/]+$/.test(url.pathname)) return json({ access: {} })
     throw new Error(`unexpected request: ${url.pathname}`)
   }
   fetch.preconnect = () => {}

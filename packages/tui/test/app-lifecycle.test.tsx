@@ -470,44 +470,6 @@ test("vertical session tabs switch to horizontal below readable content width", 
   await setup.waitForFrame((frame) => frame.split("\n")[1].slice(0, 42).includes(session.title))
 })
 
-test("narrow vertical session tabs collapse to a compact rail with the terminal", async () => {
-  await using state = await tmpdir()
-  await Bun.write(path.join(state.path, "test", "tui", "layout.json"), JSON.stringify({ verticalTabsWidth: 5 }))
-  const session = {
-    id: "ses_resize",
-    title: "Resize fixture",
-    projectID: "project",
-    location: { directory },
-    cost: 0,
-    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-    time: { created: 1, updated: 2 },
-  }
-  await using setup = await createAppFixture({
-    width: 80,
-    state: state.path,
-    config: {
-      animations: false,
-      tabs: { mode: "on", layout: "vertical", indicators: "status" },
-      session: { sidebar: "hide" },
-    },
-    args: { sessionID: session.id },
-    fetch: (url) => {
-      if (url.pathname === `/api/session/${session.id}`) return json({ data: session })
-      if (/^\/api\/session\/ses_resize\/(message|inbox|permission)$/.test(url.pathname))
-        return json({ data: [], cursor: {} })
-      return undefined
-    },
-  })
-  await setup.ready
-  await setup.waitForFrame((frame) => frame.split("\n")[1].slice(0, 10).trim() === "⌕")
-
-  setup.resize(68, 30)
-  await setup.waitForFrame((frame) => frame.split("\n")[0].includes(session.title))
-  expect(setup.captureCharFrame()).not.toContain("⌕")
-  setup.resize(80, 30)
-  await setup.waitForFrame((frame) => frame.split("\n")[1].slice(0, 10).trim() === "⌕")
-})
-
 test("automatic rename refreshes the displayed title before settling, even without a renamed event", async () => {
   await using state = await tmpdir()
   const response = Promise.withResolvers<Response>()
@@ -528,10 +490,15 @@ test("automatic rename refreshes the displayed title before settling, even witho
     width: 110,
     height: 20,
     state: state.path,
-    config: { tabs: { mode: "on", layout: "vertical" }, session: { sidebar: "hide" } },
+    config: { session: { sidebar: "hide" } },
     args: { sessionID: session.id },
     fetch: async (url, request) => {
       if (url.pathname === "/api/location") return json(location)
+      // The project tree on the left shows the session title.
+      if (url.pathname === "/api/project")
+        return json([
+          { id: "project", canonical: directory, time: { created: 0, updated: 0, active: 0 }, sandboxes: [] },
+        ])
       if (url.pathname === "/api/agent")
         return json({ location, data: [{ id: "build", mode: "primary", hidden: false, permissions: [] }] })
       if (url.pathname === "/api/model")

@@ -69,7 +69,7 @@ import { DialogHelp } from "./ui/dialog-help"
 import { DialogAgent } from "./component/dialog-agent"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogOpen, DialogOpenKey, moveOpenSession } from "./component/dialog-open"
-import { SessionTabs } from "./component/session-tabs"
+import { ProjectTree } from "./component/project-tree"
 import { clampSessionTabsWidth, sessionTabsFitVertically, SESSION_SIDEBAR_WIDTH } from "./ui/layout"
 import { createPaneResize } from "./ui/pane-resize"
 import { PaneResizeHandle } from "./ui/pane-resize-handle"
@@ -571,9 +571,9 @@ function App() {
   }
   const terminalTitleEnabled = () => config.data.terminal?.title ?? true
   const pasteSummaryEnabled = () => config.data.prompt?.paste !== "full"
-  const tabsVertical = () =>
-    config.data.tabs.layout === "vertical" && sessionTabsFitVertically(dimensions().width, tabsResize.size())
-  const tabsAvailable = () => sessionTabs.enabled() && sessionTabs.tabs().length > 0 && route.data.type !== "plugin"
+  // The project tree replaces the session tabs and always sits on the left when the terminal is wide enough.
+  const tabsVertical = () => sessionTabsFitVertically(dimensions().width, tabsResize.size())
+  const tabsAvailable = () => route.data.type !== "plugin" && data.project.list().length > 0
   const fullscreenPanel = () =>
     route.data.type === "session" &&
     panels.current()?.sessionID === route.data.sessionID &&
@@ -1345,14 +1345,11 @@ function App() {
         onMouseUp={tabsResize.onMouseUp}
       >
         <Show when={verticalTabsVisible()}>
-          <SessionTabs orientation="vertical" width={tabsResize.size()} />
+          <ProjectTree width={tabsResize.size()} />
         </Show>
         <box flexGrow={1} minWidth={0} flexDirection="column">
           <Show when={plugins.ready()}>
             <box flexGrow={1} minHeight={0} flexDirection="column">
-              <Show when={tabsVisible() && !tabsVertical()}>
-                <SessionTabs />
-              </Show>
               <Switch>
                 <Match when={route.data.type === "home"}>
                   <Home />
