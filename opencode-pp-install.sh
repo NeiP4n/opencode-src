@@ -5,8 +5,9 @@
 #
 # Missing git, curl or unzip come from the system package manager (it may ask
 # for your sudo password), Bun from bun.sh. The newest release is checked out
-# into ~/.local/share/opencode-pp and the `opencode` command goes to
-# ~/.local/bin, which is added to your shell's PATH. Running this again updates.
+# into ~/.local/share/opencode-pp and the `opencode-pp` command goes to
+# ~/.local/bin, which is added to your shell's PATH. A regular opencode keeps
+# the `opencode` command. Running this again updates.
 set -eu
 
 REPO="${OPENCODE_PP_REPO:-https://github.com/NeiP4n/opencode-src.git}"
@@ -91,16 +92,21 @@ echo "Installing dependencies…"
 (cd "$DIR" && bun install --frozen-lockfile --filter ./packages/cli)
 
 mkdir -p "$BIN"
+# The command is `opencode-pp`, so a regular opencode on the same machine keeps `opencode`.
 # The preload is passed by absolute path: bunfig.toml names it by package, and Bun resolves
-# that from the directory opencode is started in, so `opencode` failed outside the checkout.
-cat >"$BIN/opencode" <<WRAPPER
+# that from the directory the command is started in.
+cat >"$BIN/opencode-pp" <<WRAPPER
 #!/bin/sh
 # Opencode++ $VERSION, installed by opencode-pp-install.sh.
 exec "$(command -v bun)" --preload="$DIR/packages/cli/node_modules/@opentui/solid/scripts/preload.js" "$DIR/packages/cli/src/index.ts" "\$@"
 WRAPPER
-chmod +x "$BIN/opencode"
+chmod +x "$BIN/opencode-pp"
+# Earlier versions of this installer took the name `opencode`; give it back, but only our own wrapper.
+if [ -f "$BIN/opencode" ] && grep -q "installed by opencode-pp-install.sh" "$BIN/opencode"; then
+  rm -f "$BIN/opencode"
+fi
 
-# New terminals find `opencode` without the user editing anything: one line per shell
+# New terminals find `opencode-pp` without the user editing anything: one line per shell
 # config, written once.
 add_path() {
   file="$1"
@@ -123,7 +129,7 @@ esac
 echo
 echo "Opencode++ $VERSION is installed."
 if [ "${ADDED:-0}" = 1 ]; then
-  echo "Open a new terminal and run: opencode"
+  echo "Open a new terminal and run: opencode-pp"
 else
-  echo "Run: opencode"
+  echo "Run: opencode-pp"
 fi

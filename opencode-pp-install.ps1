@@ -3,8 +3,9 @@
 #   irm https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.ps1 | iex
 #
 # Missing Git comes from winget, Bun from bun.sh. The newest release is checked
-# out into %LOCALAPPDATA%\opencode-pp and the `opencode` command is added to your
-# user PATH, so it works in this window right away. Running this again updates.
+# out into %LOCALAPPDATA%\opencode-pp and the `opencode-pp` command is added to your
+# user PATH, so it works in this window right away. A regular opencode keeps the
+# `opencode` command. Running this again updates.
 $ErrorActionPreference = "Stop"
 
 $Repo = if ($env:OPENCODE_PP_REPO) { $env:OPENCODE_PP_REPO } else { "https://github.com/NeiP4n/opencode-src.git" }
@@ -78,12 +79,15 @@ if ($Installed -ne 0) { throw "bun install failed." }
 New-Item -ItemType Directory -Force -Path $Bin | Out-Null
 $Bun = (Get-Command bun).Source
 $Cli = Join-Path $Source "packages\cli"
+# The command is `opencode-pp`, so a regular opencode on the same machine keeps `opencode`.
 # The preload goes by absolute path: bunfig.toml names it by package, which Bun resolves from
-# the directory opencode is started in, so the command failed outside the checkout.
-Set-Content -Path (Join-Path $Bin "opencode.cmd") -Encoding ASCII -Value @"
+# the directory the command is started in.
+Set-Content -Path (Join-Path $Bin "opencode-pp.cmd") -Encoding ASCII -Value @"
 @echo off
 "$Bun" --preload="$Cli\node_modules\@opentui\solid\scripts\preload.js" "$Cli\src\index.ts" %*
 "@
+# Earlier versions of this installer took the name `opencode` in this folder; give it back.
+Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Bin "opencode.cmd")
 
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if (-not ($UserPath -split ";" | Where-Object { $_ -eq $Bin })) {
@@ -94,4 +98,4 @@ if (-not ($UserPath -split ";" | Where-Object { $_ -eq $Bin })) {
 if (-not ($env:Path -split ";" | Where-Object { $_ -eq $Bin })) { $env:Path = "$env:Path;$Bin" }
 
 Write-Host ""
-Write-Host "Opencode++ $Version is installed. Run: opencode"
+Write-Host "Opencode++ $Version is installed. Run: opencode-pp"

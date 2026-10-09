@@ -54,7 +54,7 @@ This fork adds LAN rooms (multiplayer between Windows and Linux), project AI tea
 | Linux / macOS | `curl -fsSL https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.sh \| sh` |
 | Windows (PowerShell) | `irm https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.ps1 \| iex` |
 
-Then run `opencode`. Running the same command again updates Opencode++.
+Then run `opencode-pp`. A regular opencode on the same computer keeps the `opencode` command; sessions are kept apart and settings in `~/.config/opencode` are shared. Running the same command again updates Opencode++.
 
 <details>
 <summary>Русский</summary>
@@ -64,7 +64,7 @@ Then run `opencode`. Running the same command again updates Opencode++.
 - Linux / macOS: `curl -fsSL https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.sh | sh`
 - Windows (PowerShell): `irm https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.ps1 | iex`
 
-Потом запусти `opencode`. Повторный запуск той же команды обновляет Opencode++.
+Потом запусти `opencode-pp`. Обычный opencode на том же компьютере остаётся командой `opencode`: сессии у них раздельные, настройки в `~/.config/opencode` общие. Повторный запуск той же команды обновляет Opencode++.
 Мультиплеер между компьютерами: на Windows один раз нажми «Разрешить в брандмауэре Windows» в окне Host или Connect.
 Язык интерфейса переключается справа в нижней строке.
 
