@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Валидатор документации ядра OpenCode.
+"""OpenCode core documentation validator.
 
-Проверяет, что каждый пакет из .opencode/doc_manifest.txt имеет документ PACKAGE.md,
-документ не пустой, в нём есть обязательные разделы и нет заглушек. Режим --dirs
-делает то же самое для подпапочных документов из .opencode/doc_manifest_dirs.txt
-(например packages/core/src/session/PACKAGE.md). В режиме --links
-дополнительно проверяет, что все упомянутые в .md пути внутри packages/... реально
-существуют на диске.
+Checks that every package listed in .opencode/doc_manifest.txt has a PACKAGE.md
+document, that the document is not empty, that it has the required sections and
+that it has no placeholders. The --dirs mode does the same for the subfolder
+documents from .opencode/doc_manifest_dirs.txt (for example
+packages/core/src/session/PACKAGE.md). In --links mode it additionally checks
+that all `packages/...` paths mentioned in the .md files really exist on disk.
 
-Запуск (из корня репозитория):
-  python3 .opencode/doc_check.py                # форма и полнота по всем пакетам
-  python3 .opencode/doc_check.py --links        # плюс проверка путей
-  python3 .opencode/doc_check.py --package core # один пакет
-  python3 .opencode/doc_check.py --surface      # сверка манифеста с packages/
-  python3 .opencode/doc_check.py --sample       # символы из документов против исходников
-  python3 .opencode/doc_check.py --dirs         # подпапочные документы (core/src/*, tui/src/*)
-  python3 .opencode/doc_check.py --dirs --links --sample   # всё сразу по подпапкам
+Run (from the repository root):
+  python3 .opencode/doc_check.py                # form and completeness for all packages
+  python3 .opencode/doc_check.py --links        # plus path checking
+  python3 .opencode/doc_check.py --package core # a single package
+  python3 .opencode/doc_check.py --surface      # reconcile the manifest with packages/
+  python3 .opencode/doc_check.py --sample       # symbols from documents against sources
+  python3 .opencode/doc_check.py --dirs         # subfolder documents (core/src/*, tui/src/*)
+  python3 .opencode/doc_check.py --dirs --links --sample   # everything at once for subfolders
 
-Код возврата: 0 — нарушений нет, 1 — нарушения найдены, 2 — нечем проверять (нет манифеста).
+Exit code: 0 — no violations, 1 — violations found, 2 — nothing to check (no manifest).
 """
 
 import argparse
@@ -30,27 +30,31 @@ MANIFEST_NAME = "doc_manifest.txt"
 DIRS_MANIFEST_NAME = "doc_manifest_dirs.txt"
 PACKAGE_DOC = "PACKAGE.md"
 
-# Разделы, без которых документ бесполезен для ИИ.
+# Sections without which a document is useless to an AI.
 REQUIRED_SECTIONS = [
-    "Что это",
-    "Слои и зависимости",
-    "Подсистемы и файлы",
-    "Точки входа",
-    "На что смотреть дальше",
-    "Ловушки",
+    "What This Is",
+    "Layers and Dependencies",
+    "Subsystems and Files",
+    "Entry Points",
+    "Where to Look Next",
+    "Pitfalls",
 ]
 
-# Слова-заглушки: документ с ними — недописанная заготовка.
+# Placeholder words: a document containing them is an unfinished draft.
+# The Russian entries stay on purpose: they still catch documents written in Russian.
 PLACEHOLDER_PATTERNS = [
     r"\bTODO\b",
     r"\bFIXME\b",
     r"раскрыть позже",
     r"дописать позже",
+    r"expand later",
+    r"fill in later",
+    r"describe later",
     r"\bLorem\b",
     r"coming soon",
 ]
 
-# Минимум строк: ниже — ИИ нечего читать.
+# Minimum number of lines: below it there is nothing for an AI to read.
 MIN_LINES = 20
 
 PATH_RE = re.compile(r"`(packages/[^`\s]+)`")
@@ -58,14 +62,14 @@ SYMBOL_RE = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+)`
 
 
 def resolve_root(value):
-    """Корень проверяемого дерева. По умолчанию — репозиторий, где лежит сам валидатор."""
+    """Root of the tree being checked. Defaults to the repository holding the validator."""
     if value:
         return os.path.abspath(value)
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def read_manifest(path, key_index=1):
-    """Читает манифест пакетов или подпапок: строки через табуляцию, # — комментарий."""
+    """Reads a package or subfolder manifest: tab-separated lines, # marks a comment."""
     entries = []
     if not os.path.isfile(path):
         return None
@@ -91,7 +95,7 @@ def read_manifest(path, key_index=1):
 
 
 def read_doc(path):
-    """Возвращает текст документа или None, если файла нет."""
+    """Returns the document text, or None when the file does not exist."""
     if not os.path.isfile(path):
         return None
     with open(path, encoding="utf-8") as handle:
@@ -99,76 +103,76 @@ def read_doc(path):
 
 
 def doc_problems(label, text, deps, neighbor_ref):
-    """Проверки, общие для документов пакетов и подпапок.
+    """Checks shared by package documents and subfolder documents.
 
-    label — как называть пакет в сообщениях; text — текст документа; deps — имя
-    зависимости, которую документ обязан упоминать; neighbor_ref — строка, по
-    которой ищется ссылка на соседний документ.
+    label — how to name the package in messages; text — the document text; deps — the
+    name of the dependency the document is required to mention; neighbor_ref — the
+    string by which the link to the neighbouring document is looked up.
     """
     problems = []
     lines = text.splitlines()
     if len(lines) < MIN_LINES:
         problems.append(
-            f"{label}: {PACKAGE_DOC} короче {MIN_LINES} строк ({len(lines)}) — читать нечего"
+            f"{label}: {PACKAGE_DOC} is shorter than {MIN_LINES} lines ({len(lines)}) — nothing to read"
         )
 
     for section in REQUIRED_SECTIONS:
         if section not in text:
-            problems.append(f"{label}: нет обязательного раздела «{section}»")
+            problems.append(f"{label}: missing required section «{section}»")
 
     for pattern in PLACEHOLDER_PATTERNS:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             problems.append(
-                f"{label}: заглушка «{match.group(0)}» — документ недописан"
+                f"{label}: placeholder «{match.group(0)}» — the document is unfinished"
             )
 
     if neighbor_ref and neighbor_ref not in text:
         problems.append(
-            f"{label}: нет ссылки на соседний документ {neighbor_ref} — ИИ не знает, куда идти дальше"
+            f"{label}: no link to the neighbouring document {neighbor_ref} — an AI does not know where to go next"
         )
 
     if deps not in ("-", "") and deps not in text:
         first_dep = deps.split(",")[0].strip()
         if first_dep not in text:
-            problems.append(f"{label}: не упомянут зависимый пакет {first_dep}")
+            problems.append(f"{label}: dependent package {first_dep} is not mentioned")
 
     return problems
 
 
 def check_package(entry):
-    """Один пакет → список проблем (пустой список = ОК)."""
+    """One package → list of problems (an empty list means OK)."""
     pkg = entry["pkg"]
     doc_path = os.path.join(ROOT, "packages", pkg, PACKAGE_DOC)
     text = read_doc(doc_path)
     if text is None:
-        return [f"{pkg}: нет {PACKAGE_DOC} в packages/{pkg}/"]
+        return [f"{pkg}: no {PACKAGE_DOC} in packages/{pkg}/"]
 
-    # У этих пакетов соседних документов нет вовсе — требовать ссылку незачем.
+    # These packages have no neighbouring documents at all — requiring a link is pointless.
     neighbor_ref = None if pkg in ("app", "ui", "web", "sdk") else PACKAGE_DOC
     return doc_problems(pkg, text, entry["deps"], neighbor_ref)
 
 
 def check_dir_doc(entry):
-    """Подпапочный документ (packages/<пакет>/<каталог>/PACKAGE.md) → список проблем."""
+    """Subfolder document (packages/<package>/<directory>/PACKAGE.md) → list of problems."""
     pkg, sub = entry["pkg"], entry["dir"]
     label = f"{pkg}/{sub}"
     doc_path = os.path.join(ROOT, "packages", pkg, sub, PACKAGE_DOC)
     text = read_doc(doc_path)
     if text is None:
-        return [f"{label}: нет {PACKAGE_DOC} в packages/{pkg}/{sub}/"]
+        return [f"{label}: no {PACKAGE_DOC} in packages/{pkg}/{sub}/"]
 
-    # Подпапочный документ обязан вести к документу своего пакета.
+    # A subfolder document must lead back to the document of its own package.
     parent_ref = f"packages/{pkg}/{PACKAGE_DOC}"
     return doc_problems(label, text, entry["deps"], parent_ref)
 
 
 def check_links(doc_path, label):
-    """Пути вида `packages/...`, упомянутые в документе, должны существовать.
+    """Paths of the form `packages/...` mentioned in the document must exist.
 
-    Ссылки на ещё не написанные документы (`.md`) — ожидаемое состояние на
-    начальной стадии: их считаем отдельно и нарушением не делаем. Ссылки с
-    `*` — это шаблон пути, а не путь, проверке не подлежат.
+    Links to documents not written yet (`.md`) are the expected state at the
+    starting stage: we count them separately and do not treat them as violations.
+    Links with a `*` are a path template, not a path, and are not checked.
     """
     text = read_doc(doc_path)
     if text is None:
@@ -182,17 +186,17 @@ def check_links(doc_path, label):
         if not os.path.exists(os.path.join(ROOT, candidate)) and not candidate.endswith(
             ".md"
         ):
-            problems.append(f"{label}: путь не существует — {candidate}")
+            problems.append(f"{label}: path does not exist — {candidate}")
     return sorted(set(problems))
 
 
 def check_surface(entries):
-    """Сверяет манифест с реальным packages/: каждый пакет с package.json обязан быть в манифесте."""
+    """Reconciles the manifest with the real packages/: every package with a package.json must be in the manifest."""
     on_disk = set()
     without_pkg = set()
     packages_dir = os.path.join(ROOT, "packages")
     if not os.path.isdir(packages_dir):
-        return ["каталога packages/ нет"]
+        return ["no packages/ directory"]
     for name in sorted(os.listdir(packages_dir)):
         if not os.path.isdir(os.path.join(packages_dir, name)):
             continue
@@ -203,18 +207,18 @@ def check_surface(entries):
 
     in_manifest = {entry["pkg"] for entry in entries}
     problems = [
-        f"на диске, но нет в манифесте: {name}"
+        f"on disk but not in the manifest: {name}"
         for name in sorted(on_disk - in_manifest)
     ]
     problems += [
-        f"в манифесте, но нет на диске: {name}"
+        f"in the manifest but not on disk: {name}"
         for name in sorted(in_manifest - on_disk)
     ]
     return problems
 
 
 def read_src(package):
-    """Тексты всех .ts/.tsx пакета — haystack для поиска символов."""
+    """Texts of all .ts/.tsx files of the package — the haystack for symbol lookup."""
     src_dir = os.path.join(ROOT, "packages", package, "src")
     if not os.path.isdir(src_dir):
         return None
@@ -235,12 +239,13 @@ def read_src(package):
 
 
 def check_sample(entries, docs):
-    """Символы вида `session.Session` из документов ищем в исходниках пакета.
+    """Symbols of the form `session.Session` found in documents are looked up in the sources of the package.
 
-    docs — список кортежей (метка, путь к документу, пакет, строк кода по манифесту).
-    Два случая нельзя смешивать: пакет объявлен в манифесте с кодом, а каталога src нет —
-    это дыра, по пакету оракул молчит (найдено мутацией 06.10); пакет с нулём строк кода
-    по манифесту (storybook) — сверять нечего, и это не дефект документации.
+    docs — a list of tuples (label, document path, package, code lines per the manifest).
+    Two cases must not be mixed up: the package is declared in the manifest with code,
+    but there is no src directory — that is a hole, and the oracle stays silent for that
+    package (found by mutation on 06.10); a package with zero code lines per the manifest
+    (storybook) has nothing to compare, and that is not a documentation defect.
     """
     cache = {}
     problems = []
@@ -254,8 +259,8 @@ def check_sample(entries, docs):
         if haystack is None:
             if code_lines not in ("0", ""):
                 problems.append(
-                    f"{label}: нет packages/{pkg}/src, а манифест объявляет {code_lines} строк — "
-                    "сверять символы нечем, оракул по пакету молчит"
+                    f"{label}: no packages/{pkg}/src, while the manifest declares {code_lines} lines — "
+                    "there is nothing to compare symbols against, the oracle stays silent for this package"
                 )
             continue
         blob = "\n".join(haystack)
@@ -267,37 +272,41 @@ def check_sample(entries, docs):
                 continue
             if not any(symbol in file_text for file_text in haystack):
                 problems.append(
-                    f"{label}: символ не найден в исходниках {pkg} — {symbol}"
+                    f"{label}: symbol not found in the sources of {pkg} — {symbol}"
                 )
     return sorted(set(problems))
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Валидатор документации ядра OpenCode")
+    parser = argparse.ArgumentParser(
+        description="Validator of the OpenCode core documentation"
+    )
     parser.add_argument(
         "--links",
         action="store_true",
-        help="проверять существование путей из документов",
+        help="check that paths from the documents exist",
     )
-    parser.add_argument("--package", help="проверить один пакет")
+    parser.add_argument("--package", help="check a single package")
     parser.add_argument(
-        "--surface", action="store_true", help="сверка манифеста с packages/"
+        "--surface", action="store_true", help="reconcile the manifest with packages/"
     )
     parser.add_argument(
-        "--sample", action="store_true", help="сверить символы документов с исходниками"
+        "--sample",
+        action="store_true",
+        help="compare document symbols with the sources",
     )
     parser.add_argument(
         "--dirs",
         action="store_true",
-        help="проверять подпапочные документы по .opencode/doc_manifest_dirs.txt",
+        help="check subfolder documents from .opencode/doc_manifest_dirs.txt",
     )
     parser.add_argument(
         "--manifest",
-        help="путь к манифесту (по умолчанию — doc_manifest.txt проверяемого дерева)",
+        help="path to the manifest (defaults to doc_manifest.txt of the checked tree)",
     )
     parser.add_argument(
         "--root",
-        help="корень проверяемого дерева (по умолчанию — репозиторий валидатора)",
+        help="root of the checked tree (defaults to the validator's repository)",
     )
     args = parser.parse_args()
 
@@ -312,16 +321,16 @@ def main():
 
     entries = read_manifest(manifest, key_index=2 if args.dirs else 1)
     if entries is None:
-        print(f"НЕТ МАНИФЕСТА: {manifest}", file=sys.stderr)
+        print(f"NO MANIFEST: {manifest}", file=sys.stderr)
         return 2
 
     if args.package:
         entries = [entry for entry in entries if entry["pkg"] == args.package]
         if not entries:
-            print(f"ПАКЕТ НЕ В МАНИФЕСТЕ: {args.package}", file=sys.stderr)
+            print(f"PACKAGE NOT IN MANIFEST: {args.package}", file=sys.stderr)
             return 2
 
-    # Раскладка проверок: подпись для вывода, функция проверки, режим вывода.
+    # Check layout: output label, check function, output mode.
     jobs = []
     for entry in entries:
         pkg = entry["pkg"]
@@ -342,16 +351,16 @@ def main():
         if found:
             problems.extend(found)
             for problem in found:
-                print(f"ПРОБЛЕМА  {problem}")
+                print(f"PROBLEM   {problem}")
     else:
         for name, run in jobs:
             found = run()
             if found:
                 problems.extend(found)
                 for problem in found:
-                    print(f"ПРОБЛЕМА  {problem}")
+                    print(f"PROBLEM   {problem}")
             else:
-                print(f"ОК        {name}")
+                print(f"OK        {name}")
 
     if args.sample:
         docs = [
@@ -369,17 +378,19 @@ def main():
         if found:
             problems.extend(found)
             for problem in found:
-                print(f"ПРОБЛЕМА  {problem}")
+                print(f"PROBLEM   {problem}")
 
     if problems:
-        print(f"\nИТОГ: {len(problems)} нарушение(й)")
+        print(f"\nTOTAL: {len(problems)} violation(s)")
         return 1
 
     flags = [
         name for name in ("links", "surface", "sample", "dirs") if getattr(args, name)
     ]
     label = ", ".join(flags)
-    print(f"\nИТОГ: ОК — {len(entries)} пакет(ов){' [' + label + ']' if label else ''}")
+    print(
+        f"\nTOTAL: OK — {len(entries)} package(s){' [' + label + ']' if label else ''}"
+    )
     return 0
 
 

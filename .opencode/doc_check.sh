@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Отрицательный контроль валидатора документации: ломаем документы на ВРЕМЕННОЙ копии
-# и проверяем, что doc_check.py это замечает. Репозиторий не трогаем.
+# Negative control of the documentation validator: we break documents on a TEMPORARY
+# copy and check that doc_check.py notices. The repository is left untouched.
 #
-# Что проверяется:
-#   мутация 1 — пустой PACKAGE.md              → должен ругаться на пустоту
-#   мутация 2 — убран раздел «Точки входа»      → должен ругаться на отсутствие раздела
-#   мутация 3 — путь packages/.../nope.ts       → --links должен найти битую ссылку
-#   мутация 4 — вписано «TODO раскрыть»         → должен ругаться на заглушку
-#   контроль — чистая копия проходит            → код 0
+# What is checked:
+#   mutation 1 — empty PACKAGE.md              → must complain about emptiness
+#   mutation 2 — section «Entry Points» removed → must complain about the missing section
+#   mutation 3 — path packages/.../nope.ts     → --links must find the broken link
+#   mutation 4 — «TODO expand later» written in → must complain about the placeholder
+#   control   — a clean copy passes           → exit code 0
 #
-# Запуск: bash .opencode/doc_check.sh
+# Run: bash .opencode/doc_check.sh
 
 set -uo pipefail
 
@@ -21,80 +21,80 @@ failed=0
 cleanup() { rm -r "$WORK"; }
 trap cleanup EXIT
 
-# Копия одного пакета целиком: документ плюс src, иначе --sample искать нечего.
+# A full copy of one package: the document plus src, otherwise --sample has nothing to look at.
 PKG="${1:-util}"
 SRC="$ROOT/packages/$PKG"
 DEST="$WORK/packages/$PKG"
 mkdir -p "$WORK/packages" "$WORK/.opencode"
 cp -r "$SRC" "$DEST"
 
-# Манифест проверки сужаем до одного пакета и кладём в корень копии:
-# валидатор ходит по --root, поэтому манифест обязан лежать там же.
+# Narrow the check manifest down to a single package and put it at the root of the copy:
+# the validator walks via --root, so the manifest has to live there too.
 grep -E "^[^#[:space:]]" "$MANIFEST" | grep -E "[[:space:]]${PKG}[[:space:]]" > "$WORK/.opencode/doc_manifest.txt"
 DOC="$DEST/PACKAGE.md"
 
-fail() { echo "ПРОВАЛ: $1"; failed=1; }
+fail() { echo "FAIL: $1"; failed=1; }
 
 if [[ ! -f "$DOC" ]]; then
-  echo "ПРОВАЛ: нет исходного $PKG/PACKAGE.md — сначала напиши документ пакета"
+  echo "FAIL: no source $PKG/PACKAGE.md — write the package document first"
   exit 1
 fi
 
 cp "$DOC" "$WORK/clean.md"
 
-echo "=== контроль: чистая копия должна пройти ==="
+echo "=== control: a clean copy must pass ==="
 if ! python3 "$ROOT/.opencode/doc_check.py" --root "$WORK" > "$WORK/out_clean.txt" 2>&1; then
-  fail "чистая копия не прошла: $(tail -1 "$WORK/out_clean.txt")"
+  fail "clean copy did not pass: $(tail -1 "$WORK/out_clean.txt")"
 else
-  echo "ОК: чистая копия прошла"
+  echo "OK: clean copy passed"
 fi
 
-echo "=== мутация 1: пустой документ ==="
+echo "=== mutation 1: empty document ==="
 : > "$DOC"
 if ! python3 "$ROOT/.opencode/doc_check.py" --root "$WORK" > "$WORK/out1.txt" 2>&1; then
-  echo "ОК: поймал — $(grep -m1 ПРОБЛЕМА "$WORK/out1.txt")"
+  echo "OK: caught — $(grep -m1 PROBLEM "$WORK/out1.txt")"
 else
-  fail "пустой документ прошёл незамеченным"
+  fail "empty document passed unnoticed"
 fi
 
-echo "=== мутация 2: убран раздел «Точки входа» ==="
+echo "=== mutation 2: section «Entry Points» removed ==="
 python3 - "$DOC" "$WORK/clean.md" <<'PY'
 import sys
 
 doc, clean = sys.argv[1], sys.argv[2]
 lines = open(clean, encoding="utf-8").readlines()
-# Вырезаем заголовок раздела и тело под ним — до следующего заголовка ##.
+# Cut out the section heading and the body under it — up to the next ## heading.
 out, skipping = [], False
 for line in lines:
     if line.startswith("## "):
-        skipping = "Точки входа" in line
+        skipping = "Entry Points" in line
     if not skipping:
         out.append(line)
 open(doc, "w", encoding="utf-8").writelines(out)
 PY
-if ! python3 "$ROOT/.opencode/doc_check.py" --root "$WORK" > "$WORK/out2.txt" 2>&1; then echo "ОК: поймал — $(grep -m1 ПРОБЛЕМА "$WORK/out2.txt")"; else fail "документ без раздела прошёл незамеченным"; fi
+if ! python3 "$ROOT/.opencode/doc_check.py" --root "$WORK" > "$WORK/out2.txt" 2>&1; then echo "OK: caught — $(grep -m1 PROBLEM "$WORK/out2.txt")"; else fail "document without the section passed unnoticed"; fi
 
-echo "=== мутация 3: битая ссылка в --links ==="
+echo "=== mutation 3: broken link in --links ==="
 cp "$WORK/clean.md" "$DOC"
-# shellcheck disable=SC2016  # обратные кавычки должны остаться буквальными: их ищет валидатор
-printf '\nБитая ссылка: `packages/%s/src/nope.ts`\n' "$PKG" >> "$DOC"
+# shellcheck disable=SC2016  # backticks must stay literal: the validator looks for them
+printf '\nBroken link: `packages/%s/src/nope.ts`\n' "$PKG" >> "$DOC"
 if python3 "$ROOT/.opencode/doc_check.py" --root "$WORK" --links > "$WORK/out3.txt" 2>&1; then
-  fail "битая ссылка прошла незамеченной"
+  fail "broken link passed unnoticed"
 elif grep -q "nope.ts" "$WORK/out3.txt"; then
-  echo "ОК: поймал именно битую ссылку — $(grep -m1 'nope.ts' "$WORK/out3.txt")"
+  echo "OK: caught exactly the broken link — $(grep -m1 'nope.ts' "$WORK/out3.txt")"
 else
-  fail "валидатор покраснел, но не на битую ссылку nope.ts"
+  fail "the validator turned red, but not on the broken link nope.ts"
 fi
 
-echo "=== мутация 4: заглушка TODO ==="
+echo "=== mutation 4: TODO placeholder ==="
 cp "$WORK/clean.md" "$DOC"
-printf '\nTODO раскрыть позже\n' >> "$DOC"
-if ! python3 "$ROOT/.opencode/doc_check.py" --root "$WORK" > "$WORK/out4.txt" 2>&1; then echo "ОК: поймал — $(grep -m1 заглушка "$WORK/out4.txt")"; else fail "заглушка прошла незамеченной"; fi
+printf '\nTODO expand later\n' >> "$DOC"
+if ! python3 "$ROOT/.opencode/doc_check.py" --root "$WORK" > "$WORK/out4.txt" 2>&1; then echo "OK: caught — $(grep -m1 placeholder "$WORK/out4.txt")"; else fail "placeholder passed unnoticed"; fi
 
 cp "$WORK/clean.md" "$DOC"
 
 if [[ $failed -ne 0 ]]; then
-  echo "ИТОГ: валидатор ПРОПУСТИЛ дефекты — мутации обязаны краснеть"
+  echo "TOTAL: the validator MISSED defects — the mutations have to turn red"
   exit 1
 fi
-echo "ИТОГ: ОК — все 4 мутации пойманы, чистая копия прошла"
+echo "TOTAL: OK — all 4 mutations caught, the clean copy passed"

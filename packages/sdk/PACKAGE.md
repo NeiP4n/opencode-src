@@ -1,23 +1,23 @@
-# @opencode/sdk — программный доступ к opencode
+# @opencode/sdk — programmatic access to opencode
 
-## Что это
+## What This Is
 
-Маленький SDK: 15 файлов, ~647 строк в `src/`. Позволяет внешнему коду
-подключиться к запущенному opencode — создавать сессии, звать инструменты,
-смотреть события — не разбираясь в HTTP-контракте.
+A small SDK: 15 files, ~647 lines in `src/`. It lets external code connect to a
+running opencode — create sessions, call tools, watch events — without dealing
+with the HTTP contract.
 
-У пакета два стиля (промис и Effect) и поддержка Cloudflare Workers
-(workerd).
+The package has two styles (promise and Effect) and support for Cloudflare
+Workers (workerd).
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L6 — поверхность**: зависит от `client`, `core`, `plugin`,
+Layer **L6 — surface**: depends on `client`, `core`, `plugin`,
 `schema`, `server`, `util`.
 
-Кто подключает: `core` (тесты/SDK-плагины), `plugin`, `session-ui`,
-сам `sdk`.
+Who depends on it: `core` (tests/SDK plugins), `plugin`, `session-ui`,
+`sdk` itself.
 
-Экспорт (`packages/sdk/package.json`):
+Exports (`packages/sdk/package.json`):
 
 ```json
 ".": "./src/index.ts",
@@ -26,54 +26,55 @@
 "./workerd/effect": "./src/effect/workerd.ts"
 ```
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Клиент opencode** — `packages/sdk/src/opencode.ts` (основной класс),
-`packages/sdk/src/promise.ts` (промис-обёртка),
-`packages/sdk/src/index.ts` (корневой экспорт).
+**opencode client** — `packages/sdk/src/opencode.ts` (the main class),
+`packages/sdk/src/promise.ts` (promise wrapper),
+`packages/sdk/src/index.ts` (root export).
 
-**Effect-вариант** — каталог `packages/sdk/src/effect/`: `index.ts`,
+**Effect variant** — the `packages/sdk/src/effect/` directory: `index.ts`,
 `opencode.ts`, `tool.ts`, `workerd.ts`.
 
-**Инструменты** — `packages/sdk/src/tool.ts` — объявление инструмента
-для внешнего использования.
+**Tools** — `packages/sdk/src/tool.ts` — tool declaration
+for external use.
 
-**Внутреннее** — каталог `packages/sdk/src/internal/`: `fetch.ts`
-(HTTP-транспорт), `host.ts` (хост), `instances.ts` (инстансы),
-`workerd.ts` (вариант для воркеров).
+**Internal** — the `packages/sdk/src/internal/` directory: `fetch.ts`
+(HTTP transport), `host.ts` (host), `instances.ts` (instances),
+`workerd.ts` (the workers variant).
 
-**Контракты и логирование** — `packages/sdk/src/contracts.ts`
-(типы, которые SDK отдаёт наружу) и `packages/sdk/src/logging.ts`.
+**Contracts and logging** — `packages/sdk/src/contracts.ts`
+(the types the SDK exposes outward) and `packages/sdk/src/logging.ts`.
 
-**Workerd** — `packages/sdk/src/workerd.ts` (экспорт `./workerd`) —
-то же SDK под Cloudflare Workers.
+**Workerd** — `packages/sdk/src/workerd.ts` (the `./workerd` export) —
+the same SDK under Cloudflare Workers.
 
-## Точки входа
+## Entry Points
 
-1. `packages/sdk/src/index.ts` — корневой экспорт, промис-SDK.
-2. `packages/sdk/src/effect/index.ts` (экспорт `./effect`) — SDK на `effect`.
-3. `packages/sdk/src/opencode.ts` — сам класс, если нужен доступ без
-   обёртки.
-4. `packages/sdk/src/workerd.ts` — вариант для воркеров.
+1. `packages/sdk/src/index.ts` — root export, promise SDK.
+2. `packages/sdk/src/effect/index.ts` (the `./effect` export) — the SDK built
+   on `effect`.
+3. `packages/sdk/src/opencode.ts` — the class itself, if you need access
+   without the wrapper.
+4. `packages/sdk/src/workerd.ts` — the workers variant.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/client/PACKAGE.md` — транспорт, которым SDK пользуется.
-- `packages/server/PACKAGE.md` — сервер, к которому оно подключается.
-- `packages/plugin/PACKAGE.md` — как плагины объявляют инструменты
-  (параллельный путь `tool.ts`).
-- `packages/cli/PACKAGE.md` — команды, запускающие то, к чему подключается SDK.
+- `packages/client/PACKAGE.md` — the transport the SDK uses.
+- `packages/server/PACKAGE.md` — the server it connects to.
+- `packages/plugin/PACKAGE.md` — how plugins declare tools
+  (the parallel path to `tool.ts`).
+- `packages/cli/PACKAGE.md` — the commands that run what the SDK connects to.
 
-## Ловушки
+## Pitfalls
 
-1. **Четыре точки входа — не одно и то же.** `"."` и `"./effect"` —
-   разные стили, `"./workerd"` — другой рантайм; случайная комбинация
-   даёт ошибки типов, а не падение в рантайме.
-2. **SDK подключается к уже запущенному opencode.** Само по себе оно
-   сервер не поднимает — нужен запущенный `serve` или служба.
-3. **`internal/` не публикуется как API** — импортировать
-   `@opencode/sdk/internal/*` можно технически, но стабильность не
-   обещана.
-4. **`contracts.ts` — не `protocol`.** Это срез типов SDK, а не полный
-   HTTP-контракт; отсутствие метода в `contracts.ts` не значит, что его
-   нет на сервере.
+1. **The four entry points are not the same thing.** `"."` and `"./effect"` are
+   different styles, `"./workerd"` is a different runtime; a wrong combination
+   produces type errors rather than a runtime failure.
+2. **The SDK connects to an already running opencode.** On its own it does not
+   start a server — you need a running `serve` or service.
+3. **`internal/` is not published as API** — importing
+   `@opencode/sdk/internal/*` technically works, but stability is not
+   promised.
+4. **`contracts.ts` is not `protocol`.** It is a slice of the SDK types, not
+   the full HTTP contract; the absence of a method in `contracts.ts` does not
+   mean it is absent on the server.

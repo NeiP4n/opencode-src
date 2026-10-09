@@ -1,36 +1,36 @@
-# core/integration — типы подключения интеграции и правило идентичности способа доступа
+# core/integration — connection types of an integration and the identity rule of an access method
 
-## Что в папке
+## What's In This Folder
 
-- `connection.ts` — тонкая фасадная переоценка схем подключения из `@opencode/schema/connection` плюс одна функция `key`, которая сводит способ доступа (сохранённая учётная запись или переменная окружения) к строковому ключу.
+- `connection.ts` — a thin facade re-exporting the connection schemas from `@opencode/schema/connection` plus one `key` function that reduces the access method (a stored credential or an environment variable) to a string key.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/integration/connection.ts` — весь модуль целиком.
+- `packages/core/src/integration/connection.ts` — the whole module.
 
-## Важные детали
+## Important Details
 
-- Значения и типы экспортируются парами: `CredentialInfo`, `EnvInfo`, `Info`, `Status`. Каждый экспорт ссылается ровно на тот же объект схемы из `packages/schema/src/connection.ts`, без обёртки и копии — так сохраняется единая идентичность схемы для ядра и схемы.
-- `Info` — тегированный союз `CredentialInfo | EnvInfo` по полю `type`. Различитель в значении: `"credential"` или `"env"`.
-- `key(connection)` возвращает `undefined`, если подключения нет, `credential:<id>` для учётной записи и `env:<name>` для переменной окружения.
-- `key` — единственная функция с логикой во всём модуле. Она чистая: не читает состояние, не ходит в Effect, не бросает исключений.
-- В комментарии над `key` зафиксировано свойство: новая подключённая учётная запись не считается новым подключением, если не изменились метки и значения обновлённого токена. То есть личность задаёт только `type` плюс `id`/`name`.
-- Первая строка файла — `export * as IntegrationConnection from "./connection.js"`: модуль обслуживает сам себя, потребители импортируют пространство имён, а не отдельные функции.
-- Имена вида `credential`, `env` в ключе выбраны так, чтобы они не пересекались с форматом идентификаторов (`prt_`, `msg_` и подобные), где есть разделитель-подчёркивание.
+- Values and types are exported in pairs: `CredentialInfo`, `EnvInfo`, `Info`, `Status`. Each export refers to exactly the same schema object from `packages/schema/src/connection.ts`, without a wrapper or a copy — that is how a single schema identity for the core and the schema is preserved.
+- `Info` — a tagged union `CredentialInfo | EnvInfo` by the `type` field. The discriminator value: `"credential"` or `"env"`.
+- `key(connection)` returns `undefined` if there is no connection, `credential:<id>` for a credential and `env:<name>` for an environment variable.
+- `key` is the only function with logic in the whole module. It is pure: it does not read state, does not go into Effect, does not throw exceptions.
+- In the comment above `key` a property is recorded: a newly connected credential is not considered a new connection if the labels and the values of the refreshed token did not change. In other words the identity is set only by `type` plus `id`/`name`.
+- The first line of the file is `export * as IntegrationConnection from "./connection.js"`: the module serves itself, the consumers import the namespace and not separate functions.
+- Names like `credential`, `env` in the key are chosen so that they do not collide with the identifier format (`prt_`, `msg_` and the like), where there is an underscore separator.
 
-## Связи
+## Connections
 
-- `packages/schema/src/connection.ts` — источник всех переоцененных схем: `Status`, `CredentialInfo`, `EnvInfo`, `Info`.
-- `packages/core/src/integration.ts` — основной потребитель: типы соединений в интерфейсе сервиса, `active(id)`, регистрация соединения и карта статусов, где ключ строится как пара «ID интеграции плюс `IntegrationConnection.key(connection)`».
-- `packages/core/src/plugin/provider/azure.ts` — сравнивает `IntegrationConnection.key` для текущего и загруженного подключения, чтобы не переподключаться заново без нужды.
-- `packages/core/src/plugin/provider/chatgpt.ts` — сравнивает ключ до и после обновления токена, чтобы отличить смену учётной записи от простого обновления.
-- `packages/core/src/credential.ts` — хранилище учётных записей, чьи ID попадают в ключ.
-- `packages/core/src/wellknown/plugin.ts` — собирает метод входа «Log in» для интеграций из манифеста, то есть дополняет тот же слой подключений со стороны плагинов.
+- `packages/schema/src/connection.ts` — the source of all re-exported schemas: `Status`, `CredentialInfo`, `EnvInfo`, `Info`.
+- `packages/core/src/integration.ts` — the main consumer: the connection types in the service interface, `active(id)`, the connection registration and the status map, where the key is built as the pair "integration ID plus `IntegrationConnection.key(connection)`".
+- `packages/core/src/plugin/provider/azure.ts` — compares `IntegrationConnection.key` for the current and the loaded connection, so as not to reconnect from scratch without need.
+- `packages/core/src/plugin/provider/chatgpt.ts` — compares the key before and after a token refresh, to tell a credential change from a simple refresh.
+- `packages/core/src/credential.ts` — the credential storage whose IDs land in the key.
+- `packages/core/src/wellknown/plugin.ts` — assembles the "Log in" method for integrations from the manifest, that is, it complements the same connection layer from the plugin side.
 
-## Ловушки
+## Pitfalls
 
-- Ключ намеренно игнорирует `label`, `method` (`key` или `oauth`) и `status`: смена названия учётной записи или её типа авторизации не меняет ключ. Сравнивать подключения по таким полям здесь бесполезно — только через `key`.
-- `key(undefined)` даёт строку `"undefined"` при наивной интерполяции в строку. В `packages/core/src/integration.ts` ключ подставляется в шаблон напрямую, поэтому случай отсутствующего подключения даёт запись с такой строкой, а не пропуск записи.
-- Пары «`credential:X`» и «`env:X`» — единственное различие по типу: идентификатор учётной записи и имя переменной окружения сравниваются в одном пространстве строк, различение держится только на префиксе из типа.
-- Тип аргумента `key` уже, чем `Info` из схемы: он принимает только `{ type, id }` либо `{ type, name }` с обязательным вторым полем, что позволяет вызывать его на срезанных объектах, но отсекает вариант без `id`/`name` без ошибки компиляции.
-- Модуль не содержит валидации иEffect-слоёв: любая логика проверки или реакции на смену подключения живёт в `packages/core/src/integration.ts` и в провайдерах, а не здесь.
+- The key deliberately ignores `label`, `method` (`key` or `oauth`) and `status`: renaming a credential or changing its authorization type does not change the key. Comparing connections by such fields is useless here — only via `key`.
+- `key(undefined)` gives the string `"undefined"` under naive interpolation into a string. In `packages/core/src/integration.ts` the key is substituted into the template directly, so the case of an absent connection gives a record with that string instead of skipping the record.
+- The pairs "`credential:X`" and "`env:X`" are the only difference by type: a credential identifier and an environment variable name are compared in one string space, the distinction is held only by the prefix of the type.
+- The argument type of `key` is narrower than `Info` from the schema: it takes only `{ type, id }` or `{ type, name }` with the second field mandatory, which allows calling it on cut objects, but cuts off the variant without `id`/`name` without a compile error.
+- The module contains no validation and no Effect layers: any logic of checking or of reacting to a connection change lives in `packages/core/src/integration.ts` and in the providers, and not here.

@@ -1,97 +1,96 @@
-# core/environment — файловая абстракция ядра: контракт, локальный и в памяти драйверы, исполнение процессов
+# core/environment — the file abstraction of the core: contract, local and in-memory drivers, process execution
 
-## Что в папке
+## What's In This Folder
 
-Восемь файлов: контракт файловых операций (`FilesImpl`), три его реализации
-(через запуск процессов, через `node:fs` и в памяти), сервис
-`@opencode/Environment`, который выбирает реализацию по локации, и заменитель среды
-среды без плоскости исполнения. Смысл: всё ядро работает с файлами и
-процессами через один узкий контракт, и ничто выше этого шва не касается
-`node:fs` напрямую.
+Eight files: the contract of file operations (`FilesImpl`), three of its implementations
+(via process launch, via `node:fs` and in memory), the `@opencode/Environment`
+service that chooses the implementation per location, and a substitute environment
+without an execution plane. The idea: the whole core works with files and
+processes through one narrow contract, and nothing above this seam touches
+`node:fs` directly.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/environment/files.ts` — контракт: `FileType`, `FileInfo`,
-  `DirEntry`, ошибки `NotFound`, `WrongKind`, `Failed`, интерфейс `FilesImpl`,
-  функция `typeFollowing`.
-- `packages/core/src/environment/exec-defaults.ts` — реализация по умолчанию
-  через запуск shell-скриптов: `execDefaults`, скрипты `stat`, `read`,
+- `packages/core/src/environment/files.ts` — the contract: `FileType`, `FileInfo`,
+  `DirEntry`, the errors `NotFound`, `WrongKind`, `Failed`, the `FilesImpl` interface,
+  the function `typeFollowing`.
+- `packages/core/src/environment/exec-defaults.ts` — the default implementation
+  via launching shell scripts: `execDefaults`, the scripts `stat`, `read`,
   `list`, `move`, `loadMetadata`.
-- `packages/core/src/environment/local.ts` — `makeLocalDriver`: локальный
-  доступ к хосту через `node:fs/promises`.
+- `packages/core/src/environment/local.ts` — `makeLocalDriver`: local
+  access to the host through `node:fs/promises`.
 - `packages/core/src/environment/memory.ts` — `makeMemoryDriver`,
-  `MemoryDriver`: файловая система в памяти с поддержкой симлинков.
-- `packages/core/src/environment/environment.ts` — сервис `@opencode/Environment`,
-  выбор драйвера по `location.workspaceID`.
-- `packages/core/src/environment/driver.ts` — тип `Driver`: спаунер и
-  необязательные переопределения `FilesImpl`.
-- `packages/core/src/environment/index.ts` — публичная точка входа папки,
-  функция `makeFiles` (склейка `execDefaults` и переопределений драйвера).
-- `packages/core/src/environment/unavailable.ts` — `spawner` и `layer`, среда
-  без возможности исполнять процессы.
+  `MemoryDriver`: a filesystem in memory with symlink support.
+- `packages/core/src/environment/environment.ts` — the `@opencode/Environment` service,
+  the choice of driver by `location.workspaceID`.
+- `packages/core/src/environment/driver.ts` — the `Driver` type: a spawner and
+  optional overrides of `FilesImpl`.
+- `packages/core/src/environment/index.ts` — the public entry point of the folder,
+  the function `makeFiles` (gluing `execDefaults` and the driver overrides).
+- `packages/core/src/environment/unavailable.ts` — `spawner` and `layer`, an environment
+  without the ability to run processes.
 
-## Важные детали
+## Important Details
 
-- Операции над содержимым (`read`, `list`) идут по финальному симлинку, а
-  метаданные (`stat` и теги записей в `list`) — нет: `stat` должен показать
-  симлинк как симлинк.
-- Локальный драйвер выбран именно потому, что нужен этот разрыв: `stat`
-  эффекта всегда следует симлинкам, а `readDirectory` возвращает только имена.
-- Реализация через процессы работает по кодам выхода: 44 — «не найдено»,
-  45 — «не тот тип», 46 — «ошибка». Тексты ошибок не разбираются, поэтому
-  локализация не ломает классификацию; единственное совпадение по тексту
-  остаётся в stderr при `LC_ALL=C`, который пинно задаётся окружением.
-- Скрипты требуют GNU coreutils и findutils: BSD и busybox не подходят.
-  Читается через `cat` или `dd` с режимом диапазона, листинг — `find` с
-  `printf '%y\0%f\0'` и разделителем NUL.
-- Ошибки разбора собственного вывода скриптов (например, `Invalid stat output`
-  или `Invalid find output`) — это дефекты, и они бросаются, а не
-  возвращаются как `Failed`.
-- Собранный вывод ограничен: 64 МиБ для stdout и 64 КиБ для stderr.
-  Превышение превращается в `Failed`, поэтому большие файлы читаются
-  диапазонами.
-- Запись по умолчанию создаёт каталоги на лету (`mkdir -p` плюс `cat`), и
-  удаление рекурсивное (`rm -rf`).
-- Драйвер в памяти разрешает пути относительно корня `/` через
-  `path.posix.resolve`, обходит циклы симлинков множеством `seen` и
-  сортирует листинг по имени. У него есть собственная операция `symlink`,
-  которой нет в контракте, — только для тестов.
-- Спаунер драйвера в памяти всегда падает с `PlatformError`: он не умеет
-  запускать процессы, и реализация по умолчанию поверх него работать не будет.
-- Сервис среды выбирает драйвер так: при наличии `workspaceID` — драйвер
-  удалённой локации, иначе локальный. Ошибка подключения к рабочей области
-  намеренно превращается в дефект: у среды нет канала ошибок, неизвестное или
-  уничтоженное размещение считается ошибкой конфигурации.
-- `typeFollowing` выводит тип с переходом по симлинку дешёвым способом: берёт
-  `stat`, а для симлинка делает чтение нулевой длины и берёт тип из
-  результата; висячий симлинк даёт `NotFound`, не «неизвестный тип».
+- Content operations (`read`, `list`) go along the final symlink, but metadata
+  (`stat` and the entry tags in `list`) do not: `stat` must show a
+  symlink as a symlink.
+- The local driver is chosen precisely because of this break: the effect's
+  `stat` always follows symlinks, and `readDirectory` returns only names.
+- The process implementation works by exit codes: 44 — "not found",
+  45 — "wrong type", 46 — "error". Error texts are not parsed, so
+  localization does not break the classification; the only text match
+  left in stderr under `LC_ALL=C`, which is pinned by the environment.
+- The scripts require GNU coreutils and findutils: BSD and busybox do not fit.
+  Reading is through `cat` or `dd` with a range mode, listing is `find` with
+  `printf '%y\0%f\0'` and a NUL separator.
+- Parse errors of the scripts' own output (for example `Invalid stat output`
+  or `Invalid find output`) are defects, and they are thrown, not
+  returned as `Failed`.
+- The collected output is limited: 64 MiB for stdout and 64 KiB for stderr.
+  Exceeding it becomes `Failed`, so large files are read in ranges.
+- The default write creates directories on the fly (`mkdir -p` plus `cat`), and
+  the delete is recursive (`rm -rf`).
+- The in-memory driver resolves paths relative to the `/` root through
+  `path.posix.resolve`, walks symlink cycles with a `seen` set and
+  sorts the listing by name. It has its own `symlink`
+  operation, which is not in the contract — for tests only.
+- The spawner of the in-memory driver always fails with `PlatformError`: it cannot
+  run processes, and the default implementation on top of it will not work.
+- The environment service chooses the driver like this: with `workspaceID` present
+  the driver of a remote location, otherwise local. A workspace connection error
+  is deliberately turned into a defect: the environment has no error channel, an unknown or
+  destroyed placement is considered a configuration error.
+- `typeFollowing` derives the type with a symlink transition in a cheap way: it takes
+  `stat`, and for a symlink it does a zero-length read and takes the type from
+  the result; a dangling symlink gives `NotFound`, not "unknown type".
 
-## Связи
+## Connections
 
-- Публичный API папки — `index.ts`: вне её импортируют `Files`, `FileInfo`,
+- The public API of the folder is `index.ts`: outside it imports `Files`, `FileInfo`,
   `Driver`, `NotFound`, `WrongKind`, `Failed`, `typeFollowing`, `execDefaults`,
-  `makeLocalDriver`, `makeMemoryDriver`, а также `Service` и `node`.
-- Узел среды — локационный, зависит от `CrossSpawnSpawner.node`,
-  `Location.node` и `Workspace.node`: выбор реализации зависит от размещения
-  локации.
-- Исполнитель процессов в реализации по умолчанию — тот же спаунер, что отдаёт
-  наружу сервис среды, поэтому удалённая локация получает те же операции, но
-  на своей машине.
-- `mcp/stdio.ts` и другие потребители процессов локации работают через спаунер
-  среды, а не через `node:child_process` напрямую.
+  `makeLocalDriver`, `makeMemoryDriver`, as well as `Service` and `node`.
+- The environment node is a location node, it depends on `CrossSpawnSpawner.node`,
+  `Location.node` and `Workspace.node`: the choice of implementation depends on the placement
+  of the location.
+- The process executor in the default implementation is the same spawner that the
+  environment service exposes outward, so a remote location gets the same operations, but
+  on its own machine.
+- `mcp/stdio.ts` and other consumers of the location's processes work through the
+  environment spawner, not directly through `node:child_process`.
 
-## Ловушки
+## Pitfalls
 
-- Пути в контракте — обычные строки, а не `AbsolutePath`: проверку корректности
-  пути берёт на себя вызывающая сторона.
-- «Нет узла плоскости исполнения» и «узел есть» — это разные слои, и
-  `unavailable.ts` отвечает на первый случай: любой запуск процесса в такой
-  локации падает сразу, без попытки обратиться к диску.
-- Реализация по умолчанию не подходит для не-GNU систем: `stat` с флагом
-  `-c` и `find` с `-printf` там либо отсутствуют, либо печатают иначе.
-- `list` в драйвере в памяти возвращает тип самих записей, а каталог
-  проходит по симлинку — ровно то поведение, ради которого контракт и разделён.
-- Лимит в 64 МиБ — на чтение stdout процесса, а не на размер файла: файл
-  больше лимита читается только диапазоном.
-- Драйвер в памяти хранит байты файлов в `Map` и не имеет ограничения
-  размера: для больших объёмов он не предназначен.
+- Paths in the contract are plain strings, not `AbsolutePath`: the check of path correctness
+  is taken on by the calling side.
+- "No execution plane node" and "the node exists" are different layers, and
+  `unavailable.ts` answers the first case: any process launch in such a
+  location fails immediately, without an attempt to reach the disk.
+- The default implementation does not fit non-GNU systems: `stat` with the flag
+  `-c` and `find` with `-printf` are either missing there or print differently.
+- `list` in the in-memory driver returns the type of the entries themselves, and the directory
+  is passed through the symlink — exactly the behavior for which the contract is separated.
+- The 64 MiB limit is on reading the process stdout, not on the file size: a file
+  larger than the limit is read by range only.
+- The in-memory driver stores file bytes in a `Map` and has no size limit: it is not
+  intended for large volumes.

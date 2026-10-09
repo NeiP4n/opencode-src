@@ -1,32 +1,32 @@
 # Universal Tool Hub
 
-## Назначение
-Библиотека готовых быстрых команд поверх modern CLI (rg, fd, jq, yq, mlr, git, docker, systemctl). Модель сначала ищет готовую запись каталога через тулзу `hub`, а `shell` остаётся fallback для всего остального. Рукописные `grep -r` / `find -name` / `cat | jq` прозрачно переписываются в быстрый инструмент, когда он установлен и ответ не меняется (флаги возвращают скрытые и .gitignore-файлы, регэкспы с разным смыслом в BRE и rg не трогаются). Работает одинаково на Linux, macOS и Windows: ОС определяется автоматически (`hub/host.ts`).
+## Purpose
+A library of ready-made fast commands on top of modern CLI tools (rg, fd, jq, yq, mlr, git, docker, systemctl). The model first looks for a ready catalog entry via the `hub` tool, and `shell` stays the fallback for everything else. Hand-written `grep -r` / `find -name` / `cat | jq` are transparently rewritten into a fast tool when it is installed and the answer does not change (flags that return hidden and .gitignore files, regexes that mean different things in BRE and in rg, are left alone). Works the same on Linux, macOS and Windows: the OS is detected automatically (`hub/host.ts`).
 
-## Структура
-Каталог: `packages/core/src/hub/catalog/` — 12 файлов категорий, 144 записи: search (12, rg/fd), files (14, lsd/tree/rsync), text (12, sd/mlr), json (14, jq/yq), data (12, mlr/sqlite3), git (14), docker (12), systemd (10), process (10), network (10), system (12), windows (10, только pwsh + `platforms: ["win32"]`).
+## Structure
+Catalog: `packages/core/src/hub/catalog/` — 12 category files, 144 entries: search (12, rg/fd), files (14, lsd/tree/rsync), text (12, sd/mlr), json (14, jq/yq), data (12, mlr/sqlite3), git (14), docker (12), systemd (10), process (10), network (10), system (12), windows (10, pwsh only + `platforms: ["win32"]`).
 
-Ядро: `hub/types.ts` (Entry, Backend `bash | nu | pwsh`, `placeholders`, слоты `{x}`, `{x?}`, `{x*}`), `hub/host.ts` (всё платформенное: порядок бэкендов, шелл бэкенда — на Windows bash = Git Bash, никогда не WSL-`System32ash.exe`; псевдонимы бинарников `fd`→`fdfind`, `pwsh`→`powershell`; каталоги winget/scoop/choco/cargo/~/.local/bin, которых ещё нет в PATH процесса; `privileged` для root), `hub/quote.ts` (экранирование значений под шелл и под контекст кавычек в шаблоне), `hub/resolve.ts` (choose/prepare/render/missingTools/available + MissingToolError/MissingArgumentError/NoBackendError; `Machine` — внедряемая модель машины для тестов), `hub/install.ts` (planFor/detectManager: apt, dnf, pacman, zypper, apk, brew, winget, scoop, choco; `sudo -n` для запуска из панели, без sudo под root; winget — только по точным id), `hub/match.ts` (3 правила rewrite), `hub/catalog/index.ts` (плоский `all` + assert уникальности id при загрузке модуля).
+Core: `hub/types.ts` (Entry, Backend `bash | nu | pwsh`, `placeholders`, slots `{x}`, `{x?}`, `{x*}`), `hub/host.ts` (everything platform-specific: backend order, the backend shell — on Windows bash = Git Bash, never the WSL `System32\bash.exe`; binary aliases `fd`→`fdfind`, `pwsh`→`powershell`; winget/scoop/choco/cargo/~/.local/bin directories that are not yet in the process PATH; `privileged` for root), `hub/quote.ts` (escaping values for the shell and for the quoting context in a template), `hub/resolve.ts` (choose/prepare/render/missingTools/available + MissingToolError/MissingArgumentError/NoBackendError; `Machine` is an injectable machine model for tests), `hub/install.ts` (planFor/detectManager: apt, dnf, pacman, zypper, apk, brew, winget, scoop, choco; `sudo -n` for running from the panel, no sudo under root; winget only by exact id), `hub/match.ts` (3 rewrite rules), `hub/catalog/index.ts` (a flat `all` plus an id-uniqueness assert when the module loads).
 
-Тулза: `tool/plugin/hub.ts` — list/query/install/run через тот же Shell+Job+Permission пайплайн, что и shell. Метаданные вызова несут `hubID`, `backend`, `command` — их показывает TUI-бейдж.
+Tool: `tool/plugin/hub.ts` — list/query/install/run through the same Shell+Job+Permission pipeline as shell. The call metadata carries `hubID`, `backend`, `command` — the TUI badge shows them.
 
-Интеграция: `tool/plugin/shell.ts` (prepare переписывает распознанные формы до permission-скана), `plugin/internal.ts` (HubTool перед ShellTool), `skill/instructions.ts` (HUB_GUIDANCE: hub-first, shell-fallback), `tui/.../index.tsx` (компонент Hub поверх ShellDisplay + бейдж `HUB:<id> · <backend>`), `message-parts.tsx` (`"hub"` в toolDisplays).
+Integration: `tool/plugin/shell.ts` (prepare rewrites recognized forms before the permission scan), `plugin/internal.ts` (HubTool before ShellTool), `skill/instructions.ts` (HUB_GUIDANCE: hub-first, shell-fallback), `tui/.../index.tsx` (the Hub component on top of ShellDisplay + the `HUB:<id> · <backend>` badge), `message-parts.tsx` (`"hub"` in toolDisplays).
 
-## Точки входа
-- `Hub.all`, `Hub.get(id)`, `Hub.categories()` — каталог.
-- `Hub.prepare(entry, args, { backend })` — платформа, инструменты, рендер.
-- `Hub.rewrite(command, available)` — матчер рукописных форм.
-- `Hub.planFor(tools)` — install-команда под детектнутый менеджер.
-- Тулза `hub`: `{list}`, `{query, category}`, `{id, args, backend}`, `{install: true, id}`.
+## Entry Points
+- `Hub.all`, `Hub.get(id)`, `Hub.categories()` — the catalog.
+- `Hub.prepare(entry, args, { backend })` — platform, tools, render.
+- `Hub.rewrite(command, available)` — the matcher for hand-written forms.
+- `Hub.planFor(tools)` — the install command for the detected manager.
+- The `hub` tool: `{list}`, `{query, category}`, `{id, args, backend}`, `{install: true, id}`.
 
-## Потребители
-Модель через тулзу `hub`; shell через rewrite; TUI через метаданные; Skill-инструкции через HUB_GUIDANCE. Тесты: `packages/core/test/hub.test.ts` (12 тестов).
+## Consumers
+The model via the `hub` tool; shell via rewrite; the TUI via metadata; Skill instructions via HUB_GUIDANCE. Tests: `packages/core/test/hub.test.ts` (12 tests).
 
-## Ловушки
-- `danger: true` записи (files.remove, docker.prune, kill-force, systemd restart/enable) никогда не получают silent allow — permission ask обязателен.
-- rewrite срабатывает только на полное совпадение якорных regex и только когда инструмент на PATH; составные `&&` команды не трогает.
-- windows-записи отфильтровываются `supportsPlatform` на linux/darwin; Linux-only записи (`ps aux --sort`, `ping -c`, `lscpu`, `journalctl`, systemd) — на win32, у них есть пары `windows.*`.
-- Порядок бэкендов: Linux/macOS `bash → nu → pwsh`, Windows `pwsh → bash(Git Bash) → nu`; явный `backend` проверяется первым. Простой bash-шаблон без пайпов и кавычек (`portable`) на Windows без Git Bash исполняется в PowerShell; `curl` там вызывается как `curl.exe`.
-- Команда исполняется в шелле выбранного бэкенда (`Rendered.shell`), а не в «совместимом» шелле сессии.
-- Значения аргументов экранируются: голый слот → одно слово; слот внутри `'…'`/`"…"` шаблона остаётся внутри литерала. NUL отклоняется.
-- Тулза `hub` с `install` только печатает команду (`planned`); ставит панель Registry в TUI (`HubActions`).
+## Pitfalls
+- `danger: true` entries (files.remove, docker.prune, kill-force, systemd restart/enable) never get a silent allow — the permission ask is mandatory.
+- Rewrite triggers only on a full match of the anchor regexes and only when the tool is on PATH; compound `&&` commands are untouched.
+- windows entries are filtered out by `supportsPlatform` on linux/darwin; Linux-only entries (`ps aux --sort`, `ping -c`, `lscpu`, `journalctl`, systemd) on win32, where they have `windows.*` counterparts.
+- Backend order: Linux/macOS `bash → nu → pwsh`, Windows `pwsh → bash(Git Bash) → nu`; an explicit `backend` is checked first. A plain bash template without pipes or quotes (`portable`) on Windows without Git Bash runs in PowerShell; `curl` there is invoked as `curl.exe`.
+- The command runs in the shell of the chosen backend (`Rendered.shell`), not in the session's "compatible" shell.
+- Argument values are escaped: a bare slot → one word; a slot inside `'…'`/`"…"` of a template stays inside the literal. NUL is rejected.
+- The `hub` tool with `install` only prints the command (`planned`); it installs from the Registry panel in the TUI (`HubActions`).

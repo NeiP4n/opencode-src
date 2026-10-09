@@ -1,91 +1,90 @@
-# core/skill — скачивание навыков из внешнего индекса и инструкция о них для модели
+# core/skill — downloading skills from an external index and the instruction about them for the model
 
-## Что в папке
+## What's In This Folder
 
-Два файла: `packages/core/src/skill/discovery.ts` — загрузка навыков из
-внешнего HTTP-индекса в кэш, и `packages/core/src/skill/instructions.ts` —
-инструкция для модели со списком доступных навыков.
+Two files: `packages/core/src/skill/discovery.ts` — loading of the skills from
+an external HTTP index into a cache, and `packages/core/src/skill/instructions.ts` —
+the instruction for the model with the list of available skills.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/skill/discovery.ts` — сервис `SkillDiscovery`
-  (`@opencode/SkillDiscovery`) с единственным методом `pull(url)`:
-  возвращает массив абсолютных путей к скачанным навыкам.
-- `packages/core/src/skill/instructions.ts` — сервис `SkillInstructions`
-  (`@opencode/SkillInstructions`) с `load(permissions)`.
-- Схемы в `discovery.ts`: `Index` (`{ skills: [...] }`) и `IndexSkill`
-  (`name`, необязательный `version`, `files`).
+- `packages/core/src/skill/discovery.ts` — the service `SkillDiscovery`
+  (`@opencode/SkillDiscovery`) with the single method `pull(url)`:
+  it returns an array of absolute paths to the downloaded skills.
+- `packages/core/src/skill/instructions.ts` — the service `SkillInstructions`
+  (`@opencode/SkillInstructions`) with `load(permissions)`.
+- The schemas in `discovery.ts`: `Index` (`{ skills: [...] }`) and `IndexSkill`
+  (`name`, the optional `version`, `files`).
 
-## Важные детали
+## Important Details
 
-- Протокол индекса: по адресу `url` (с приведённым `/` на конце) читается
-  `index.json`, у каждого навыка — `files`, у каждого файла — URL
-  относительно `<name>/`.
-- Навык берётся, только если у него есть `SKILL.md` либо `<name>.md`.
-  Оба варианта проверяются и при скачивании, и в готовом каталоге.
-- Каталог навыка: `path.resolve(global.cache, "skills", Hash.fast(base))`,
-  то есть подкаталог кэша, названный хешем адреса индекса, и внутри него
-  каталог навыка.
-- Проверки безопасности путей многослойные и срабатывают **до** скачивания:
-  `isSafeSegment` для имени, `isSafeRelativePath` для каждого файла,
-  `FSUtil.contains` для каталога, совпадение `resource.origin === source.origin`
-  для URL. Любой провал отбрасывает навык целиком.
-- `isSafeRelativePath` отсекает `\` и `\0`, `?`, `#`, абсолютные пути в
-  posix и win32, URL-подобные строки, и каждый сегмент проверяется после
-  `decodeURIComponent` — нераспарсенный процент даёт отказ.
-- Файлы одного навыка качаются параллельно, константа `fileConcurrency`
-  равна 8; навыки обрабатываются параллельно, `skillConcurrency` равна 4.
-- HTTP-клиент перенастроен: повтор транзиентных ошибок два раза по
-  экспоненциальному расписанию с джиттером (база 200 мс) и фильтр
-  не-2xx ответов.
-- Скачивание каждого файла идемпотентно: если цель уже существует,
-  `download` ничего не делает и возвращает `true`.
-- Обновление безопасно заменяет каталог. Если версия навыка задана и не
-  совпадает с содержимым `.opencode-version`, файлы качаются в
-  `staging` = `<root>.tmp-<uuid>`, наличие манифеста проверяется, пишется
-  новая версия, затем старый каталог уезжает в `backup` = `<root>.old-<uuid>`,
-  staging переименовывается на место, а backup удаляется.
-- Замена каталога обёрнута в `Effect.uninterruptible`, а ошибка переименования
-  откатывает `backup` обратно на место.
-- Любой сбой при обновлении логируется и **не** прерывает: в staging
-  остаётся нетронутым, а `ensuring` удаляет его рекурсивно.
-- `instructions.ts` показывает навык, только если у него есть `description`
-  и `autoinvoke` не равен `false`.
-- Перед выводом навыки фильтруются по правам: `Skill.available(list, permissions)`,
-  куда передаётся объединённый ruleset агента и сессии.
-- Ключ инструкции — `core/skill-guidance`; сортировка по `id`.
-- Инструкция прямо говорит модели: скилл, уже пришедший блоком
-  `<skill_content>` в переписке, вызывать повторно не нужно.
+- The index protocol: at the address `url` (with a trailing `/` added) `index.json` is read,
+  each skill has `files`, each file has a URL
+  relative to `<name>/`.
+- A skill is taken only if it has `SKILL.md` or `<name>.md`.
+  Both variants are checked both when downloading and in the ready catalog.
+- The skill directory: `path.resolve(global.cache, "skills", Hash.fast(base))`,
+  that is, a subdirectory of the cache named by the hash of the index address, and inside it
+  the skill directory.
+- The path safety checks are multilayered and trigger **before** the download:
+  `isSafeSegment` for the name, `isSafeRelativePath` for each file,
+  `FSUtil.contains` for the directory, the match `resource.origin === source.origin`
+  for the URL. Any failure discards the skill entirely.
+- `isSafeRelativePath` cuts off `\` and `\0`, `?`, `#`, absolute paths in
+  posix and win32, URL-like strings, and each segment is checked after
+  `decodeURIComponent` — an unparsed percent gives a refusal.
+- The files of one skill are downloaded in parallel, the constant `fileConcurrency`
+  equals 8; the skills are processed in parallel, `skillConcurrency` equals 4.
+- The HTTP client is reconfigured: a retry of transient errors twice on
+  an exponential schedule with jitter (base 200 ms) and a filter
+  of non-2xx answers.
+- The download of each file is idempotent: if the target already exists,
+  `download` does nothing and returns `true`.
+- The update safely replaces the directory. If the version of the skill is set and does not
+  match the content of `.opencode-version`, the files are downloaded into
+  `staging` = `<root>.tmp-<uuid>`, the presence of the manifest is checked, the new version is written,
+  then the old directory goes into `backup` = `<root>.old-<uuid>`,
+  staging is renamed into place, and the backup is deleted.
+- The replacement of the directory is wrapped in `Effect.uninterruptible`, and a rename error
+  rolls the `backup` back into place.
+- Any failure during the update is logged and **does not** interrupt: the staging
+  stays untouched, and `ensuring` deletes it recursively.
+- `instructions.ts` shows a skill only if it has a `description`
+  and `autoinvoke` is not `false`.
+- Before the output the skills are filtered by the permissions: `Skill.available(list, permissions)`,
+  which is given the merged ruleset of the agent and the session.
+- The instruction key is `core/skill-guidance`; the sorting is by `id`.
+- The instruction says to the model directly: a skill that has already arrived as a `<skill_content>`
+  block in the correspondence does not need to be called again.
 
-## Связи
+## Connections
 
-- `packages/core/src/skill.ts` — соседний файл корня `src`: сервис
-  `Skill.Service` со списком скиллов, типы `Skill.ID`, `Skill.Name` и
-  функция `Skill.available`.
+- `packages/core/src/skill.ts` — a neighboring file of the root `src`: the service
+  `Skill.Service` with the list of skills, the types `Skill.ID`, `Skill.Name` and
+  the function `Skill.available`.
 - `packages/core/src/instructions/index.ts` — `Instructions.make`,
-  `Key`, `diffByKey`, `removed`; движок дельт.
-- `packages/core/src/permission.ts` — тип `Permission.Ruleset`, который
-  фильтрует список навыков.
+  `Key`, `diffByKey`, `removed`; the delta engine.
+- `packages/core/src/permission.ts` — the type `Permission.Ruleset`, which
+  filters the list of skills.
 - `@opencode/util/fs-util` — `exists`, `readFileStringSafe`, `writeWithDirs`,
   `writeFileString`, `rename`, `remove`, `contains`.
-- `@opencode/util/hash` — `Hash.fast` для имени каталога в кэше.
-- `effect/unstable/http` — клиент, повторы и `schemaBodyJson` для разбора
+- `@opencode/util/hash` — `Hash.fast` for the name of the directory in the cache.
+- `effect/unstable/http` — the client, the retries and `schemaBodyJson` for the parsing of
   `index.json`.
-- `@opencode/util/effect/app-node` — `makeGlobalNode` для discovery и
-  `makeLocationNode` для инструкции.
+- `@opencode/util/effect/app-node` — `makeGlobalNode` for the discovery and
+  `makeLocationNode` for the instruction.
 
-## Ловушки
+## Pitfalls
 
-- `SkillInstructions` создан через `makeLocationNode`, а `SkillDiscovery` —
-  через `makeGlobalNode`: первый пересобирается на локацию, второй общий.
-- `pull` возвращает только те навыки, у которых после скачивания нашёлся
-  манифест. Навык без файлов в индексе молча выпадает из результата.
-- Отсутствие `version` у навыка означает, что апдейт не проверяется: файлы
-  просто докачиваются поверх, `.opencode-version` не пишется.
-- `Hash.fast` от адреса индекса, а не от навыка: смена адреса сбрасывает
-  весь кэш навыков для этого индекса.
-- Фильтр по `autoinvoke === false` сравнивает строго: скилл без поля
-  `autoinvoke` попадает в инструкцию, если описания достаточно.
-- Сравнение прав в `load` происходит на стороне вызывающего: если передать
-  не тот ruleset, в инструкцию попадут навыки, которые агент вызвать не
-  сможет.
+- `SkillInstructions` is created via `makeLocationNode`, and `SkillDiscovery` —
+  via `makeGlobalNode`: the first is rebuilt per location, the second is global.
+- `pull` returns only those skills for which a manifest was found after
+  the download. A skill without files in the index silently falls out of the result.
+- The absence of `version` in a skill means that the update is not checked: the files
+  are simply downloaded on top, and `.opencode-version` is not written.
+- `Hash.fast` is from the index address, and not from the skill: a change of the address resets
+  the whole cache of skills for that index.
+- The filter by `autoinvoke === false` compares strictly: a skill without the field
+  `autoinvoke` gets into the instruction if the description is enough.
+- The comparison of the permissions in `load` happens on the side of the caller: if you pass
+  the wrong ruleset, the instruction will get skills that the agent will not be able to call.

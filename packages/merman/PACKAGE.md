@@ -1,23 +1,23 @@
-# @opencode/merman — рендер диаграмм Mermaid в терминале
+# @opencode/merman — rendering Mermaid diagrams in the terminal
 
-## Что это
+## What This Is
 
-Рендер диаграмм Mermaid внутри TUI: 88 файлов, ~21 тыс. строк в `src/`
-(значительная часть — тесты). Пакет разбирает текст диаграммы, раскладывает
-узлы и связи, рисует в символьной сетке терминала. Регистрируется как
-плагин с одним рендерером кода — `mermaid`.
+Rendering of Mermaid diagrams inside the TUI: 88 files, ~21 thousand lines in `src/`
+(a significant part are tests). The package parses diagram text, lays out
+nodes and edges, and draws them in the terminal's character grid. It registers
+as a plugin with a single code renderer — `mermaid`.
 
-Поддерживаемые типы диаграмм видны по каталогам: `flowchart`, `sequence`,
+The supported diagram types are visible from the directories: `flowchart`, `sequence`,
 `state`, `gantt`, `gitgraph`, `timeline`.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L1**: зависит от `plugin` (хост расширений TUI). Других пакетов
-`@opencode/*` в зависимостях нет.
+Layer **L1**: depends on `plugin` (the TUI extension host). No other
+`@opencode/*` packages in the dependencies.
 
-Единственный потребитель — `packages/tui`.
+The only consumer is `packages/tui`.
 
-Экспорт — три пути (из `packages/merman/package.json`):
+Exports — three paths (from `packages/merman/package.json`):
 
 ```json
 "./markdown": "./src/markdown.ts",
@@ -25,73 +25,73 @@
 "./plugin": "./src/plugin.ts"
 ```
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Плагин** — `packages/merman/src/plugin.ts`: `Plugin.define` с id
-`opencode.merman`; в `setup` регистрирует рендерер под именем `mermaid`
-через `context.markdown.registerCodeBlockRenderer("mermaid", ...)`. Цвета
-берутся из палитры: `resolveOpenCodeDiagramPalette(context.theme,
+**Plugin** — `packages/merman/src/plugin.ts`: `Plugin.define` with the id
+`opencode.merman`; in `setup` it registers a renderer under the name `mermaid`
+through `context.markdown.registerCodeBlockRenderer("mermaid", ...)`. The colors
+come from the palette: `resolveOpenCodeDiagramPalette(context.theme,
 context.themeMode)`.
 
-**Точка входа рендера** — `packages/merman/src/markdown.ts` →
+**Renderer entry point** — `packages/merman/src/markdown.ts` →
 `createMermaidCodeBlockRenderer`.
 
-**Палитра** — `packages/merman/src/palette.ts` →
-`resolveOpenCodeDiagramPalette(theme, mode)` — цвета диаграмм под светлую
-и тёмную схему (тест `palette.test.ts`).
+**Palette** — `packages/merman/src/palette.ts` →
+`resolveOpenCodeDiagramPalette(theme, mode)` — diagram colors for the light
+and dark schemes (test `palette.test.ts`).
 
-**Ядро рендера** — каталог `packages/merman/src/core/`:
-`canvas.ts` (символьный холст), `drawing.ts` (примитивы отрисовки),
-`geometry.ts` (геометрия), `spatial.ts` (пространственные структуры),
-`text.ts` и `text-lines.ts` (текст и переносы), `color/style.ts` (стили
-цветов), `render-grid.ts` (сетка вывода), `mermaid.ts` (общее для
-диаграмм). Отдельно, в корне `src/`, — `detect.ts`: определение типа
-диаграммы по тексту.
+**Rendering core** — the directory `packages/merman/src/core/`:
+`canvas.ts` (character canvas), `drawing.ts` (drawing primitives),
+`geometry.ts` (geometry), `spatial.ts` (spatial structures),
+`text.ts` and `text-lines.ts` (text and line breaks), `color/style.ts` (color
+styles), `render-grid.ts` (output grid), `mermaid.ts` (common to all
+diagrams). Separately, in the `src/` root — `detect.ts`: determining the
+diagram type from the text.
 
-**Типы диаграмм** — каталоги с единым набором файлов (`diagram.ts` /
+**Diagram types** — directories with a uniform set of files (`diagram.ts` /
 `parser.ts` / `layout.ts` / `drawing.ts` / `render-grid.ts` / `style.ts` /
 `types.ts`):
-- `flowchart/` плюс `routing.ts`, `labels.ts`, `options.ts`;
-- `sequence/` плюс `placement.ts`, `note.ts`, `endpoint.ts`;
-- `state/` плюс `routing.ts`, `search.ts`, `visible-model.ts`;
+- `flowchart/` plus `routing.ts`, `labels.ts`, `options.ts`;
+- `sequence/` plus `placement.ts`, `note.ts`, `endpoint.ts`;
+- `state/` plus `routing.ts`, `search.ts`, `visible-model.ts`;
 - `gantt/`, `gitgraph/`, `timeline/`.
 
-**Диагностика** — `packages/merman/src/diagnostics.ts` (ошибки разбора),
+**Diagnostics** — `packages/merman/src/diagnostics.ts` (parse errors),
 `packages/merman/src/plugin.ts`.
 
-**Markdown-обвязка** — `packages/merman/src/markdown.ts`.
+**Markdown wrapper** — `packages/merman/src/markdown.ts`.
 
-**Тесты** — `packages/merman/src/test/` (включая `layout-audit/` с
-fixture'ами и harness'ем), плюс `*.test.ts` рядом с кодом.
+**Tests** — `packages/merman/src/test/` (including `layout-audit/` with
+fixtures and a harness), plus `*.test.ts` next to the code.
 
-## Точки входа
+## Entry Points
 
-1. `packages/merman/src/plugin.ts` — `export default`, подключение как
-   плагина.
+1. `packages/merman/src/plugin.ts` — `export default`, attaching as
+   a plugin.
 2. `packages/merman/src/markdown.ts` → `createMermaidCodeBlockRenderer(...)`
-   — рендерер без регистрации.
-3. `packages/merman/src/detect.ts` — определить тип диаграммы по тексту.
+   — the renderer without registration.
+3. `packages/merman/src/detect.ts` — determine the diagram type from the text.
 4. `packages/merman/src/palette.ts` → `resolveOpenCodeDiagramPalette(...)` —
-   цвета под тему.
+   colors for the theme.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/latex/PACKAGE.md` — соседний рендерер формул, тот же паттерн
-  (`plugin` + `markdown`).
-- `packages/plugin/PACKAGE.md` — `Plugin.define` и контекст `setup`.
-- `packages/tui/PACKAGE.md` — потребитель, где живёт рендер Markdown.
-- `packages/theme/PACKAGE.md` — темы, из которых берётся палитра.
+- `packages/latex/PACKAGE.md` — the sibling formula renderer, the same pattern
+   (`plugin` + `markdown`).
+- `packages/plugin/PACKAGE.md` — `Plugin.define` and the `setup` context.
+- `packages/tui/PACKAGE.md` — the consumer, where Markdown rendering lives.
+- `packages/theme/PACKAGE.md` — the themes the palette is taken from.
 
-## Ловушки
+## Pitfalls
 
-1. **Реализация — не браузерный Mermaid.** Это свой парсер и своя раскладка
-   под терминал: синтаксис поддерживается выборочно, экзотика уйдёт в
-   `diagnostics.ts`.
-2. **Три точки входа не взаимозаменяемы:** `plugin` регистрирует,
-   `markdown` рендерит, `palette` красит. Корневого `exports` нет.
-3. **`state/routing.ts` и `flowchart/routing.ts` — разный код.**
-   Прокладка линий у каждого типа диаграммы своя; правка одного не чинит
-   другой.
-4. **Тесты лежат в `src/`**, а не в `test/`: `*.test.ts` и каталог
-   `src/test/` входят в `src/` и в подсчёт строк — цифры «21 тыс. строк»
-   включают их.
+1. **The implementation is not browser Mermaid.** It is its own parser and its own
+   layout for the terminal: syntax is supported selectively, exotic constructs
+   end up in `diagnostics.ts`.
+2. **The three entry points are not interchangeable:** `plugin` registers,
+   `markdown` renders, `palette` colors. There is no root `exports`.
+3. **`state/routing.ts` and `flowchart/routing.ts` are different code.**
+   Line routing is its own thing for each diagram type; editing one does not fix
+   the other.
+4. **The tests live in `src/`**, not in `test/`: `*.test.ts` and the directory
+   `src/test/` are inside `src/` and inside the line count — the figure
+   "21 thousand lines" includes them.

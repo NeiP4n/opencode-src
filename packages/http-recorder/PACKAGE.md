@@ -1,86 +1,88 @@
-# @opencode/http-recorder — запись и воспроизведение HTTP-трафика
+# @opencode/http-recorder — recording and replaying HTTP traffic
 
-## Что это
+## What This Is
 
-Записыватель трафика Effect в кассеты (аналог VCR): 14 файлов, ~1.6 тыс. строк
-в `src/`. Ловит HTTP- и WebSocket-запросы при прогоне теста и на повторе
-отдаёт сохранённые ответы — так интеграционные тесты ядра не ходят в сеть.
+An Effect traffic recorder into cassettes (a VCR analogue): 14 files, ~1.6 thousand
+lines in `src/`. It captures HTTP and WebSocket requests while a test runs and, on
+a repeat run, returns the saved responses — that is how the core integration tests
+stay out of the network.
 
-Пакет описывает себя так: «Record and replay Effect HTTP and WebSocket traffic
+The package describes itself as: «Record and replay Effect HTTP and WebSocket traffic
 with deterministic cassettes».
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L0 — лист**: от других пакетов `@opencode/*` не зависит. Опора —
-`effect` (`HttpClient`, `Socket`), рантайм — Node ≥22.
+Layer **L0 — leaf**: it does not depend on any other `@opencode/*` package. Its
+base is `effect` (`HttpClient`, `Socket`), runtime — Node ≥22.
 
-Кто подключает (только `devDependencies`, то есть в тестах):
+Who plugs it in (only `devDependencies`, that is, in tests):
 
 - `packages/ai/package.json`;
 - `packages/core/package.json`.
 
-В `src` продуктового кода импортов нет — пример:
-`packages/core/test/session-runner-recorded.test.ts` использует
-`HttpRecorder.layerFetch(...)` и `HttpRecorder.removeCassetteSync(...)`.
+There are no imports in the `src` product code — for example:
+`packages/core/test/session-runner-recorded.test.ts` uses
+`HttpRecorder.layerFetch(...)` and `HttpRecorder.removeCassetteSync(...)`.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Публичное лицо** — `packages/http-recorder/src/index.ts`: объект
-`HttpRecorder` с пятью функциями (`layer`, `layerFetch`, `layerSocket`,
-`layerWebSocketConstructor`, `hasCassetteSync`, `removeCassetteSync`) и
-namespace с типами (`RecorderOptions`, `RedactOptions`, `RequestMatcher`,
+**Public face** — `packages/http-recorder/src/index.ts`: the
+`HttpRecorder` object with five functions (`layer`, `layerFetch`, `layerSocket`,
+`layerWebSocketConstructor`, `hasCassetteSync`, `removeCassetteSync`) and
+a namespace with types (`RecorderOptions`, `RedactOptions`, `RequestMatcher`,
 `RequestSnapshot`, `CassetteMetadata`).
 
-**Кассеты** — каталог `packages/http-recorder/src/cassette/`:
-- `model.ts` — устройство кассеты и метаданных;
-- `store.ts` — чтение/запись на диск, `hasCassetteSync` и `removeCassetteSync`.
+**Cassettes** — the directory `packages/http-recorder/src/cassette/`:
+- `model.ts` — the structure of a cassette and its metadata;
+- `store.ts` — reading/writing to disk, `hasCassetteSync` and `removeCassetteSync`.
 
-**HTTP** — каталог `packages/http-recorder/src/http/`:
-- `recorder.ts` — слои `layer` и `layerFetch`, перехват запроса;
-- `matching.ts` — сравнение входящего запроса с записанным;
-- `model.ts` — нормализованный снимок запроса/ответа.
+**HTTP** — the directory `packages/http-recorder/src/http/`:
+- `recorder.ts` — the `layer` and `layerFetch` layers, request interception;
+- `matching.ts` — comparing an incoming request with a recorded one;
+- `model.ts` — the normalized request/response snapshot.
 
-**WebSocket** — каталог `packages/http-recorder/src/websocket/`:
-`recorder.ts` (слои `layerSocket`, `layerWebSocketConstructor`),
-`model.ts` (формат кадров).
+**WebSocket** — the directory `packages/http-recorder/src/websocket/`:
+`recorder.ts` (the `layerSocket`, `layerWebSocketConstructor` layers),
+`model.ts` (the frame format).
 
-**Редактирование секретов** — каталог
-`packages/http-recorder/src/redaction/`: `secrets.ts` (что считать секретом),
-`redactor.ts` (аддитивная политика редактирования и сохранения заголовков).
+**Secret redaction** — the directory
+`packages/http-recorder/src/redaction/`: `secrets.ts` (what to treat as a secret),
+`redactor.ts` (the additive policy of redaction and header preservation).
 
-**Состояние воспроизведения** — каталог
-`packages/http-recorder/src/replay/`: `state.ts` (режим записи/повтора),
-`comparison.ts` (сверка фактического ответа с кассетой).
+**Replay state** — the directory
+`packages/http-recorder/src/replay/`: `state.ts` (record/replay mode),
+`comparison.ts` (matching the actual response against the cassette).
 
-**Опции и API** — `packages/http-recorder/src/options.ts`,
-`packages/http-recorder/src/api.ts` (типы, которые реэкспортит `index.ts`).
+**Options and API** — `packages/http-recorder/src/options.ts`,
+`packages/http-recorder/src/api.ts` (the types that `index.ts` re-exports).
 
-## Точки входа
+## Entry Points
 
-1. `packages/http-recorder/src/index.ts` — `HttpRecorder` (объект и namespace),
-   единственная точка подключения извне.
-2. `packages/http-recorder/src/index.ts` → `layer(name, options?)` — основной
-   способ навесить запись на HTTP-клиент.
+1. `packages/http-recorder/src/index.ts` — `HttpRecorder` (object and namespace),
+   the only attachment point from outside.
+2. `packages/http-recorder/src/index.ts` → `layer(name, options?)` — the main
+   way to hang recording on an HTTP client.
 3. `packages/http-recorder/src/index.ts` → `hasCassetteSync(name, options?)` —
-   проверить, есть ли уже кассета, до запуска теста.
+   check whether a cassette already exists, before the test run.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/core/test/session-runner-recorded.test.ts` — живое применение:
-  как тест ядра подключает кассету.
-- `packages/ai/PACKAGE.md` — второй потребитель, тесты моделей.
-- `packages/util/PACKAGE.md` — где хранятся файлы (каталог кассет задаётся
-  опциями, не хардкодом).
+- `packages/core/test/session-runner-recorded.test.ts` — live usage:
+  how a core test plugs in a cassette.
+- `packages/ai/PACKAGE.md` — the second consumer, model tests.
+- `packages/util/PACKAGE.md` — where the files are stored (the cassette directory
+  is set by options, not hardcoded).
 
-## Ловушки
+## Pitfalls
 
-1. **Запись и повтор взаимоисключающи.** Незакрытая запись оставляет
-   неполную кассету, и следующий прогон уходит в сеть вместо ответа из файла.
-2. **`removeCassetteSync` удаляет кассету с диска** — в тестах его зовут перед
-   перезаписью, случайный вызов в прод-коде стирает артефакт.
-3. **Секреты редактируются до записи**, политика аддитивная: новые поля
-   добавляются к уже заданной, а не заменяют её — неверно настроенный
-   `RedactOptions` молча запишет токен в кассету.
-4. **Совпадение запроса — не точное равенство.** `matching.ts` сравнивает по
-   нормализованному снимку; провайдер, вернувший другой порядок полей или
-   разный `requestId`, может не совпасть с записью.
+1. **Recording and replay are mutually exclusive.** An unclosed recording leaves
+   an incomplete cassette, and the next run goes to the network instead of
+   answering from the file.
+2. **`removeCassetteSync` deletes the cassette from disk** — in tests it is called
+   before a re-record, a stray call in production code erases the artifact.
+3. **Secrets are redacted before recording**, the policy is additive: new fields
+   are added to the already-set one instead of replacing it — a misconfigured
+   `RedactOptions` silently writes the token into the cassette.
+4. **A request match is not exact equality.** `matching.ts` compares by
+   normalized snapshot; a provider that returned another field order or a
+   different `requestId` may fail to match the recording.

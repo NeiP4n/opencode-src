@@ -1,24 +1,24 @@
-# @opencode/client — клиент HTTP-API в трёх вариантах
+# @opencode/client — HTTP API client in three variants
 
-## Что это
+## What This Is
 
-Тонкий транспорт к серверу opencode: 30 файлов, ~16.7 тыс. строк в `src/`.
-Пакет не содержит логики ядра — только вызовы эндпоинтов, описанных в
-`protocol`, в трёх flavour'ах: на промисах, на Effect и для Solid.
+A thin transport to the opencode server: 30 files, ~16.7k lines in `src/`.
+The package contains no core logic — only calls to the endpoints described in
+`protocol`, in three flavours: promise-based, Effect-based and for Solid.
 
-Большая часть строк — сгенерированный код в каталогах `generated/`:
-правки руками туда не вносятся.
+Most of the lines are generated code in the `generated/` directories: hand
+edits do not go there.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L2**: зависит от `protocol` и `schema` (а через них — от `plugin`,
-`ai`).
+Layer **L2**: depends on `protocol` and `schema` (and through them on
+`plugin`, `ai`).
 
-Кто подключает: `app`, `cli`, `core`, `desktop`, `enterprise`,
-`gui-extensions`, `plugin`, `sdk`, `session-ui`, `tui`, сам `client`
-(внутренние импорты) и `protocol` (типы).
+Who depends on it: `app`, `cli`, `core`, `desktop`, `enterprise`,
+`gui-extensions`, `plugin`, `sdk`, `session-ui`, `tui`, `client` itself
+(internal imports) and `protocol` (types).
 
-Карта экспорта (`packages/client/package.json`):
+Export map (`packages/client/package.json`):
 
 ```json
 ".": "./src/promise/index.ts",
@@ -29,63 +29,63 @@
 "./effect/service": "./src/effect/service.ts"
 ```
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Контракт** — `packages/client/src/contract.ts`: одна строка реэкспорта
-`ClientApi`, `groupNames`, `effectOmitEndpoints`, `promiseOmitEndpoints` из
-`@opencode/protocol/client`. Это мост к `protocol`, а не своя модель.
+**Contract** — `packages/client/src/contract.ts`: a single re-export line for
+`ClientApi`, `groupNames`, `effectOmitEndpoints`, `promiseOmitEndpoints` from
+`@opencode/protocol/client`. It is a bridge to `protocol`, not a model of its
+own.
 
-**Промис-вариант** — каталог `packages/client/src/promise/`:
-`client.ts` (реализация), `api.ts`, `rpc.ts`, `service.ts`, `index.ts` и
+**Promise variant** — the `packages/client/src/promise/` directory:
+`client.ts` (implementation), `api.ts`, `rpc.ts`, `service.ts`, `index.ts` and
 `generated/` (`client.ts`, `client-error.ts`, `types.ts`, `index.ts`).
 
-**Effect-вариант** — каталог `packages/client/src/effect/`: те же файлы
-(`client.ts`, `api.ts` + `api/api.ts`, `rpc.ts`, `service.ts`, `index.ts`,
-`generated/client.ts`, `generated/client-error.ts`).
+**Effect variant** — the `packages/client/src/effect/` directory: the same
+files (`client.ts`, `api.ts` + `api/api.ts`, `rpc.ts`, `service.ts`,
+`index.ts`, `generated/client.ts`, `generated/client-error.ts`).
 
-**Solid-вариант** — каталог `packages/client/src/solid/`: `data.ts`
-(реактивные данные), `connection.ts` (состояние соединения), `pty.ts`
-(терминал), `index.ts`.
+**Solid variant** — the `packages/client/src/solid/` directory: `data.ts`
+(reactive data), `connection.ts` (connection state), `pty.ts` (terminal),
+`index.ts`.
 
-**Служебное** — `packages/client/src/service.ts`,
-`service-contender.ts`, `service-timing.ts`, `service-version.ts`
-(версионирование и выбор службы), `shared-events.ts` (общие события),
-`rpc-runtime.ts` (рантайм RPC), `pty-handoff.ts` (передача PTY между
-процессами).
+**Service** — `packages/client/src/service.ts`, `service-contender.ts`,
+`service-timing.ts`, `service-version.ts` (versioning and service selection),
+`shared-events.ts` (shared events), `rpc-runtime.ts` (RPC runtime),
+`pty-handoff.ts` (handing a PTY between processes).
 
-## Точки входа
+## Entry Points
 
-1. `packages/client/package.json` → `"."` (то же, что `./promise`) — путь
-   по умолчанию, промис-клиент.
-2. `packages/client/src/promise/index.ts` → `ClientApi` — список всех
-   методов.
-3. `packages/client/src/effect/index.ts` — Effect-вариант для кода на
+1. `packages/client/package.json` → `"."` (the same as `./promise`) — the
+   default path, the promise client.
+2. `packages/client/src/promise/index.ts` → `ClientApi` — the list of all
+   methods.
+3. `packages/client/src/effect/index.ts` — the Effect variant for code on
    `effect`.
-4. `packages/client/src/solid/index.ts` — реактивные подписки для UI.
-5. `packages/client/script/build.ts` — сборка сгенерированных файлов
+4. `packages/client/src/solid/index.ts` — reactive subscriptions for the UI.
+5. `packages/client/script/build.ts` — building the generated files
    (`bun run generate`).
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/protocol/PACKAGE.md` — контракт, из которого клиент собран.
-- `packages/httpapi-codegen/PACKAGE.md` — генератор `generated/`.
-- `packages/server/PACKAGE.md` — тот же API на стороне сервера.
-- `packages/cli/src/services/server-connection.ts` — подключение к чужому
-  серверу.
+- `packages/protocol/PACKAGE.md` — the contract the client is assembled from.
+- `packages/httpapi-codegen/PACKAGE.md` — the `generated/` generator.
+- `packages/server/PACKAGE.md` — the same API on the server side.
+- `packages/cli/src/services/server-connection.ts` — connecting to a foreign
+  server.
 
-## Ловушки
+## Pitfalls
 
-1. **Сгенерированные каталоги не правятся.** Правило репозитория: после
-   изменения `HttpApi` запускать `bun run generate` из
-   `packages/client`; файлы в `generated/` перезаписываются.
-2. **Три варианта — один API, но разные типы возврата.** `promise` отдаёт
-   `Promise`, `effect` — `Effect`, `solid` — реактивный сигнал. Перенос
-   кода между ними не тривиален.
-3. **`"."` и `"./promise"` — один и тот же файл.** Импорт `@opencode/client`
-   и `@opencode/client/promise` не различаются; путаница возникает, когда
-   ждут Effect, а получают промис.
-4. **`contract.ts` не является клиентом** — это реэкспорт типов из
-   `protocol`; методов вызова в нём нет.
-5. **`service-version.ts` сверяет версию службы.** Подключение клиента к
-   серверу другой версии может быть отклонено — смотреть в
+1. **Generated directories are not edited.** Repository rule: after changing
+   `HttpApi`, run `bun run generate` from `packages/client`; files in
+   `generated/` are overwritten.
+2. **Three variants — one API, but different return types.** `promise`
+   returns a `Promise`, `effect` — `Effect`, `solid` — a reactive signal.
+   Moving code between them is not trivial.
+3. **`"."` and `"./promise"` are the same file.** Importing
+   `@opencode/client` and `@opencode/client/promise` makes no difference;
+   confusion arises when Effect is expected and a promise is received.
+4. **`contract.ts` is not a client** — it is a re-export of types from
+   `protocol`; it has no call methods.
+5. **`service-version.ts` compares the service version.** Connecting a client
+   to a server of another version may be rejected — look in
    `service-contender.ts`.

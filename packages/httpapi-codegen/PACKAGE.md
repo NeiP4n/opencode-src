@@ -1,85 +1,89 @@
-# @opencode/httpapi-codegen — генератор клиента из HttpApi
+# @opencode/httpapi-codegen — client generator from HttpApi
 
-## Что это
+## What This Is
 
-Генератор кода: 1 файл, ~2 тыс. строк в `src/`. Берёт `HttpApi` из Effect
-(HTTP-контракт, описанный в `protocol`) и превращает его в TypeScript-файл
-клиента — те самые сгенерированные файлы, которые правило репозитория
-запрещает править руками.
+Code generator: 1 file, ~2 thousand lines in `src/`. It takes `HttpApi` from
+Effect (the HTTP contract described in `protocol`) and turns it into a
+TypeScript client file — exactly those generated files that the repository rule
+forbids editing by hand.
 
-Пакет `private: true`, в рантайме не используется: он работает только во время
-сборки.
+The package is `private: true` and is not used at runtime: it only works during
+the build.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L0 — лист**: от пакетов `@opencode/*` не зависит. Опора — `effect`
-(`Schema`, `HttpApi`, `OpenApi`) и `prettier` (форматирование вывода).
+Layer **L0 — leaf**: it does not depend on any `@opencode/*` packages. Its
+foundation is `effect` (`Schema`, `HttpApi`, `OpenApi`) and `prettier` (output
+formatting).
 
-Единственный потребитель — `packages/client`:
+The only consumer is `packages/client`:
 
-- `packages/client/package.json` объявляет зависимость `@opencode/httpapi-codegen`;
-- `packages/client/script/build.ts` импортирует `compile`, `emitEffectImported`,
-  `emitEffectShape`, `emitPromise`, `write` и собирает из них клиент.
+- `packages/client/package.json` declares the `@opencode/httpapi-codegen`
+  dependency;
+- `packages/client/script/build.ts` imports `compile`, `emitEffectImported`,
+  `emitEffectShape`, `emitPromise`, `write` and assembles the client from them.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-Единственный файл `packages/httpapi-codegen/src/index.ts`, но разделить его
-можно на шесть смысловых частей:
+There is a single file, `packages/httpapi-codegen/src/index.ts`, but it can be
+split into six meaningful parts:
 
-**Модель операции** (строки 7–100) — типы `Operation`, `OperationInputField`,
-`InputField`, `Output`, `Contract`, `Endpoint`, `Group`. Описывают, что
-генератор видит на входе: группу, имя метода, поля ввода
-(`params` / `query` / `headers` / `payload` / `wildcard`), успех
-(`value` / `void` / `stream`) и список ошибок. Здесь же
-`GenerationError` — `Schema.TaggedError` с полем `reason`.
+**Operation model** (lines 7–100) — the types `Operation`,
+`OperationInputField`, `InputField`, `Output`, `Contract`, `Endpoint`, `Group`.
+They describe what the generator sees on input: a group, a method name, input
+fields (`params` / `query` / `headers` / `payload` / `wildcard`), success
+(`value` / `void` / `stream`) and the list of errors. `GenerationError` is here
+too — a `Schema.TaggedError` with a `reason` field.
 
-**Компиляция контракта** — `compile(api)` (строка 101): обходит `HttpApi`,
-собирает группы и эндпоинты, валидирует уникальность имён
-(`groupTypeNames` / `endpointTypeNames`) и превращает схемы в понятные
-ссылки на типы.
+**Contract compilation** — `compile(api)` (line 101): walks `HttpApi`, collects
+groups and endpoints, validates name uniqueness (`groupTypeNames` /
+`endpointTypeNames`) and turns schemas into readable type references.
 
-**Эмиссия вариантов клиента** — четыре функции:
-- `emitEffect(contract)` (293) — Effect-клиент;
-- `emitEffectImported(...)` (303) — то же, но с импортами типов;
-- `emitEffectShape(...)` (320) — форма результата, без реализации;
-- `emitPromise(...)` (338) — промис-клиент.
+**Client variant emission** — four functions:
+- `emitEffect(contract)` (293) — the Effect client;
+- `emitEffectImported(...)` (303) — the same, but with type imports;
+- `emitEffectShape(...)` (320) — the result shape, without an implementation;
+- `emitPromise(...)` (338) — the promise client.
 
-**Генерация текста** — основная часть файла: построение объявлений функций,
-типов и импортов строками, с проверками, чтобы вывод был валидным TS.
+**Text generation** — the main part of the file: building function, type and
+import declarations as strings, with checks so that the output is valid TS.
 
-**Запись на диск** — `write(output, directory?)` (1467): кладёт файлы в каталог
-и пишет манифест (список сгенерированных файлов).
+**Writing to disk** — `write(output, directory?)` (1467): puts the files into
+the directory and writes a manifest (a list of the generated files).
 
-**Сборка целиком** — `generate(api, options?)` (1536): `compile` →
+**The whole build** — `generate(api, options?)` (1536): `compile` →
 `emitEffect` → `write`.
 
-## Точки входа
+## Entry Points
 
-1. `packages/httpapi-codegen/src/index.ts` → `generate(...)` — полный цикл,
-   начать стоит с него.
-2. `packages/httpapi-codegen/src/index.ts` → `compile(...)` — если нужен
-   только разбор контракта в `Contract`.
-3. `packages/client/script/build.ts` — единственное место, где пакет реально
-   вызывается; оттуда же понятно, какие файлы клиента получаются.
+1. `packages/httpapi-codegen/src/index.ts` → `generate(...)` — the full cycle,
+   this is where to start.
+2. `packages/httpapi-codegen/src/index.ts` → `compile(...)` — if you only need
+   the contract parsing into `Contract`.
+3. `packages/client/script/build.ts` — the only place where the package is
+   really called; it also shows which client files come out.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/protocol/PACKAGE.md` — сам `HttpApi`, из которого берётся контракт.
-- `packages/client/PACKAGE.md` — сгенерированный результат и три варианта API
+- `packages/protocol/PACKAGE.md` — the `HttpApi` itself that the contract is
+  taken from.
+- `packages/client/PACKAGE.md` — the generated result and three API variants
   (`effect`, `promise`, `solid`).
-- `packages/server/PACKAGE.md` — реализация тех же эндпоинтов на сервере.
-- `packages/schema/PACKAGE.md` — типы, которые попадают в контракт.
+- `packages/server/PACKAGE.md` — the server-side implementation of the same
+  endpoints.
+- `packages/schema/PACKAGE.md` — the types that end up in the contract.
 
-## Ловушки
+## Pitfalls
 
-1. **Файлы клиента не редактируются руками** — это следствие работы
-   генератора: любая правка будет перезаписана следующим `bun run generate`
-   из `packages/client`.
-2. **Изменение `HttpApi` в `protocol` или `server` без регенерации** даёт
-   рассинхрон типов: сервер отвечает иначе, чем объявлено в клиенте.
-3. **`GenerationError` — единственная штатная ошибка**: дубли имён групп или
-   эндпоинтов валит генерацию, а не предупреждает.
-4. **`generate` пишет файлы и манифест** — запуск вне каталога пакета
-   раскидает сгенерированные файлы по указанному `options.directory`.
-5. **Форматирование через `prettier` встроено** — версия `3.6.2` закреплена
-   в зависимостях; её обмен меняет вид сгенерированного кода в git.
+1. **Client files are not edited by hand** — this follows from how the
+   generator works: any edit will be overwritten by the next `bun run generate`
+   run from `packages/client`.
+2. **Changing `HttpApi` in `protocol` or `server` without regeneration**
+   desynchronizes the types: the server answers differently from what the
+   client declares.
+3. **`GenerationError` is the only expected error**: duplicate group or
+   endpoint names fail generation instead of producing a warning.
+4. **`generate` writes files and a manifest** — running it outside the package
+   directory scatters the generated files across the given `options.directory`.
+5. **Formatting via `prettier` is built in** — the version `3.6.2` is pinned in
+   the dependencies; changing it changes how the generated code looks in git.

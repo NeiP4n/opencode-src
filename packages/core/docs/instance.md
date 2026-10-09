@@ -1,35 +1,35 @@
-# core/instance — интерфейс подстановки сервисов по сессии
+# core/instance — the interface of per-session service substitution
 
-## Что в папке
+## What's In This Folder
 
-- `service.ts` — единственный файл: контракт сервиса `Instance` и его узел в графе слоёв.
-- Папка не содержит реализации: она объявляет, что должно происходить, когда коду нужны сервисы конкретной сессии.
-- Настоящая сборка графа — в корневом `packages/core/src/instance.ts`, который этот файл переэкспортирует.
+- `service.ts` — the only file: the `Instance` service contract and its node in the layer graph.
+- The folder contains no implementation: it declares what must happen when code needs the services of a specific session.
+- The real graph assembly is in the root `packages/core/src/instance.ts`, which this file re-exports.
 
-## Ключевые файлы
+## Key Files
 
 - `packages/core/src/instance/service.ts` — `Interface`, `Service`, `node`.
-- `packages/core/src/instance.ts` — корень: тип `Services` и построение графа слоёв ядра.
+- `packages/core/src/instance.ts` — the root: the `Services` type and the construction of the core layer graph.
 
-## Важные детали
+## Important Details
 
-- `Interface.provide(session)` — метод высшего порядка: он принимает сессию и возвращает функцию, которая оборачивает любой Effect, убирая из его требований `Services`. То есть сервисы, зависящие от location сессии, достаются одной подстановкой, а не передачей через аргументы.
-- Единственный метод контракта — `provide`. Всё остальное поведение (кэширование, время жизни слоёв) объявлено как принадлежность реализаций, а не сервиса.
-- `Service` — `Context.Service<Service, Interface>` с тегом `"@opencode/Instance"`. Это Effect-пустой тег, а не реализация: слой подставляется снаружи.
-- `node = LayerNode.unbound(Service, Node.tags.values.global)` — узел без реализации и без зависимостей, помеченный как глобальный. Реальный слой подставляется заменой в `packages/core/src/effect/app-node-builder.ts`.
-- Модуль переэкспортирует тип `Services` из `../instance.js`, так что потребителям достаточно одного импорта из папки.
+- `Interface.provide(session)` — a higher-order method: it takes a session and returns a function that wraps any Effect, removing `Services` from its requirements. In other words the services that depend on the session's location are obtained by one substitution, not by passing arguments.
+- The only method of the contract is `provide`. All other behavior (caching, layer lifetime) is declared as belonging to the implementations, not to the service.
+- `Service` — `Context.Service<Service, Interface>` with the tag `"@opencode/Instance"`. This is an Effect-empty tag, not an implementation: the layer is substituted from outside.
+- `node = LayerNode.unbound(Service, Node.tags.values.global)` — a node without implementation and without dependencies, marked as global. The real layer is substituted by a replacement in `packages/core/src/effect/app-node-builder.ts`.
+- The module re-exports the `Services` type from `../instance.js`, so a single import from the folder is enough for the consumers.
 
-## Связи
+## Connections
 
-- `packages/core/src/effect/app-node-builder.ts` — подставляет реализацию: `build()` заменяет `Instance.node` на слой, который берёт `LocationServiceMap.Service` и отдаёт `Effect.provide(locations.get(session.location))`. Это единственное место, где `provide` реализуется.
-- `packages/core/src/location-service-map.ts` и `packages/core/src/location-services.ts` — источник набора сервисов по location.
-- `packages/core/src/session.ts` — сессия содержит поле `location`, по которому `provide` выбирает набор сервисов.
-- `packages/util/src/effect/app-node.ts` — `Node`, `makeGlobalNode`, конструкторы узлов, которыми помечены зависимости `deps`.
-- `packages/core/docs/effect.md` — соседняя папка со слоями и сборкой графа.
+- `packages/core/src/effect/app-node-builder.ts` — substitutes the implementation: `build()` replaces `Instance.node` with a layer that takes `LocationServiceMap.Service` and gives `Effect.provide(locations.get(session.location))`. This is the only place where `provide` is implemented.
+- `packages/core/src/location-service-map.ts` and `packages/core/src/location-services.ts` — the source of the set of services per location.
+- `packages/core/src/session.ts` — a session has the field `location`, by which `provide` chooses the set of services.
+- `packages/util/src/effect/app-node.ts` — `Node`, `makeGlobalNode`, the node constructors by which the `deps` dependencies are marked.
+- `packages/core/docs/effect.md` — the neighboring folder with the layers and the graph assembly.
 
-## Ловушки
+## Pitfalls
 
-- Узел объявлен `unbound`: если забыть подстановку в `app-node-builder.ts`, ошибка будет не «сервис не найден» на старте, а разрыв требований Effect в произвольном месте использования.
-- `provide` зависит от `session.location`. Сессия без корректного location не подставит сервисы, и место падения окажется далеко от места создания сессии.
-- Тип `Services` приходит сюда переэкспортом: правка корневого `instance.ts` меняет требования всех эффектов ядра разом.
-- Контракт намеренно не обещает кэширование и время жизни. Любая реализация, считающая слои вечными, должна брать это на себя явно — иначе per-location сервисы начнут течь.
+- The node is declared `unbound`: if you forget the substitution in `app-node-builder.ts`, the error will not be "service not found" at startup, but a break of Effect requirements at an arbitrary place of use.
+- `provide` depends on `session.location`. A session without a correct location will not substitute services, and the place of failure will be far from the place where the session was created.
+- The `Services` type arrives here by re-export: an edit of the root `instance.ts` changes the requirements of all core effects at once.
+- The contract deliberately promises neither caching nor lifetime. Any implementation that considers layers eternal must take this on explicitly — otherwise per-location services start leaking.

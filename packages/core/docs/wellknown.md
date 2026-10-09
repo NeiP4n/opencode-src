@@ -1,37 +1,37 @@
-# core/wellknown — внутренний плагин, превращающий манифесты известных интеграций в методы и имя в UI
+# core/wellknown — an internal plugin turning the manifests of known integrations into methods and a name in the UI
 
-## Что в папке
+## What's In This Folder
 
-- `plugin.ts` — один плагин `opencode.wellknown`, который читает записи well-known сервиса и регистрирует для каждой интеграции с блоком авторизации имя по имени хоста и команду входа.
+- `plugin.ts` — one plugin `opencode.wellknown`, which reads the well-known service entries and registers for each integration with an auth block a name by the host name and a login command.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/wellknown/plugin.ts` — весь модуль целиком.
+- `packages/core/src/wellknown/plugin.ts` — the whole module.
 
-## Важные детали
+## Important Details
 
-- Объявление `export const Plugin = define({ id: "opencode.wellknown", effect: Effect.fn(...) })` использует `define` из `@opencode/plugin/effect/plugin`; тело — генератор Effect, который получает сервисы через `yield*`.
-- Первым делом вызывается `wellknown.entries().pipe(Effect.orDie)`: ошибка загрузки манифестов превращается в дефект, а не в тихий пропуск регистрации. После этого данные берутся из `wellknown.snapshot()`, то есть уже из кеша.
-- `ctx.integration.transform(...)` — редактор интеграций; внутри цикла по снимку пропускаются записи без `entry.manifest.auth`. У каждой такой записи через `editor.update` принудительно ставится `integration.name = new URL(entry.origin).hostname`, то есть имя перезаписывается, даже если было задано раньше.
-- Через `editor.method.update` добавляется метод с фиксированным `id: "login"`, `type: "command"`, подписью `Log in` и командой, скопированной из манифеста массивом `[...entry.manifest.auth.command]` — копия нужна, чтобы поле не разделялось с данными манифеста.
-- Подписка на `WellKnown.Event.Updated` выполняется через `bus.subscribe(...)`, тело — `Stream.runForEach(() => ctx.integration.reload())`, и запускается через `Effect.forkScoped({ startImmediately: true })`. Форк привязан к scope плагина: при выгрузке плагина подписка умирает вместе с ним, без ручной отмены.
-- Файл экспортирует себя как пространство имён строкой выше импортов: `export * as WellKnownPlugin from "./plugin.js"`.
-- Манифест берётся из сервиса `WellKnown`, чей тип записи `Entry` содержит `origin`, `integrationID` и `manifest`; блок `auth` в манифесте — это массив команды и имя переменной окружения.
+- The declaration `export const Plugin = define({ id: "opencode.wellknown", effect: Effect.fn(...) })` uses `define` from `@opencode/plugin/effect/plugin`; the body is an Effect generator, which receives the services through `yield*`.
+- First of all `wellknown.entries().pipe(Effect.orDie)` is called: a load error of the manifests turns into a defect, and not into a quiet skip of the registration. After that the data is taken from `wellknown.snapshot()`, that is, already from the cache.
+- `ctx.integration.transform(...)` is the editor of the integrations; inside the loop over the snapshot the records without `entry.manifest.auth` are skipped. Each such record forcibly gets `integration.name = new URL(entry.origin).hostname` through `editor.update`, that is, the name is overwritten even if it had been set before.
+- Through `editor.method.update` a method with a fixed `id: "login"`, `type: "command"`, the label `Log in` and the command copied from the manifest as an array `[...entry.manifest.auth.command]` is added — the copy is needed so that the field is not shared with the manifest data.
+- The subscription to `WellKnown.Event.Updated` is done via `bus.subscribe(...)`, the body is `Stream.runForEach(() => ctx.integration.reload())`, and it is started via `Effect.forkScoped({ startImmediately: true })`. The fork is bound to the scope of the plugin: on the unloading of the plugin the subscription dies with it, without a manual cancellation.
+- The file exports itself as a namespace by the line above the imports: `export * as WellKnownPlugin from "./plugin.js"`.
+- The manifest is taken from the `WellKnown` service, whose record type `Entry` contains `origin`, `integrationID` and `manifest`; the `auth` block in the manifest is an array of the command and the name of the environment variable.
 
-## Связи
+## Connections
 
-- `packages/core/src/wellknown.ts` — сам сервис: `Service` с `entries()` и `snapshot()`, тип `Entry`, схема `Manifest` и событие `WellKnown.Event.Updated` с типом `wellknown.updated`.
-- `packages/core/src/bus.ts` — шина, из которой берётся `Bus.Service` для подписки.
-- `packages/plugin/src/effect/plugin.ts` — `define` и тип контекста плагина, в котором есть `ctx.integration`.
-- `packages/plugin/src/effect/integration.ts` — контракт домена интеграций: `transform`, `reload`, редактор с `update` и `method.update`.
-- `packages/core/src/plugin/internal.ts` — список внутренних плагинов, где `WellKnownPlugin.Plugin` стоит рядом с плагинами инструментов, конфигурации, VCS и моделей.
-- `packages/core/src/integration.ts` — реализация домена, к которому этот плагин пишет через контекст.
+- `packages/core/src/wellknown.ts` — the service itself: `Service` with `entries()` and `snapshot()`, the type `Entry`, the schema `Manifest` and the event `WellKnown.Event.Updated` with the type `wellknown.updated`.
+- `packages/core/src/bus.ts` — the bus, from which `Bus.Service` is taken for the subscription.
+- `packages/plugin/src/effect/plugin.ts` — `define` and the type of the plugin context, in which there is `ctx.integration`.
+- `packages/plugin/src/effect/integration.ts` — the contract of the integrations domain: `transform`, `reload`, the editor with `update` and `method.update`.
+- `packages/core/src/plugin/internal.ts` — the list of the internal plugins, where `WellKnownPlugin.Plugin` stands next to the plugins of the tools, the config, the VCS and the models.
+- `packages/core/src/integration.ts` — the implementation of the domain that this plugin writes into through the context.
 
-## Ловушки
+## Pitfalls
 
-- Порядок вызовов обязателен: `entries()` должен завершиться раньше первого обращения к `snapshot()`, иначе редактору достанется пустой кеш. Сейчас это обеспечено тем, что оба вызова стоят в одном генераторе подряд.
-- `Effect.orDie` на `entries()` превращает сетевую или разбора ошибку в дефект процесса. Плагин не «переживает» недоступный манифест — он падает.
-- Имя интеграции перезаписывается целиком: любое имя, заданное другим плагином раньше, будет затёрто именем хоста. Порядок загрузки плагинов влияет на результат.
-- Метод входа добавляется с фиксированным `id: "login"`, поэтому повторная регистрация для той же интеграции заменяет метод, а не добавляет второй.
-- Обновление снимка не переводит `transform` в «горячий» режим: `transform` вызывается один раз при старте, а на событие `wellknown.updated` плагин зовёт `reload`, то есть пересборку домена целиком. Промежуток между событием и готовым состоянием — момент, когда интеграции ещё нет в списке.
-- `forEach` по снимку синхронный, но сам `forEach` — внутри Effect-контекста: исключение из `new URL(entry.origin)` уедет в дефект, так как нет локальной обработки.
+- The order of the calls is mandatory: `entries()` must finish before the first access to `snapshot()`, otherwise the editor will get an empty cache. Now this is ensured by both calls standing in one generator in a row.
+- `Effect.orDie` on `entries()` turns a network or a parsing error into a process defect. The plugin does not "survive" an unavailable manifest — it dies.
+- The name of the integration is overwritten entirely: any name set by another plugin before will be wiped with the host name. The load order of the plugins affects the result.
+- The login method is added with a fixed `id: "login"`, therefore a repeated registration for the same integration replaces the method, and not adds a second one.
+- A snapshot update does not switch `transform` into a "hot" mode: `transform` is called once at startup, and on the event `wellknown.updated` the plugin calls `reload`, that is, a full reassembly of the domain. The interval between the event and the ready state is the moment when the integration is not yet in the list.
+- `forEach` over the snapshot is synchronous, but the `forEach` itself is inside an Effect context: an exception from `new URL(entry.origin)` will go into a defect, since there is no local handling.

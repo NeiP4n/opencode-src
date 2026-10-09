@@ -1,75 +1,75 @@
-# core/session — сессия целиком: входящие, проекция, исполнение и сборка запроса к модели
+# core/session — the session as a whole: inbox, projection, execution and assembling the request to the model
 
-## Что в папке
+## What's In This Folder
 
-- 49 файлов `.ts` (около 10 500 строк) плюс `packages/core/src/session/runner/prompt/system.txt`.
-- Подпапки: `runner/` — цикл выполнения шага (9 файлов), `execution/` — только `restart.ts` с восстановлением после перезапуска.
-- Слои по назначению: публичный фасад (`session.ts`), проекция событий в БД (`projector.ts`, `message-updater.ts`), хранение (`sql.ts`, `store.ts`, `info.ts`), входящие (`inbox.ts`), исполнение (`execution.ts`, `run-coordinator.ts`), сборка запроса (`model-request.ts`, `model-transport.ts`, `provider-context.ts`, `affinity.ts`), история (`history.ts`, `compaction.ts`, `instruction-state.ts`, `instruction-entry.ts`, `instructions.ts`), прочее (`usage.ts`, `diff.ts`, `revert.ts`, `title.ts`, `stats.ts`, `transfer.ts`, `subagent-job.ts`, `subagent-completion.ts`, `move.ts`, `generate.ts`, `system-prompt.ts`, `command.ts`, `shell.ts`, `skill.ts`, `environment.ts`, `error.ts`, `to-session-error.ts`, `schema.ts`, `event.ts`, `message.ts`).
-- Общий принцип: `session.ts` только публикует события через шину, а единственный код, который пишет в таблицы во время работы, — проектор `projector.ts`.
+- 49 `.ts` files (about 10 500 lines) plus `packages/core/src/session/runner/prompt/system.txt`.
+- Subfolders: `runner/` — the loop of step execution (9 files), `execution/` — only `restart.ts` with the recovery after a restart.
+- Layers by purpose: the public facade (`session.ts`), the projection of events into the DB (`projector.ts`, `message-updater.ts`), the storage (`sql.ts`, `store.ts`, `info.ts`), the inbox (`inbox.ts`), the execution (`execution.ts`, `run-coordinator.ts`), the request assembly (`model-request.ts`, `model-transport.ts`, `provider-context.ts`, `affinity.ts`), the history (`history.ts`, `compaction.ts`, `instruction-state.ts`, `instruction-entry.ts`, `instructions.ts`), other (`usage.ts`, `diff.ts`, `revert.ts`, `title.ts`, `stats.ts`, `transfer.ts`, `subagent-job.ts`, `subagent-completion.ts`, `move.ts`, `generate.ts`, `system-prompt.ts`, `command.ts`, `shell.ts`, `skill.ts`, `environment.ts`, `error.ts`, `to-session-error.ts`, `schema.ts`, `event.ts`, `message.ts`).
+- The general principle: `session.ts` only publishes events through the bus, and the only code that writes into the tables during the work is the projector `projector.ts`.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/session/session.ts` — фасад. `make()` собирает сервис один раз в host Scope, `forSession(id)` возвращает ручку с уже привязанным `sessionID`.
-- `packages/core/src/session/projector.ts` — все `bus.project(...)`: создание, переименование, форк, доставка входа, терминалы исполнения, откат, суммы токенов.
-- `packages/core/src/session/message-updater.ts` — чистая функция: событие плюс адаптер дают новое сообщение; вся работа с БД живёт в адаптере проектора.
-- `packages/core/src/session/sql.ts` — таблицы `session_v2`, `session_message`, `session_pending`, `session_inbox`, `instruction_entry`, `instruction_blob`, `instruction_state`.
-- `packages/core/src/session/store.ts` — чтение сессий и сообщений плюс «claim» исполнения (`claim`, `release`, `releaseChildClaims`, `countResume`, `listSuspended`).
-- `packages/core/src/session/inbox.ts` — приём входа, переключение `steer`/`queue`, выборка promotable, проекции строк.
-- `packages/core/src/session/execution.ts` — маршрутизация по `Session ID` в раннер выбранного Location и терминальные события.
-- `packages/core/src/session/run-coordinator.ts` — одна fiber на «занятый период», дверной колокольчик `pendingWake`.
-- `packages/core/src/session/execution/restart.ts` — восстановление сессий с невыпущенным claim после падения или перезапуска.
-- `packages/core/src/session/runner/llm.ts` — цикл `drain`: вход → контекст → шаг → шаг; выход `Complete`/`Moved`/`Reloaded`.
-- `packages/core/src/session/runner/step.ts` — одна попытка шага: стрим провайдера, инструменты, расчёт ошибок и результат `Outcome`.
-- `packages/core/src/session/runner/publish-llm-event.ts` — перевод событий провайдера в события сессии с батчингом дельт.
-- `packages/core/src/session/model-request.ts` — сборка запроса, лимит ответа, фильтры медиа, крюки плагинов, HTTP- и WebSocket-обёртки.
-- `packages/core/src/session/compaction.ts` — сжатие истории: локальное резюме или нативное окно провайдера.
-- `packages/core/src/session/history.ts` — какие сообщения попадают в запрос и с какой нижней границей.
+- `packages/core/src/session/session.ts` — the facade. `make()` assembles the service once in the host Scope, `forSession(id)` returns a handle with an already bound `sessionID`.
+- `packages/core/src/session/projector.ts` — all the `bus.project(...)`: creation, renaming, forking, delivery of the inbox, execution terminals, rollback, token sums.
+- `packages/core/src/session/message-updater.ts` — a pure function: an event plus an adapter give a new message; all the work with the DB lives in the adapter of the projector.
+- `packages/core/src/session/sql.ts` — the tables `session_v2`, `session_message`, `session_pending`, `session_inbox`, `instruction_entry`, `instruction_blob`, `instruction_state`.
+- `packages/core/src/session/store.ts` — reading of sessions and messages plus the "claim" of the execution (`claim`, `release`, `releaseChildClaims`, `countResume`, `listSuspended`).
+- `packages/core/src/session/inbox.ts` — admission of the input, the `steer`/`queue` switch, selection of the promotable, projections of the rows.
+- `packages/core/src/session/execution.ts` — the routing by `Session ID` into the runner of the chosen Location and the terminal events.
+- `packages/core/src/session/run-coordinator.ts` — one fiber per "busy period", the doorbell `pendingWake`.
+- `packages/core/src/session/execution/restart.ts` — the recovery of sessions with an unreleased claim after a crash or a restart.
+- `packages/core/src/session/runner/llm.ts` — the `drain` loop: input → context → step → step; the exit `Complete`/`Moved`/`Reloaded`.
+- `packages/core/src/session/runner/step.ts` — one attempt of a step: the provider stream, the tools, the calculation of the errors and the `Outcome` result.
+- `packages/core/src/session/runner/publish-llm-event.ts` — the translation of provider events into session events with batching of deltas.
+- `packages/core/src/session/model-request.ts` — the request assembly, the response limit, the media filters, the plugin hooks, the HTTP and WebSocket wrappers.
+- `packages/core/src/session/compaction.ts` — compaction of the history: a local summary or the native window of the provider.
+- `packages/core/src/session/history.ts` — which messages get into the request and with which lower bound.
 
-## Важные детали
+## Important Details
 
-- `Session.prompt`, `synthetic`, `compact`, `skill`, `steerInbox` по умолчанию будит сессию (`execution.wake`); отключается флагом `resume: false`. Приём входа идёт под `SessionInbox.serialized`, подготовка промпта — вне блокировки, под маской `uninterruptibleMask`.
-- Заявленный откат коммитится только после успешной подготовки нового входа и до его приёма (`SessionRevert.commit` внутри `Session.prompt`).
-- `Session.shell` форкает работу и ждёт: сервер сам дописывает результат, даже если отправивший клиент отвалился.
-- Проектор — единственное место записи в `session_message` во время работы; исключение — импорт в `transfer.ts`, который вставляет строки напрямую в той же транзакции, что и событие создания.
-- Claim пишется в коммит-хуке события `Execution.Started`, снимается на терминале; оба хука держат `time_updated` присваиванием самому себе, чтобы запись не выглядела активностью пользователя.
-- `time_idle` растёт как `max(now, time_idle + 1)`, `time_viewed` как `max(idle, coalesce(time_viewed, idle))` — «непрочитанное» определяется строгим сравнением меток.
-- `run-coordinator.ts`: `wake` на активном ключе не прерывает работу, а звонит в дверь; слитые пробуждения сохраняют самый широкий scope («input» шире, чем «steer»). Остановленный execution отказывает новым участникам и передаёт их преемнику.
-- `inbox.ts`: таблица хранит только невыданное; повтор того же `id` в той же сессии и типе идемпотентен, несовпадение даёт `LifecycleConflict`. Проекторы сообщают конфликт дефектом, а публикации превращают его в ошибку через `catchDefect`.
-- `promote` сначала берёт steer-строки, выносит compaction вперёд, но не пересекает `move`; в scope «input» допускается одна очередь.
-- `history.ts` задаёт нижнюю границу типом `Boundary`: `latest` (любая завершённая), `local` (только локальные резюме) или `Provenance` (нативное окно, которое умеет переиграть целевая модель).
-- `compaction.ts`: после отказа «слишком длинно» цели уменьшаются до 70%, 50% и 35% от первой отклонённой оценки; потолок запроса — окно минус 10%, но не меньше 16 000 токенов. Расход публикуется по каждому вызову модели, поэтому прерванное сжатие тоже биллится.
-- `provider-context.ts`: идентичность развёртывания — sha256 от базового URL, пути и отсортированных query-параметров; сравнение строгое по значению. Старые версии 1 с полями `mediaType`/`data` приводятся к виду `media.source` при чтении.
-- `model-request.ts` урезает вывод под остаток окна с запасом 15% на оценку текста; картинки суммарно свыше 25 МиБ заменяются текстовой заглушкой до 15 МиБ, медиа неподдерживаемых типов заменяется текстовой ошибкой для модели.
-- Крюк может переименовать инструмент, поэтому фактический инструмент ищется по идентичности объекта определения, а не по имени.
-- `runner/publish-llm-event.ts` батчит дельты по 100 мс, но начала блоков публикует сразу: порядок событий совпадает с порядком модели. Поздний `tool-result` с ошибкой считается безобидным отставанием, поздний успех — двойным выполнением и роняет fiber.
-- `stats.ts` считает окнами по 31 дню строго последовательно; расход сжатия берётся из таблицы событий, а не из сообщений, поэтому не зависит от нижней границы истории.
-- `transfer.ts` при `sanitize` заменяет содержимое на метки вида `[redacted:kind:id]`, а данные вложений обнуляет; импорт с уже существующим `id` даёт `ImportConflictError`.
-- `diff.ts` ищет границы хода по сообщениям `idle`; в сессии без таких маркеров ход заканчивается на следующем сообщении пользователя, а диапазон, пересекающий смену Location, отклоняется.
+- `Session.prompt`, `synthetic`, `compact`, `skill`, `steerInbox` by default wake the session (`execution.wake`); it is switched off by the flag `resume: false`. The admission of the input goes under `SessionInbox.serialized`, the preparation of the prompt — outside the lock, under the mask `uninterruptibleMask`.
+- The declared rollback is committed only after the successful preparation of a new input and before its admission (`SessionRevert.commit` inside `Session.prompt`).
+- `Session.shell` forks the work and waits: the server itself appends the result, even if the sending client has dropped.
+- The projector is the only place of writing into `session_message` during the work; the exception is the import in `transfer.ts`, which inserts the rows directly in the same transaction as the creation event.
+- The claim is written in the commit hook of the `Execution.Started` event, taken off on a terminal; both hooks hold `time_updated` by assigning it to themselves, so that the record does not look like user activity.
+- `time_idle` grows as `max(now, time_idle + 1)`, `time_viewed` as `max(idle, coalesce(time_viewed, idle))` — the "unread" is determined by a strict comparison of the marks.
+- `run-coordinator.ts`: a `wake` on an active key does not interrupt the work, but rings the doorbell; the merged wakeups keep the widest scope ("input" is wider than "steer"). A stopped execution refuses new participants and passes them to its successor.
+- `inbox.ts`: the table stores only the undelivered; a repeat of the same `id` in the same session and type is idempotent, a mismatch gives `LifecycleConflict`. The projectors report the conflict as a defect, and the publications turn it into an error via `catchDefect`.
+- `promote` first takes the steer rows, moves compaction forward but does not cross `move`; in the "input" scope one queue is allowed.
+- `history.ts` sets the lower bound by the type `Boundary`: `latest` (any completed), `local` (only local summaries) or `Provenance` (the native window that the target model is able to replay).
+- `compaction.ts`: after a refusal "too long" the targets are reduced to 70%, 50% and 35% of the first rejected estimate; the ceiling of the request is the window minus 10%, but not less than 16 000 tokens. The expense is published per model call, therefore an interrupted compaction is also billed.
+- `provider-context.ts`: the identity of the deployment is a sha256 from the base URL, the path and the sorted query parameters; the comparison is strictly by value. Old version 1 with the fields `mediaType`/`data` is brought to the `media.source` form on read.
+- `model-request.ts` cuts the output to the remainder of the window with a 15% margin for the text estimate; the pictures in total over 25 MiB are replaced with a text stub up to 15 MiB, the media of unsupported types is replaced with a text error for the model.
+- A hook can rename a tool, therefore the actual tool is looked for by the identity of the definition object, and not by the name.
+- `runner/publish-llm-event.ts` batches the deltas by 100 ms, but publishes the beginnings of the blocks right away: the order of the events matches the order of the model. A late `tool-result` with an error is considered a harmless lag, a late success — a double execution and brings down the fiber.
+- `stats.ts` counts 31-day windows strictly sequentially; the compaction expense is taken from the events table and not from the messages, therefore it does not depend on the lower bound of the history.
+- `transfer.ts` under `sanitize` replaces the content with marks of the form `[redacted:kind:id]`, and zeroes the attachment data; an import with an already existing `id` gives `ImportConflictError`.
+- `diff.ts` looks for the turn boundaries by the `idle` messages; in a session without such markers the turn ends at the next user message, and a range crossing a change of Location is rejected.
 
-## Связи
+## Connections
 
-- `packages/schema/src/session.ts`, `session-message.ts`, `session-event.ts`, `session-inbox.ts`, `session-revert.ts`, `session-provider-context.ts`, `session-stats.ts` — источники всех типов и событий.
-- `packages/core/src/bus.ts` — шина: `publish` с коммит-хуками и `project`; именно через неё идёт любая запись.
-- `packages/core/src/database/database.ts` и `packages/core/src/project/sql.ts` — соединение и каскад по таблицам.
-- `packages/core/src/job.ts` — фоновые команды и субагенты, чьи уведомления восстанавливаются в `execution/restart.ts`.
-- `packages/core/src/location-service-map.ts`, `location.ts`, `snapshot.ts`, `vcs/patch.ts` — смена Location, снимки и диффы.
-- `packages/core/src/tool.ts`, `tool-output.ts`, `permission.ts`, `question.ts` — выполнение инструментов и их бюджеты.
-- `packages/core/src/model-resolver.ts`, `packages/ai` — выбор модели, поток, ошибки и `isRetryable`.
-- `packages/core/src/instructions/index.ts` — сборка инструкций и их эпохи.
-- `packages/core/src/plugin/hooks.ts` — крюки `prompt`, `context`, `compaction`, `title`, `model.request`, `http.*`, `retry`, WebSocket-кадры.
+- `packages/schema/src/session.ts`, `session-message.ts`, `session-event.ts`, `session-inbox.ts`, `session-revert.ts`, `session-provider-context.ts`, `session-stats.ts` — the sources of all the types and events.
+- `packages/core/src/bus.ts` — the bus: `publish` with commit hooks and `project`; every write goes exactly through it.
+- `packages/core/src/database/database.ts` and `packages/core/src/project/sql.ts` — the connection and the cascade over the tables.
+- `packages/core/src/job.ts` — background commands and subagents, whose notifications are recovered in `execution/restart.ts`.
+- `packages/core/src/location-service-map.ts`, `location.ts`, `snapshot.ts`, `vcs/patch.ts` — the change of Location, the snapshots and the diffs.
+- `packages/core/src/tool.ts`, `tool-output.ts`, `permission.ts`, `question.ts` — the execution of the tools and their budgets.
+- `packages/core/src/model-resolver.ts`, `packages/ai` — the choice of the model, the stream, the errors and `isRetryable`.
+- `packages/core/src/instructions/index.ts` — the assembly of instructions and their epochs.
+- `packages/core/src/plugin/hooks.ts` — the hooks `prompt`, `context`, `compaction`, `title`, `model.request`, `http.*`, `retry`, WebSocket frames.
 
-## Ловушки
+## Pitfalls
 
-- `Session.prompt` возвращает уже принятый элемент, а не новое сообщение: сообщение появляется только при доставке (`InboxDelivered`) во время дрейна.
-- `store.list` и `store.messages` при `anchor`/`cursor` с направлением `previous` меняют сортировку на противоположную и разворачивают выборку — порядок на выходе «человеческий», а не порядок базы.
-- `SessionStore.claim` не двигает `time_updated`, поэтому счётчик активности и список сессий не реагируют на старт хода.
-- `execution.ts` при прерывании с причиной `shutdown` намеренно сохраняет claim: следующая загрузка продолжит ход. Любой другой терминал его снимает.
-- `SessionExecution.noopLayer` — заглушка без исполнения: вызывающий получает пустые `wake`/`resume`, а тихих отказов не будет.
-- `run-coordinator.ts` не запускает работу на один тик позже пробуждения: прогресс виден по событиям или по `run`, а не по самому `wake`.
-- `session.ts` заканчивается константой предела предпросмотра, повторяющей предел инструмента оболочки: при правке одной стороны легко забыть другую.
-- `inbox.ts` держит собственные блокировки (`KeyedMutex`); `move.ts` проверяет доступность источника вне блокировки специально, чтобы отмена перемещения оставалась возможной во время инициализации.
-- `history.ts` ищет нативное окно запросом `json_extract` по `$.providerContext.provenance.*`, поэтому состав полей provenance влияет на то, какие сообщения попадут в запрос.
-- `runner/to-llm-message.ts` переигрывает состояние провайдера только для той же модели; после смены модели текст и рассуждения переживают как обычный текст, а рассуждения с ошибкой превращаются в текст.
-- `model-transport.ts`: пять подряд потерянных обменов или один отказ 1009 («слишком большой запрос») навсегда оставляют сессию на HTTP до перезапуска или перемещения.
-- `prompt.ts` отклоняет вложение больше 20 МиБ и data-URL с неканоническим base64; в сообщениях об ошибке вложение называется меткой, а не самими байтами.
-- `instructions.ts` ведёт дедупликацию по синтетическим сообщениям с `metadata.instruction.paths`: выпавшие из видимой истории (сжатие, откат) пути будут введены заново.
+- `Session.prompt` returns the already admitted item, and not a new message: the message appears only at the delivery (`InboxDelivered`) during the drain.
+- `store.list` and `store.messages` with `anchor`/`cursor` with the direction `previous` change the sorting to the opposite and reverse the selection — the order of the output is "human", and not the order of the database.
+- `SessionStore.claim` does not move `time_updated`, therefore the activity counter and the session list do not react to the start of a turn.
+- `execution.ts` on an interruption with the reason `shutdown` deliberately keeps the claim: the next load will continue the turn. Any other terminal takes it off.
+- `SessionExecution.noopLayer` is a stub without execution: the caller gets empty `wake`/`resume`, and there will be no silent refusals.
+- `run-coordinator.ts` does not start the work one tick later than the wakeup: the progress is visible by the events or by `run`, and not by the `wake` itself.
+- `session.ts` ends with a constant of the preview limit repeating the limit of the shell tool: when editing one side it is easy to forget the other.
+- `inbox.ts` holds its own locks (`KeyedMutex`); `move.ts` checks the availability of the source outside the lock deliberately, so that the cancellation of the move stays possible during the initialization.
+- `history.ts` looks for the native window with a `json_extract` query on `$.providerContext.provenance.*`, therefore the composition of the provenance fields affects which messages get into the request.
+- `runner/to-llm-message.ts` replays the provider state only for the same model; after a change of model the text and the reasonings survive as ordinary text, and the reasonings with an error turn into text.
+- `model-transport.ts`: five lost exchanges in a row or one refusal 1009 ("request too large") leave the session on HTTP forever until a restart or a move.
+- `prompt.ts` rejects an attachment over 20 MiB and a data-URL with non-canonical base64; in the error messages the attachment is named by its mark, and not by the bytes themselves.
+- `instructions.ts` keeps the deduplication by the synthetic messages with `metadata.instruction.paths`: the paths that fell out of the visible history (compaction, rollback) will be introduced anew.

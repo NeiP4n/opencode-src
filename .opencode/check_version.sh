@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Проверка версии, которую объявит локальная сборка OpenCode.
+# Checks the version that the local OpenCode build reports.
 #
-# Не задаёт OPENCODE_VERSION: так проверяется именно запасной путь, который берёт
-# версию из git-тега (см. releaseTagVersion в packages/script/src/index.ts).
-# Скрипт обязан напечатать version=2.0.22 channel=local — число ≥ 1.18.0, иначе
-# провайдер opencode.ai откажет в бесплатных моделях.
+# It does not set OPENCODE_VERSION: that is exactly the fallback path being checked,
+# the one that takes the version from a git tag (see releaseTagVersion in
+# packages/script/src/index.ts). The script must print version=2.0.22 channel=local —
+# a number ≥ 1.18.0, otherwise the opencode.ai provider refuses the free models.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -15,8 +15,8 @@ describe("renderHubHints", () => {
     expect(text).toContain("- mlr —")
     expect(text).toContain("Show the first N rows with headers aligned")
     expect(text).toContain("mlr --icsv --opprint")
-    expect(text).toContain("инструмент hub")
-    expect(text).toContain("Терминалы: bash")
+    expect(text).toContain("the hub tool")
+    expect(text).toContain("Terminals: bash")
   })
 
   test("disabled tool produces nothing at all", () => {
@@ -43,18 +43,18 @@ describe("renderHubHints", () => {
     const text = renderHubHints({ state: stateOf(enabled), availability })
     expect(text.length).toBeLessThanOrEqual(2000)
     expect(text.split("\n").length).toBeLessThanOrEqual(40)
-    expect(text).toContain("инструментов — подробности")
+    expect(text).toContain("more tools — details through the hub tool")
   })
 
   test("terminals line appears only when terminals are given", () => {
     const without = renderHubHints({ state: stateOf({ mlr: true }), availability: ["mlr"] })
-    expect(without).not.toContain("Терминалы:")
+    expect(without).not.toContain("Terminals:")
     const withTerminals = renderHubHints({
       state: stateOf({ mlr: true }),
       availability: ["mlr"],
       terminals: ["bash", "nu"],
     })
-    expect(withTerminals).toContain("Терминалы: bash, nu")
+    expect(withTerminals).toContain("Terminals: bash, nu")
   })
 
   test("eligible tools are listed in sorted order", () => {

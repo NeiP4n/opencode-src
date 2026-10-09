@@ -1,78 +1,85 @@
-# @opencode/web — сайт, документация и лендер
+# @opencode/web — site, documentation and lander
 
-## Что это
+## What This Is
 
-Astro-сайт: лендер, документация и страница шаринга сессии. Пакет
-2 649 строк `*.ts` в `src/` (само содержимое — `.astro` и `.mdx`, в подсчёт
-`*.ts` не входит), 18 файлов TS.
+An Astro site: the lander, the documentation and the session sharing page.
+The package has 2 649 `*.ts` lines in `src/` (the content itself is `.astro`
+and `.mdx`, which is not counted in `*.ts`), 18 TS files.
 
-Это витрина opencode: маркетинговые страницы (`lander`), документация
-(`content/docs`, переводы `content/i18n`) и страница публичной сессии
-`pages/s/[id].astro`. Пакет не входит в бинарник CLI.
+This is the showcase of opencode: marketing pages (`lander`), documentation
+(`content/docs`, translations `content/i18n`) and the public session page
+`pages/s/[id].astro`. The package is not part of the CLI binary.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L0 — лист**: от пакетов `@opencode/*` не зависит. `exports` в
-`package.json` нет — пакет не подключается как модуль, он собирается как
-сайт. Опора — Astro и Starlight (документация).
+Layer **L0 — leaf**: it does not depend on any `@opencode/*` packages. There
+is no `exports` in `package.json` — the package is not consumed as a module,
+it is built as a site. It relies on Astro and Starlight (documentation).
 
-Потребителей в `packages/*/src` нет.
+There are no consumers in `packages/*/src`.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Страницы** — `packages/web/src/pages/`:
-- `s/[id].astro` — страница опубликованной сессии;
-- `[...slug].md.ts` — отдача Markdown по пути.
+**Pages** — `packages/web/src/pages/`:
+- `s/[id].astro` — the published session page;
+- `[...slug].md.ts` — serving Markdown by path.
 
-Страницы документации не лежат в `pages/`: их раздаёт Starlight по
-конфигурации из `packages/web/src/content.config.ts` и `astro.config.mjs`
-(оба — в корне пакета).
+The documentation pages do not live in `pages/`: Starlight serves them
+according to the configuration from `packages/web/src/content.config.ts` and
+`astro.config.mjs` (both at the root of the package).
 
-**Контент** — `packages/web/src/content/`:
-- `docs/` — документация на десятках языков (`en`, `ru`, `zh-cn`, `zh-tw`,
-  `ja`, `ko`, `de`, `fr`, `es`, …), темы включают `cli`, `config`, `plugins`,
-  `providers`, `models`, `permissions`, `share`, `themes`, `tools`, `tui`, `zen`;
-- `i18n/*.json` — переводы интерфейса сайта (18 файлов).
+**Content** — `packages/web/src/content/`:
+- `docs/` — documentation in dozens of languages (`en`, `ru`, `zh-cn`,
+  `zh-tw`, `ja`, `ko`, `de`, `fr`, `es`, …), topics include `cli`, `config`,
+  `plugins`, `providers`, `models`, `permissions`, `share`, `themes`, `tools`,
+  `tui`, `zen`;
+- `i18n/*.json` — translations of the site interface (18 files).
 
-**Компоненты** — `packages/web/src/components/`: `Head.astro`,
-`Header.astro`, `Footer.astro` — каркас страниц.
+**Components** — `packages/web/src/components/`: `Head.astro`,
+`Header.astro`, `Footer.astro` — the skeleton of the pages.
 
-**Переводы** — `packages/web/src/i18n/locales.ts` и
-`packages/web/src/middleware.ts` — определение языка и подстановка.
+**Translations** — `packages/web/src/i18n/locales.ts` and
+`packages/web/src/middleware.ts` — language detection and substitution.
 
-**Ассеты** — `packages/web/src/assets/` (логотипы `logo-dark.svg`,
-`logo-light.svg`, скриншоты `lander/` и `web/`).
+**Assets** — `packages/web/src/assets/` (logos `logo-dark.svg`,
+`logo-light.svg`, screenshots `lander/` and `web/`).
 
-**Стили и типы** — `packages/web/src/styles/custom.css`,
+**Styles and types** — `packages/web/src/styles/custom.css`,
 `packages/web/src/types/lang-map.d.ts`, `packages/web/src/types/starlight-virtual.d.ts`.
 
-## Точки входа
+## Entry Points
 
-1. `packages/web/src/content.config.ts` — конфигурация коллекций документации,
-   с неё начинается маршрутная раздача.
-2. `packages/web/src/middleware.ts` — точка, где определяется язык запроса.
-3. `packages/web/src/i18n/locales.ts` — список поддерживаемых локалей.
-4. Скрипты пакета (`dev`, `build`) из `packages/web/package.json` — запуск
-   и сборка сайта.
+1. `packages/web/src/content.config.ts` — the documentation collections
+   configuration, the routed serving starts from it.
+2. `packages/web/src/middleware.ts` — the point where the language of the
+   request is determined.
+3. `packages/web/src/i18n/locales.ts` — the list of supported locales.
+4. The package scripts (`dev`, `build`) from `packages/web/package.json` —
+   starting and building the site.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/posts/PACKAGE.md` — второй сайт в репозитории (блог), тот же
-  подход к деплою.
-- `packages/theme/PACKAGE.md` — темы, которые документация описывает словами.
-- `AGENTS.md` в корне репозитория — правила монорепозитория.
-- `packages/console`, `packages/stats` — инфраструктура SST вокруг сайтов.
+- `packages/posts/PACKAGE.md` — the second site in the repository (the blog),
+  the same deployment approach.
+- `packages/theme/PACKAGE.md` — the themes that the documentation describes in
+  words.
+- `AGENTS.md` at the repository root — the monorepo rules.
+- `packages/console`, `packages/stats` — SST infrastructure around the sites.
 
-## Ловушки
+## Pitfalls
 
-1. **Строки `src/` почти не входят в статистику:** 2 649 строк — это `.ts`
-   (`i18n`, `middleware`, типы), а вся документация лежит `.mdx` и в подсчёт
-   `*.ts` не попадает. Цифра не отражает объём контента.
-2. **Переводы разного возраста.** Переводов больше, чем обновляемых статей:
-   часть `ru`/`zh-cn` страниц расходится с `en`. Сверять нужно с `en`.
-3. **Маршруты документации и Markdown конфликтуют не в `pages/`.** Starlight
-   раздаёт `.mdx` по конфигурации, а `pages/[...slug].md.ts` отдаёт Markdown —
-   порядок разрешения задаёт Astro, а не код пакета.
-4. **Starlight-типизация хрупкая:** `types/starlight-virtual.d.ts` —
-   декларация поверх виртуальных модулей, правка структуры документации может
-   её нарушить, и это вылезет только при сборке сайта.
+1. **`src/` lines barely enter the statistics:** 2 649 lines is `.ts`
+   (`i18n`, `middleware`, types), while all the documentation is `.mdx` and
+   does not get into the `*.ts` count. The number does not reflect the volume
+   of the content.
+2. **Translations of different ages.** There are more translations than
+   updated articles: part of the `ru`/`zh-cn` pages diverges from `en`. They
+   have to be checked against `en`.
+3. **The documentation routes and Markdown do not conflict in `pages/`.**
+   Starlight serves `.mdx` according to the configuration, and
+   `pages/[...slug].md.ts` serves Markdown — the resolution order is set by
+   Astro, not by the package code.
+4. **Starlight typing is fragile:** `types/starlight-virtual.d.ts` is a
+   declaration over virtual modules, changing the structure of the
+   documentation can break it, and that will only surface when the site is
+   built.

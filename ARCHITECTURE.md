@@ -1,79 +1,81 @@
-# Ядро OpenCode — карта репозитория
+# The OpenCode Core — Repository Map
 
-Репозиторий: `github.com/sst/opencode`, лицензия MIT, релиз **v2.0.22**
-(`git describe` → `v2.0.22`, HEAD `527f0b931d`). Каждый пакет описан в своём файле
-`packages/<пакет>/PACKAGE.md` — с этого файла и начинай, если знаешь, какой пакет нужен.
+Repository: `github.com/sst/opencode`, license MIT, release **v2.0.22**
+(`git describe` → `v2.0.22`, HEAD `527f0b931d`). Every package is described in its own
+file `packages/<package>/PACKAGE.md` — start from that file if you already know which
+package you need.
 
-Всего 35 каталогов в `packages/`, из них 30 с `package.json` (у `console`, `stats`,
-`containers`, `identity`, `effect-drizzle-sqlite` своего манифеста нет). Строки и число
-файлов — по `src/`, без тестов.
+There are 35 directories in `packages/`, 30 of them with a `package.json` (`console`,
+`stats`, `containers`, `identity`, `effect-drizzle-sqlite` have no manifest of their
+own). Line and file counts are over `src/`, without tests.
 
-## Карта слоёв
+## Layer Map
 
-Слои с ссылками на документ каждого пакета (порядок — от фундамента к поверхности):
+Layers with a link to each package's document (order is from foundation to surface):
 
-| Слой | Пакеты и их документы |
+| Layer | Packages and their documents |
 | --- | --- |
-| L0 — листья | [schema](packages/schema/PACKAGE.md), [util](packages/util/PACKAGE.md), [codemode](packages/codemode/PACKAGE.md), [theme](packages/theme/PACKAGE.md), [ui](packages/ui/PACKAGE.md), [http-recorder](packages/http-recorder/PACKAGE.md), [httpapi-codegen](packages/httpapi-codegen/PACKAGE.md), [web](packages/web/PACKAGE.md), [script](packages/script/PACKAGE.md), [function](packages/function/PACKAGE.md), [posts](packages/posts/PACKAGE.md) |
+| L0 — leaves | [schema](packages/schema/PACKAGE.md), [util](packages/util/PACKAGE.md), [codemode](packages/codemode/PACKAGE.md), [theme](packages/theme/PACKAGE.md), [ui](packages/ui/PACKAGE.md), [http-recorder](packages/http-recorder/PACKAGE.md), [httpapi-codegen](packages/httpapi-codegen/PACKAGE.md), [web](packages/web/PACKAGE.md), [script](packages/script/PACKAGE.md), [function](packages/function/PACKAGE.md), [posts](packages/posts/PACKAGE.md) |
 | L1 | [protocol](packages/protocol/PACKAGE.md), [ai](packages/ai/PACKAGE.md), [latex](packages/latex/PACKAGE.md), [merman](packages/merman/PACKAGE.md) |
 | L2 | [client](packages/client/PACKAGE.md), [plugin-browser](packages/plugin-browser/PACKAGE.md) |
 | L3 | [plugin](packages/plugin/PACKAGE.md) |
-| L4 — ядро | [core](packages/core/PACKAGE.md), [simulation](packages/simulation/PACKAGE.md) |
-| L5 — транспорт | [server](packages/server/PACKAGE.md), [session-ui](packages/session-ui/PACKAGE.md) |
-| L6 — поверхности | [cli](packages/cli/PACKAGE.md), [tui](packages/tui/PACKAGE.md), [sdk](packages/sdk/PACKAGE.md), [app](packages/app/PACKAGE.md), [gui-extensions](packages/gui-extensions/PACKAGE.md), [enterprise](packages/enterprise/PACKAGE.md), [desktop](packages/desktop/PACKAGE.md), [storybook](packages/storybook/PACKAGE.md) |
+| L4 — core | [core](packages/core/PACKAGE.md), [simulation](packages/simulation/PACKAGE.md) |
+| L5 — transport | [server](packages/server/PACKAGE.md), [session-ui](packages/session-ui/PACKAGE.md) |
+| L6 — surfaces | [cli](packages/cli/PACKAGE.md), [tui](packages/tui/PACKAGE.md), [sdk](packages/sdk/PACKAGE.md), [app](packages/app/PACKAGE.md), [gui-extensions](packages/gui-extensions/PACKAGE.md), [enterprise](packages/enterprise/PACKAGE.md), [desktop](packages/desktop/PACKAGE.md), [storybook](packages/storybook/PACKAGE.md) |
 
-## Как всё запускается
+## How Everything Runs
 
-Один короткий путь, который стоит запомнить:
+One short path worth remembering:
 
 ```
 opencode (packages/cli/src/index.ts)
-  └─ команда (serve, run, tui, pair, service, …)
-      └─ сервер (packages/server/src/routes.ts) — HTTP + SSE
-          └─ ядро (packages/core/src) — сессии, инструменты, провайдеры
-              └─ база (packages/core/src/database) и конфиг (packages/core/src/config.ts)
+  └─ command (serve, run, tui, pair, service, …)
+      └─ server (packages/server/src/routes.ts) — HTTP + SSE
+          └─ core (packages/core/src) — sessions, tools, providers
+              └─ database (packages/core/src/database) and config (packages/core/src/config.ts)
 ```
 
-Клиент (TUI, приложение, SDK) через этот сервер ходит по эндпоинтам, объявленным
-в `packages/protocol/src/api.ts`. Типы данных живут отдельно — в `packages/schema/src`.
+The client (TUI, app, SDK) talks to this server through the endpoints declared in
+`packages/protocol/src/api.ts`. Data types live separately, in `packages/schema/src`.
 
-Три места, где это можно перечитать в коде:
+Three places in the code where this can be re-read:
 
-- `packages/cli/src/index.ts` — реестр команд; каждая команда подгружается лениво
-  через динамический импорт, в таблице `Handlers`.
-- `packages/server/src/routes.ts:176` — `HttpApiBuilder.layer(Api, …)` монтирует API;
-  ниже идёт `Layer.provide` со слоями авторизации, ошибок и ~35 слоёв ядра.
+- `packages/cli/src/index.ts` — the command registry; each command is loaded lazily
+  via a dynamic import, in the `Handlers` table.
+- `packages/server/src/routes.ts:176` — `HttpApiBuilder.layer(Api, …)` mounts the API;
+  below it goes `Layer.provide` with the authorization, error layers and ~35 core layers.
 - `packages/core/src/instance.ts:114` — `export const graph = LayerNode.group(nodes)`:
-  граф слоёв ядра. Это точка сборки зависимостей, а не «объект инстанса».
-  Таких графов в ядре три: ещё два собирают требования плагинов —
-  `packages/core/src/plugin/host.ts:574` и `packages/core/src/plugin/internal.ts:160`.
+  the core layer graph. This is the assembly point of dependencies, not an "instance
+  object". There are three such graphs in the core: the other two assemble plugin
+  requirements — `packages/core/src/plugin/host.ts:574` and
+  `packages/core/src/plugin/internal.ts:160`.
 
-## Слои зависимостей
+## Dependency Layers
 
-Слои посчитаны по полю `dependencies` в `packages/*/package.json` (только пакеты
-`@opencode/*`). Пакет в строке не может зависеть от пакета выше по списку.
+Layers are counted from the `dependencies` field in `packages/*/package.json` (only
+`@opencode/*` packages). A package in a row cannot depend on a package higher up the list.
 
-| Слой | Пакеты | Зависит от |
+| Layer | Packages | Depends on |
 | --- | --- | --- |
-| **L0 — листья** | `schema`, `util`, `codemode`, `theme`, `ui`, `http-recorder`, `httpapi-codegen`, `web`, `script`, `function`, `posts` | — |
+| **L0 — leaves** | `schema`, `util`, `codemode`, `theme`, `ui`, `http-recorder`, `httpapi-codegen`, `web`, `script`, `function`, `posts` | — |
 | **L1** | `protocol`, `ai`, `latex`, `merman` | `schema`, `plugin` |
 | **L2** | `client`, `plugin-browser` | `protocol`, `schema`, `plugin` |
 | **L3** | `plugin` | `ai`, `client`, `protocol`, `schema`, `util` |
-| **L4 — ядро** | `core`, `simulation` | `ai`, `codemode`, `plugin`, `schema`, `util`, `core` |
-| **L5 — транспорт** | `server`, `session-ui` | `core`, `protocol`, `schema`, `simulation`, `util`, `client`, `ui` |
-| **L6 — поверхности** | `cli`, `tui`, `sdk`, `app`, `gui-extensions`, `enterprise`, `desktop`, `storybook` | всё вышеперечисленное |
+| **L4 — core** | `core`, `simulation` | `ai`, `codemode`, `plugin`, `schema`, `util`, `core` |
+| **L5 — transport** | `server`, `session-ui` | `core`, `protocol`, `schema`, `simulation`, `util`, `client`, `ui` |
+| **L6 — surfaces** | `cli`, `tui`, `sdk`, `app`, `gui-extensions`, `enterprise`, `desktop`, `storybook` | everything listed above |
 
-**Оговорка, важная для чтения:** слои взяты из манифестов, а не из графа импортов,
-поэтому реальная связность шире. Два примера, которые это видят:
+**A caveat that matters when reading this:** the layers come from the manifests, not from
+the import graph, so the real coupling is wider. Two examples that show it:
 
-- `packages/tui` объявлен на L6 и зависит от `core`, но `packages/tui/src/mini/`
-  тянет ядро напрямую, минуя `packages/tui/src/context/client.tsx`.
-- `packages/latex` и `packages/merman` стоят на L1, но зависят от `plugin` (L3) —
-  то есть ссылка идёт вниз по слоям. Проверяй конкретный файл, а не только пакет.
+- `packages/tui` is declared at L6 and depends on `core`, but `packages/tui/src/mini/`
+  pulls the core directly, bypassing `packages/tui/src/context/client.tsx`.
+- `packages/latex` and `packages/merman` sit at L1 but depend on `plugin` (L3) — that is,
+  the reference goes down the layers. Check the concrete file, not just the package.
 
-## Пакеты по слоям
+## Packages by Layer
 
-| Пакет | Строк в src | Файлов | Документ |
+| Package | Lines in src | Files | Document |
 | --- | --- | --- | --- |
 | `schema` | 5 785 | 102 | `packages/schema/PACKAGE.md` |
 | `util` | 4 565 | 44 | `packages/util/PACKAGE.md` |
@@ -106,77 +108,77 @@ opencode (packages/cli/src/index.ts)
 | `desktop` | 9 569 | 142 | `packages/desktop/PACKAGE.md` |
 | `storybook` | 0 | 0 | `packages/storybook/PACKAGE.md` |
 
-## Где что искать
+## Where To Look
 
-| Задача | Первый файл | Пакет |
+| Task | First file | Package |
 | --- | --- | --- |
-| как живут сессии, промпты, инструменты | `packages/core/src/session/session.ts` | `core` |
-| какие инструменты у агента и как они описываются провайдеру | `packages/core/src/tool/runtime.ts` | `core` |
-| откуда берутся модели и как выбирается провайдер | `packages/core/src/provider.ts` | `core` |
-| где лежат данные opencode (база, кэш, состояние) | `packages/util/src/global.ts` | `util` |
-| как задаётся конфиг и откуда он подхватывается | `packages/core/src/config.ts` | `core` |
-| какие HTTP-эндпоинты есть и что они возвращают | `packages/protocol/src/api.ts` | `protocol` |
-| авторизация, pair, порты, привязка сервера | `packages/server/src/auth.ts` | `server` |
-| поток событий (SSE) | `packages/server/src/event-feed.ts` | `server` |
-| как устроен интерфейс в терминале | `packages/tui/src/routes/session/index.tsx` | `tui` |
-| как подключиться к чужому серверу | `packages/cli/src/services/server-connection.ts` | `cli` |
-| как написать плагин (серверная часть) | `packages/plugin/src/app.ts` | `plugin` |
-| как написать плагин (интерфейс) | `packages/plugin/src/tui/` | `plugin` |
-| типы данных, которые ходят по API | `packages/schema/src/` | `schema` |
+| how sessions, prompts and tools live | `packages/core/src/session/session.ts` | `core` |
+| which tools the agent has and how they are described to the provider | `packages/core/src/tool/runtime.ts` | `core` |
+| where models come from and how a provider is chosen | `packages/core/src/provider.ts` | `core` |
+| where opencode's data lives (database, cache, state) | `packages/util/src/global.ts` | `util` |
+| how config is set and where it is picked up from | `packages/core/src/config.ts` | `core` |
+| which HTTP endpoints exist and what they return | `packages/protocol/src/api.ts` | `protocol` |
+| authorization, pair, ports, server binding | `packages/server/src/auth.ts` | `server` |
+| the event stream (SSE) | `packages/server/src/event-feed.ts` | `server` |
+| how the terminal interface is built | `packages/tui/src/routes/session/index.tsx` | `tui` |
+| how to connect to someone else's server | `packages/cli/src/services/server-connection.ts` | `cli` |
+| how to write a plugin (server side) | `packages/plugin/src/app.ts` | `plugin` |
+| how to write a plugin (interface) | `packages/plugin/src/tui/` | `plugin` |
+| the data types that travel over the API | `packages/schema/src/` | `schema` |
 
-## Правила репозитория (из AGENTS.md)
+## Repository Rules (from AGENTS.md)
 
-Перед правкой любого файла прочитай `AGENTS.md` в корне. Коротко, что там важного:
+Before editing any file, read `AGENTS.md` in the root. Briefly, what matters there:
 
-- После изменения публичного `HttpApi` в `protocol` или `server` нужно
-  `bun run generate` из `packages/client`; сгенерированные файлы клиента не правят руками.
-- Направление зависимостей: `schema` → `core` и `protocol` → `server`. Клиентский код
-  может зависеть от `schema` и `protocol`, но не от `core` и `server`.
-- Изменения — в `packages/core`, `cli`, `server`, `protocol`, `schema` и сгенерированных
-  поверхностях клиента.
-- Changesets в этом репозитории не используются.
-- Ветка по умолчанию — `v2`. Локальной `main` может не быть: для диффов берётся `v2`.
-- Тесты не запускают из корня репозитория (есть guard `do-not-run-tests-from-root`),
-  а из каталогов пакетов.
-- Проверка целиком: `bun run check` из корня. Точечно: `bun typecheck` из каталога пакета.
-  `tsc` напрямую не запускают.
+- After changing the public `HttpApi` in `protocol` or `server` you need
+  `bun run generate` from `packages/client`; generated client files are not edited by hand.
+- Dependency direction: `schema` → `core` and `protocol` → `server`. Client code
+  may depend on `schema` and `protocol`, but not on `core` and `server`.
+- Changes go into `packages/core`, `cli`, `server`, `protocol`, `schema` and the generated
+  client surfaces.
+- Changesets are not used in this repository.
+- The default branch is `v2`. A local `main` may not exist: diffs are taken against `v2`.
+- Tests are not run from the repository root (there is a guard `do-not-run-tests-from-root`),
+  but from the package directories.
+- Full check: `bun run check` from the root. Narrow check: `bun typecheck` from the package
+  directory. `tsc` is never run directly.
 
-## Как проверять документацию
+## How To Check The Documentation
 
-Валидатор лежит в `.opencode/` и проверяет, что у каждого пакета из
-`.opencode/doc_manifest.txt` есть непустой `PACKAGE.md` с шестью обязательными
-разделами и без заглушек.
+The validator lives in `.opencode/` and checks that every package from
+`.opencode/doc_manifest.txt` has a non-empty `PACKAGE.md` with the six mandatory
+sections and no placeholders.
 
 ```bash
 cd ~/opencode-src
-./.opencode/doc_check.py            # форма и полнота по всем пакетам
-./.opencode/doc_check.py --links    # плюс существование упомянутых путей
-./.opencode/doc_check.py --surface  # сверка манифеста с каталогом packages/
-./.opencode/doc_check.py --sample   # символы из документов против исходников
-./.opencode/doc_check.sh util       # отрицательный контроль: 4 мутации должны краснеть
+./.opencode/doc_check.py            # shape and completeness across all packages
+./.opencode/doc_check.py --links    # plus existence of the mentioned paths
+./.opencode/doc_check.py --surface  # manifest against the packages/ directory
+./.opencode/doc_check.py --sample   # symbols from the documents against the sources
+./.opencode/doc_check.sh util       # negative control: 4 mutations must turn red
 ```
 
-Валидатор проверяет форму документа и существование путей, но **не** проверяет, что
-написанное совпадает со смыслом кода. Фактическую верность описания подтверждает
-только чтение исходников и выборочная проверка `--sample`.
+The validator checks the shape of a document and the existence of paths, but it does
+**not** check that what is written matches the meaning of the code. Only reading the
+sources and a spot check with `--sample` confirm the factual accuracy of a description.
 
-## Ловушки
+## Pitfalls
 
-1. **Папка — не всегда подсистема.** В `packages/core/src` подсистемы `provider`,
-   `event`, `credential`, `permission` — это одиночные `.ts`-файлы, а одноимённые папки
-   существуют ради `sql.ts` со схемой таблиц. Ищи файл, а не папку.
-2. **Реальный движок событий — `packages/core/src/bus.ts`, а не каталог `event/`.**
-   В `event/` лежит только `sql.ts`.
-3. **Три рантайма в базе:** `packages/core/src/database/sqlite.bun.ts`,
-   `sqlite.node.ts` и `sqlite.workerd.ts`. Правка одного из них не означает правку
-   остальных.
-4. **`packages/tui/src/mini/` — не «мини-версия» интерфейса.** Это отдельный
-   фронтенд-рантайм на 18 тыс. строк со своим рендером, запускаемый отдельной
-   командой CLI (`packages/cli/src/commands/handlers/mini.ts`).
-5. **`packages/core/src/account/sql.ts` — мёртвый код:** импортов ноль, таблица в
-   `console/core/src/schema/account.sql` существует отдельно. Не чинится, только
-   помечено.
-6. **`packages/core/test/` — 96.5 тыс. строк из 162.7 тыс. в `core`.** `src/` ядра —
-   это 65 тыс. строк; остальное — тесты. Не ищи логику в тестах.
-7. **Границы документации:** новые файлы в этом репозитории попадут в чужой
-   `git status` как untracked. Коммитов не делается.
+1. **A folder is not always a subsystem.** In `packages/core/src` the subsystems
+   `provider`, `event`, `credential`, `permission` are single `.ts` files, and the
+   same-named folders exist only for the `sql.ts` with the table schema. Look for the
+   file, not the folder.
+2. **The real event engine is `packages/core/src/bus.ts`, not the `event/` directory.**
+   `event/` holds only `sql.ts`.
+3. **Three runtimes in the database:** `packages/core/src/database/sqlite.bun.ts`,
+   `sqlite.node.ts` and `sqlite.workerd.ts`. Editing one of them does not mean editing
+   the others.
+4. **`packages/tui/src/mini/` is not a "mini version" of the interface.** It is a separate
+   18 thousand line frontend runtime with its own renderer, started by a separate
+   CLI command (`packages/cli/src/commands/handlers/mini.ts`).
+5. **`packages/core/src/account/sql.ts` is dead code:** zero imports, and the table in
+   `console/core/src/schema/account.sql` exists separately. It is not fixed, only marked.
+6. **`packages/core/test/` is 96.5 thousand lines out of 162.7 thousand in `core`.** The
+   core `src/` is 65 thousand lines; the rest is tests. Do not look for logic in tests.
+7. **Documentation boundaries:** new files in this repository will show up in someone
+   else's `git status` as untracked. No commits are made.

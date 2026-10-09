@@ -1,119 +1,118 @@
-# core/shell — выбор оболочки, разбор команд и результаты выполнения
+# core/shell — shell selection, command parsing and execution results
 
-## Что в папке
+## What's In This Folder
 
-Семь файлов. Три из них — разбор команд для разрешений: ручной сканер bash и
-PowerShell (`scan.ts`, самый большой файл папки, около 1500 строк), сканер на
-грамматиках tree-sitter (`parse.ts`) и подбор оболочки из списка известных
-(`select.ts`). Ещё `result.ts` собирает ответ о выполненной команде, а три
-`parser-wasm.*` отдают пути к wasm-файлам парсера.
+Seven files. Three of them are command parsing for permissions: a manual scanner of bash and
+PowerShell (`scan.ts`, the largest file of the folder, about 1500 lines), a scanner based
+on tree-sitter grammars (`parse.ts`) and the selection of a shell from a list of known ones
+(`select.ts`). Also `result.ts` assembles the answer about an executed command, and the three
+`parser-wasm.*` hand over the paths to the wasm files of the parser.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/shell/scan.ts` — `scan(input)` для bash и
-  `scanPowerShell(input)` для PowerShell, тип `Result` (`scanned` с командами
-  либо `opaque` с причиной), тип `OpaqueReason`, внутренние разборы
+- `packages/core/src/shell/scan.ts` — `scan(input)` for bash and
+  `scanPowerShell(input)` for PowerShell, the type `Result` (`scanned` with commands
+  or `opaque` with a reason), the type `OpaqueReason`, the internal parsings
   `bashExpansion`, `bashDelimited`, `bashHeredoc`, `powerShellBlock`,
   `powerShellEscape`, `powerShellRedirect`.
 - `packages/core/src/shell/parse.ts` — `scan`, `scanPortable`, `scanLegacy`,
-  таблица арности `ARITY`, тип `Result` с командами и каталогами.
-- `packages/core/src/shell/select.ts` — сервис `@opencode/ShellSelect`, слои
-  `layer`, `configured`, `node`; функции `resolve`, `list`, `args`, `name`,
+  the arity table `ARITY`, the type `Result` with commands and directories.
+- `packages/core/src/shell/select.ts` — the service `@opencode/ShellSelect`, the layers
+  `layer`, `configured`, `node`; the functions `resolve`, `list`, `args`, `name`,
   `login`, `ps`, `environment`, `gitbash`.
 - `packages/core/src/shell/result.ts` — `output`, `notice`, `metadata`,
-  `notification`, `userNotification`, константа `unavailable`.
+  `notification`, `userNotification`, the constant `unavailable`.
 - `packages/core/src/shell/parser-wasm.bun.ts`, `parser-wasm.node.ts`,
-  `parser-wasm.workerd.ts` — три источника путей к wasm-артефактам.
+  `parser-wasm.workerd.ts` — three sources of the paths to the wasm artifacts.
 
-## Важные детали
+## Important Details
 
-- Ручной сканер отвечает на вопрос «какие команды вообще выполнятся», а не
-  «что разрешено»: тип `Result` прямо назван разделением `opaque` как
-  ограничение разбора. `OpaqueReason` перечисляет девять причин: от
-  `command-substitution` до `dynamic-command-name`.
-- Каждая команда описывается источником (`resource`), разобранными словами
-  (`words`), их исходными формами (`rawWords`), концами слов относительно
-  `resource` (`wordEnds`), признаком начала оператора (`statementHead`),
-  признаком объявления (`declaration`) и числом слов до хвостового
-  перенаправления (`redirectWordCount`).
-- Границы разбора жёсткие: вход до 64 КиБ, глубина подстановок до 32 и общий
-  бюджет исходника `MAX_INPUT_LENGTH * MAX_SUBSTITUTION_DEPTH`. При исчерпании
-  бюджета или лимита — `opaque`, а не частичный разбор.
-- Объявления `declare`, `typeset`, `export`, `readonly`, `local`, `unset`,
-  `unsetenv` помечаются флагом `declaration`, и `parse.ts` их пропускает: в
-  legacy-разборе пропускались объявления, но не подстановки внутри них.
-- Оболочка выбирается по известной таблице `META`: `fish` и `nu` помечены как
-  несовместимые, PowerShell-оболочки требуют особых аргументов запуска, а
-  `bash`, `dash`, `ksh`, `sh`, `zsh` запускаются как login-оболочки.
-- `parse.ts` строит для разрешения префикс команды с подстановкой первых слов:
-  по таблице арности (`npm run` — 3 слова, `git` — 2, `cat` — 1) и
-  сохраняемое разрешение получает вид `префикс *`. Если префикс не найден,
-  берётся одно слово.
-- В PowerShell приоритет префикса отличается от bash: там сохраняется исходная
-  граница команды и добавляется `*` после неё, чтобы уже выданные разрешения
-  не менялись после нормализации пробелов. Проверка идёт через `Wildcard.match`.
-- Каталоги извлекаются из команд смены каталога: `cd`, `chdir`, `popd`,
-  `pushd`, `push-location`, `set-location`. В PowerShell учитываются флаги
-  `-Path` и `-LiteralPath`, в том числе в форме `-Path:значение`.
-- Раскрываются только заведомо безопасные значения: `~`, `~/`, переменные
-  окружения через `$env:ИМЯ`, `$HOME`, `$PWD`, `$PSHOME`. Любая конструкция с
-  `$`, обратной кавычкой или открывающей скобкой не раскрывается вовсе —
-  неизвестное выражение нельзя разрешить безопасно на этапе анализа.
-- Имена переменных окружения в PowerShell ищутся без учёта регистра, но на
-  не-Windows используется прямое обращение к `process.env`.
-- Wasm-файлы: под Bun они встраиваются статическим импортом, под Node
-  разрешаются через `require.resolve` с возможностью переопределить путь
-  переменными окружения, под workerd остаются пустыми строками, чтобы модуль
-  грузился без побочных эффектов.
-- Разбор на tree-sitter ленивый (`lazy`), языки bash и PowerShell грузятся
-  параллельно, дерево освобождается через `acquireUseRelease`.
-- `result.ts` при отсутствии вывода отдаёт не пустую строку, а специальный
-  текст «Shell command output is no longer available.» с курсором и размером,
-  посчитанными в байтах.
-- `notice` выбирает первую подходящую формулировку: таймаут, затем сигнал,
-  затем ненулевой код возврата; при нулевом коде не возвращает ничего.
-- Пользовательское уведомление о выполненной команде начинается с фразы «The
-  following shell command was executed by the user» и несёт метаданные с
-  источником `shell`.
+- The manual scanner answers the question "which commands will run at all", and not
+  "what is allowed": the type `Result` explicitly names the `opaque` separation as a
+  parsing limitation. `OpaqueReason` lists nine reasons: from
+  `command-substitution` to `dynamic-command-name`.
+- Each command is described by its source (`resource`), the parsed words
+  (`words`), their original forms (`rawWords`), the ends of the words relative to
+  `resource` (`wordEnds`), the sign of the beginning of an operator (`statementHead`),
+  the sign of a declaration (`declaration`) and the number of words before a trailing
+  redirect (`redirectWordCount`).
+- The parsing limits are hard: input up to 64 KiB, substitution depth up to 32 and the total
+  source budget of `MAX_INPUT_LENGTH * MAX_SUBSTITUTION_DEPTH`. On exhausting
+  the budget or the limit — `opaque`, and not a partial parsing.
+- The declarations `declare`, `typeset`, `export`, `readonly`, `local`, `unset`,
+  `unsetenv` are marked with the flag `declaration`, and `parse.ts` skips them: in
+  the legacy parsing the declarations were skipped, but the substitutions inside them were not.
+- The shell is chosen by the known table `META`: `fish` and `nu` are marked as
+  incompatible, the PowerShell shells require special launch arguments, and
+  `bash`, `dash`, `ksh`, `sh`, `zsh` are launched as login shells.
+- `parse.ts` builds the command prefix for the permission by substituting the first words:
+  by the arity table (`npm run` — 3 words, `git` — 2, `cat` — 1) and the
+  saved permission gets the form `prefix *`. If the prefix is not found,
+  one word is taken.
+- In PowerShell the prefix priority differs from bash: there the original
+  command boundary is kept and `*` is added after it, so that the already issued permissions
+  do not change after the normalization of spaces. The check goes through `Wildcard.match`.
+- The directories are extracted from the directory change commands: `cd`, `chdir`, `popd`,
+  `pushd`, `push-location`, `set-location`. In PowerShell the flags
+  `-Path` and `-LiteralPath` are taken into account, including in the form `-Path:value`.
+- Only surely safe values are expanded: `~`, `~/`, environment variables through `$env:NAME`, `$HOME`, `$PWD`, `$PSHOME`. Any construction with
+  `$`, a backtick or an opening bracket is not expanded at all —
+  an unknown expression cannot be resolved safely at the analysis stage.
+- The environment variable names in PowerShell are looked up case-insensitively, but on
+  non-Windows a direct access to `process.env` is used.
+- Wasm files: under Bun they are embedded by a static import, under Node
+  they are resolved through `require.resolve` with the possibility to override the path
+  with environment variables, under workerd they stay empty strings, so that the module
+  loads without side effects.
+- The tree-sitter parsing is lazy (`lazy`), the bash and PowerShell languages are loaded
+  in parallel, the tree is freed via `acquireUseRelease`.
+- `result.ts` in the absence of output gives not an empty string but a special
+  text «Shell command output is no longer available.» with the cursor and the size,
+  counted in bytes.
+- `notice` chooses the first suitable wording: a timeout, then a signal,
+  then a non-zero return code; with a zero code it gives nothing.
+- The user notification about an executed command starts with the phrase «The
+  following shell command was executed by the user» and carries the metadata with
+  the source `shell`.
 
-## Связи
+## Connections
 
-- `parse.ts` вызывает `ShellSelect.ps(shell)`, чтобы выбрать грамматику, и
-  `Wildcard.match` из `../util/wildcard.js` для стабилизации префикса;
-  ленивую загрузку даёт `../util/lazy.js`, поиск исполняемых файлов —
+- `parse.ts` calls `ShellSelect.ps(shell)` to choose the grammar, and
+  `Wildcard.match` from `../util/wildcard.js` to stabilize the prefix;
+  the lazy loading comes from `../util/lazy.js`, the search of the executables —
   `../util/which.js`.
-- Ручной сканер грузится динамически только в портативном режиме
-  (`Effect.tryPromise` с `import("./scan.js")`), поэтому основной путь работы
-  не тянет этот большой модуль.
-- `select.ts` — локационный узел: он зависит только от `Global.node`, потому
-  что ищет оболочки в системных путях и в каталоге данных.
-- Типы оболочки (`Shell.Info`, `Shell.Output`) приходят из
-  `@opencode/schema/shell`; вид события файлов — из `FileSystem.Event.Changed`
-  в `filesystem/watcher.ts`.
-- Права на команды, посчитанные этими файлами, потребляет слой разрешений
-  `permission.ts`; сами команды исполняются средой локации из папки
-  `environment`.
+- The manual scanner is loaded dynamically only in the portable mode
+  (`Effect.tryPromise` with `import("./scan.js")`), therefore the main work path
+  does not pull this large module.
+- `select.ts` is a location node: it depends only on `Global.node`, because
+  it looks for shells in the system paths and in the data directory.
+- The shell types (`Shell.Info`, `Shell.Output`) come from
+  `@opencode/schema/shell`; the kind of the file event comes from `FileSystem.Event.Changed`
+  in `filesystem/watcher.ts`.
+- The permissions on the commands counted by these files are consumed by the permissions
+  layer `permission.ts`; the commands themselves are executed by the location environment from the
+  `environment` folder.
 
-## Ловушки
+## Pitfalls
 
-- Ручной сканер bash не понимает подстановку команды глубже 32 уровней и не
-  примет вход длиннее 64 КиБ: вместо частичного результата придёт `opaque`, и
-  анализ прав провалится целиком.
-- Составные конструкции (функции, `if`, циклы, `case`) не разбираются как
-  команды — они либо раскрываются, либо дают `opaque` с причиной
+- The manual bash scanner does not understand command substitution deeper than 32 levels and does not
+  accept input longer than 64 KiB: instead of a partial result you get `opaque`, and the
+  analysis of the rights will fail entirely.
+- Compound constructions (functions, `if`, loops, `case`) are not parsed as
+  commands — they are either expanded or give `opaque` with the reason
   `compound-command`.
-- Объявления переменных помечены, а не выброшены: вызывающий обязан их
-  отфильтровать, иначе в списке команд появятся `export` и `local`.
-- Таблица `ARITY` — это список известных команд, а не полный синтаксис: для
-  неизвестной команды сохраняется одно слово, то есть разрешение может
-  оказаться уже фактического.
-- `meta` в `select.ts` отвечает на «нужен ли login-shell», а `ps` — на «нужны
-  ли аргументы PowerShell». Для `fish` и `nu` совместимость отрицательная, и
-  такие оболочки отфильтровываются при приоритете `compat`.
-- `unavailable` в `result.ts` — осмысленный заменитель ответа, а не признак
-  ошибки: клиент увидит текст о недоступности вывода, и это лучше пустоты.
-- Кэш разрешения оболочки сбрасывается через `resolve.reset`, а проверяется по
-  каталогу `bin`: удалённая установка другой оболочки требует сброса или
-  нового каталога данных.
-- Под workerd пути к wasm пустые: разбор команд там не работает вовсе, и
-  вызывающий должен вести себя как при недоступном бэкенде.
+- Variable declarations are marked and not thrown out: the caller is obliged to
+  filter them, otherwise `export` and `local` will appear in the list of commands.
+- The `ARITY` table is a list of known commands and not the full syntax: for
+  an unknown command one word is kept, that is, the permission may turn out
+  narrower than the actual one.
+- `meta` in `select.ts` answers "is a login shell needed", and `ps` answers "are
+  PowerShell arguments needed". For `fish` and `nu` the compatibility is negative, and
+  such shells are filtered out at the `compat` priority.
+- `unavailable` in `result.ts` is a meaningful replacement of an answer, and not a sign of
+  an error: the client will see the text about the unavailability of the output, and that is better than an emptiness.
+- The cache of the resolved shell is reset via `resolve.reset`, and is checked by the
+  `bin` directory: a removed installation of another shell requires a reset or
+  a new data directory.
+- Under workerd the paths to the wasm are empty: the parsing of commands does not work at all there, and
+  the caller must behave as with an unavailable backend.

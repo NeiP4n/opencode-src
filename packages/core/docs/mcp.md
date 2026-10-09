@@ -1,150 +1,149 @@
-# core/mcp — клиент MCP: подключение серверов, stdio-транспорт, OAuth, инструкции
+# core/mcp — the MCP client: connecting servers, stdio transport, OAuth, instructions
 
-## Что в папке
+## What's In This Folder
 
-Четыре файла: `index.ts` — сервис MCP с жизненным циклом серверов,
-`client.ts` — подключение одного сервера через SDK, `stdio.ts` — собственный
-транспорт поверх процессов локации, `oauth.ts` — вход и хранение учётных
-данных. Плюс `instructions.ts` — инструкция для модели по серверам. Смысл:
-локальные и удалённые серверы MCP подключаются как к ядру, их инструменты
-становятся обычными инструментами, а их инструкции попадают в промпт.
+Four files: `index.ts` — the MCP service with the lifecycle of servers,
+`client.ts` — the connection of one server through the SDK, `stdio.ts` — our own
+transport on top of the location's processes, `oauth.ts` — login and credential
+storage. Plus `instructions.ts` — the instruction for the model about servers. The meaning:
+local and remote MCP servers are connected as to the core, their tools
+become ordinary tools, and their instructions get into the prompt.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/mcp/index.ts` — сервис `@opencode/MCP`: `servers`,
+- `packages/core/src/mcp/index.ts` — the service `@opencode/MCP`: `servers`,
   `add`, `connect`, `disconnect`, `remove`, `tools`, `callTool`,
   `instructions`, `prompts`, `prompt`, `resourceCatalog`, `resources`,
-  `readResource`; ошибки `NotFoundError` и `ToolCallError`.
-- `packages/core/src/mcp/client.ts` — `connect(...)`, интерфейс
-  `Connection`, ошибки `NeedsAuthError`, `ConnectError`,
-  `SessionExpiredError`, преобразование ответа `toCallToolResult`.
-- `packages/core/src/mcp/stdio.ts` — `make(options)`: транспорт, запускающий
-  сервер через `Environment` локации.
+  `readResource`; the errors `NotFoundError` and `ToolCallError`.
+- `packages/core/src/mcp/client.ts` — `connect(...)`, the `Connection`
+  interface, the errors `NeedsAuthError`, `ConnectError`,
+  `SessionExpiredError`, the response conversion `toCallToolResult`.
+- `packages/core/src/mcp/stdio.ts` — `make(options)`: a transport that launches
+  the server through the `Environment` of the location.
 - `packages/core/src/mcp/oauth.ts` — `provider`, `loggedFetch`,
   `configuredDiscovery`, `authorize`, `connectProvider`, `memoryStore`,
-  перевод учётных данных `toCredential` и `toTokens`; `instructions.ts` —
-  сервис `McpInstructions` с ключом инструкции `core/mcp-guidance`.
+  the credential conversion `toCredential` and `toTokens`; `instructions.ts` —
+  the service `McpInstructions` with the instruction key `core/mcp-guidance`.
 
-## Важные детали
+## Important Details
 
-- Статусы сервера: `pending`, `connected`, `failed`, `needs_auth`,
-  `disabled`; тексты для модели собирает функция `unavailable`.
-  Соединение — Location-скоупное, но старт **удалённых** серверов
-  сериализуется по URL через `KeyedMutex` с именем `endpointLoads`: общая
-  точка не должна получать пачку одновременных подключений.
-- Каждый сервер хранит `Latch` запуска: вызов инструмента ждёт
-  `startup.await`, поэтому обращение к ещё не подключённому серверу не падает,
-  а ждёт рукопожатия. Инструменты читаются **в составе подключения**: сбой их
-  загрузки помечает сервер как `failed`, а не оставляет его подключённым с
-  пустым списком. Успешное подключение публикует три события:
-  `ToolsChanged`, `ResourcesChanged`, `StatusChanged`; без первого поздно
-  подключившийся сервер не появился бы в реестре инструментов вовсе.
-- Истечение HTTP-сессии обрабатывается дважды: запрос на переднем плане
-  повторяется один раз через `recovering`, фоновые обновления — через
-  `recover`. Истечение определяется по 404 либо по 400 с текстом «Bad
-  Request: Server not initialized», и только когда у транспорта есть
-  `sessionId` — признак устаревшей эры протокола.
-- Поздние колбэки SDK отбрасываются: `whenLive` сверяет, что соединение всё
-  ещё текущее, иначе эффект превращается в пустоту. Жизненные операции
-  сериализованы `locks`; всё, что берёт этот замок из колбэка соединения,
-  обязано работать в форке, потому что операции закрывают скоупы и вызывают
-  `onClose`. Скоуп подключения — форк от корневого: его закрытие роняет
-  транспорт и процесс, а для stdio ещё и группу процессов.
-- Регистрация OAuth-интеграции: идентификатор считается как `mcp_` плюс sha1
-  от имени и URL, обрезанный до 16 символов — имя и URL вместе, а не только
-  URL: два сервера с одинаковым адресом под разными именами держат разные
-  учётные записи. Эти данные **переживают удаление** сервера из конфига, а их
-  смена переподключает сервер без перезапуска.
-- Elicitation-формы принадлежат локации, а не сессии, и висят на фиктивном
-  идентификаторе `global`: сервер не может отнести их к сохранённой сессии.
-  Режимы: URL (внешнее поле формы, гонка с отменой запроса, только устаревшая
-  эра) и форма по JSON-схеме. Машинные заголовки вида «string with format
-  email» заменяются описанием или ключом; массивы становятся мультивыбором.
-- Таймауты клиента: старт 30 секунд, каталог 30 секунд, выполнение 12 часов;
-  каждый настраивается в конфигурации сервера. При вызове инструмента
-  передаётся `onprogress: () => {}` — это держит SDK-таймаут от
-  преждевременного срабатывания на долгих вызовах. Удалённые серверы
-  получают параметр `?codemode=false`, чтобы отдавать «сырые» инструменты
-  вместо собственного Code Mode сервера; при ответе 400 или 404 делается
-  одна повторная попытка с исходным адресом.
-- Идентичность ресурса в OAuth: адрес с тем же origin и путём приравнивается
-  к настроенному, потому что серверы возвращают транспортный query как
-  resource; токен остаётся привязан к настроенному адресу.
-- Одновременные обновления по одному refresh-токену объединяются в один
-  запрос: токены ротируются, и второй параллельный запрос получил бы
+- Server statuses: `pending`, `connected`, `failed`, `needs_auth`,
+  `disabled`; the texts for the model are assembled by the function `unavailable`.
+  The connection is Location-scoped, but the start of **remote** servers
+  is serialized by URL through a `KeyedMutex` named `endpointLoads`: a common
+  point must not receive a batch of simultaneous connections.
+- Each server holds a startup `Latch`: a tool call waits for
+  `startup.await`, so a call to a server that is not connected yet does not fail,
+  but waits for the handshake. The tools are read **as part of the connection**: a failure of
+  their loading marks the server as `failed`, instead of leaving it connected with
+  an empty list. A successful connection publishes three events:
+  `ToolsChanged`, `ResourcesChanged`, `StatusChanged`; without the first a
+  server that connected late would not appear in the tool registry at all.
+- The expiration of the HTTP session is handled twice: a foreground request
+  is repeated once through `recovering`, background refreshes — through
+  `recover`. The expiration is determined by a 404 or by a 400 with the text «Bad
+  Request: Server not initialized», and only when the transport has
+  a `sessionId` — a sign of the obsolete protocol era.
+- Late SDK callbacks are discarded: `whenLive` verifies that the connection is still
+  current, otherwise the effect turns into nothing. The lifecycle operations
+  are serialized by `locks`; everything that takes that lock from a connection callback
+  must work in a fork, because the operations close scopes and call
+  `onClose`. The connection scope is a fork from the root: its closure brings down
+  the transport and the process, and for stdio also the process group.
+- Registration of an OAuth integration: the identifier is counted as `mcp_` plus a sha1
+  of the name and URL, cut to 16 characters — the name and URL together, and not only
+  the URL: two servers with the same address under different names keep different
+  credentials. This data **survives the removal** of the server from the config, and its
+  change reconnects the server without a restart.
+- Elicitation forms belong to the location, and not to the session, and hang on the fictitious
+  identifier `global`: a server cannot attribute them to a stored session.
+  Modes: URL (an external form field, a race with a request cancellation, only the obsolete
+  era) and a form by a JSON schema. Machine headers of the kind «string with format
+  email» are replaced with a description or a key; arrays become a multiselect.
+- Client timeouts: startup 30 seconds, catalog 30 seconds, execution 12 hours;
+  each is configurable in the server configuration. On a tool call
+  `onprogress: () => {}` is passed — that keeps the SDK timeout from
+  firing prematurely on long calls. Remote servers
+  get the `?codemode=false` parameter, in order to give "raw" tools
+  instead of their own Code Mode server; on a 400 or 404 response one
+  retry is made with the original address.
+- Identity of the resource in OAuth: an address with the same origin and path is equated
+  to the configured one, because the servers return the transport query as
+  resource; the token stays bound to the configured address.
+- Simultaneous refreshes by one refresh token are merged into one
+  request: the tokens are rotated, and a second parallel request would get
   `invalid_grant`.
-- `oauth.ts` поддерживает три регистрации клиента: статический `client_id`,
-  CIMD (публичный документ по адресу
-  `https://opencode.ai/oauth/opencode/client.json`) и динамическую. Порядок
-  входа: сначала `initialize` с таймаутом 5 секунд, чтобы из ответа 401
-  достать адрес метаданных ресурса и требуемые scope; без него поиск
-  метаданных может лишь угадать well-known путь.
-- Приёмник OAuth — локальный HTTP-сервер на `127.0.0.1`: порт берётся из
-  `callback_port`, иначе из порта `redirect_uri`, иначе случайный; модуль
-  `node:http` грузится лениво, чтобы рантаймы без loopback не платили за
-  импорт. Токен без срока действия сохраняется с `expires: 0`, что при
-  обратном чтении не заставляет SDK обновлять токен принудительно.
-- `stdio.ts` не использует транспорт SDK: сервер запускается через
-  `Environment` локации, поэтому удалённая рабочая область выполняет
-  MCP-серверы там же, где и остальные команды. Исходящие кадры кладутся в
-  очередь на 64 элемента, а не пишутся напрямую: stdin обязан оставаться
-  открытым всю сессию. Ограничение кадра — 16 МиБ, при превышении чтение
-  падает, а не обрезается. Неожиданный выход сервера сообщается с кодом и
-  хвостом stderr (последние 1000 символов), потому что именно там названа
-  причина. Закрытие: SIGTERM после 2 секунд ожидания кода выхода, затем
+- `oauth.ts` supports three client registrations: static `client_id`,
+  CIMD (a public document at the address
+  `https://opencode.ai/oauth/opencode/client.json`) and dynamic. The login
+  order: first `initialize` with a 5 second timeout, to get the resource metadata
+  address and the required scopes from the 401 response; without it the metadata
+  search can only guess the well-known path.
+- The OAuth receiver is a local HTTP server on `127.0.0.1`: the port is taken from
+  `callback_port`, otherwise from the port of `redirect_uri`, otherwise random; the
+  `node:http` module is loaded lazily, so that runtimes without loopback do not pay for
+  the import. A token without an expiry is stored with `expires: 0`, which on
+  a reverse read does not force the SDK to refresh the token.
+- `stdio.ts` does not use the SDK transport: the server is launched through
+  the `Environment` of the location, so a remote workspace runs
+  the MCP servers there, where the rest of the commands run. The outgoing frames are put into
+  a queue of 64 items, and not written directly: stdin must stay
+  open for the whole session. The frame limit is 16 MiB, on exceeding it the read
+  fails, and is not truncated. An unexpected exit of the server is reported with the code and
+  the tail of stderr (the last 1000 characters), because that is exactly where the
+  reason is named. Closing: SIGTERM after 2 seconds of waiting for the exit code, then
   SIGKILL.
-- `instructions.ts` показывает сервер только если сессия может дойти хотя бы до
-  одного его инструмента, а для Code Mode — только если разрешено `execute`.
+- `instructions.ts` shows a server only if the session can reach at least
+  one of its tools, and for Code Mode — only if `execute` is allowed.
 
-## Связи
+## Connections
 
-- `packages/core/src/tool/mcp.ts` — регистрирует инструменты MCP в реестре и
-  импортирует `namespace` и `name` отсюда; `tool/plugin/mcp-resource.ts` —
-  инструменты `list_mcp_resources` и `read_mcp_resource` поверх сервиса.
-- `@opencode/schema/mcp` — типы сервера, статуса, ресурсов и шаблонов;
-  `mcp-event` — события `ToolsChanged`, `StatusChanged`, `ResourcesChanged`;
-  `config/mcp` — конфигурация сервера.
-- `packages/core/src/state.ts` — `State.create` и `State.reconcile` дают
-  редактор конфигурации и уведомление об изменениях; `credential.ts` —
-  `Credential.Service` и `Credential.Event.Switched`; `integration.ts` —
-  регистрация OAuth-интеграции.
-- `packages/core/src/form.ts` — формы для elicitation; ключ поля URL —
+- `packages/core/src/tool/mcp.ts` — registers the MCP tools in the registry and
+  imports `namespace` and `name` from here; `tool/plugin/mcp-resource.ts` —
+  the `list_mcp_resources` and `read_mcp_resource` tools on top of the service.
+- `@opencode/schema/mcp` — the server, status, resource and template types;
+  `mcp-event` — the events `ToolsChanged`, `StatusChanged`, `ResourcesChanged`;
+  `config/mcp` — the server configuration.
+- `packages/core/src/state.ts` — `State.create` and `State.reconcile` give the
+  config editor and the change notification; `credential.ts` —
+  `Credential.Service` and `Credential.Event.Switched`; `integration.ts` —
+  the OAuth integration registration.
+- `packages/core/src/form.ts` — forms for elicitation; the URL field key is
   `elicitation`.
-- `packages/core/src/effect/keyed-mutex.ts` — `KeyedMutex` для блокировок.
-- `@modelcontextprotocol/client` — SDK: `Client`,
+- `packages/core/src/effect/keyed-mutex.ts` — `KeyedMutex` for the locks.
+- `@modelcontextprotocol/client` — the SDK: `Client`,
   `StreamableHTTPClientTransport`, `ReadBuffer`, `serializeMessage`, `auth`,
   `discoverOAuthServerInfo`.
-- `packages/core/src/oauth/page.ts` — страницы успеха и ошибки приёмника
-  OAuth; `packages/core/src/util/error-summary.ts` — сводка ошибок в лог;
-  `packages/core/src/v1/config/mcp.ts` — старый формат конфигурации.
+- `packages/core/src/oauth/page.ts` — success and error pages of the OAuth
+  receiver; `packages/core/src/util/error-summary.ts` — a summary of errors to the log;
+  `packages/core/src/v1/config/mcp.ts` — the old configuration format.
 
-## Ловушки
+## Pitfalls
 
-- `McpStdio` намеренно не берёт транспорт SDK: подмена на
-  `StdioClientTransport` вернёт серверы на хост и сломает удалённые рабочие
-  области. Окружение расширяется через `extendEnv` спавнером, а не в самом
-  транспорте, чтобы переменные хоста не пересекали границу.
-- Признак истечения сессии — наличие `sessionId` у транспорта: на
-  современных соединениях его нет, и 404 на неизвестный метод ошибочно сочли
-  бы истечением.
-- Признак «сервер ещё не подключён» в `callTool` берётся из статуса: текст
-  для модели подсказывает, переподключить или войти через `/mcps`.
-  `tools()` отдаёт подключённое сейчас, поэтому серверы в статусе `pending`
-  попадут в список после публикации `ToolsChanged`.
-- `prompts()` скрывает сбой: ошибка загрузки промптов превращается в пустой
-  список, тогда как сбой инструментов при подключении — в статус `failed`.
-  Сбор каталога ресурсов идёт параллельно, и сбой одного сервера даёт пустой
-  каталог вместо ошибки всего вызова.
-- Обновление общих refresh-токенов в `connectProvider` удаляет строку учётных
-  данных только если она всё ещё хранит предъявленный токен, иначе можно было
-  бы снести чужое обновление. При отзыве учётных данных пропускаются области
-  `verifier` и `discovery`: они не означают, что токен протух.
-- Адрес перенаправления и `state` передаются в провайдер только при реальном
-  входе. Без них провайдер **отказывается** регистрировать клиента и
-  перенаправлять, и подключение заканчивается `needs_auth`, а не пустым
-  токеном. Отсутствие `redirectUrl` переключает SDK на грант
-  client-credentials, поэтому подставной адрес `http://127.0.0.1/callback`
-  задаётся всегда. Состояние OAuth (`state`) — 32 случайных байта в
-  base64url; при несовпадении вход отклоняется до обмена кода, а параметр
-  `codemode=false` добавляется только если его ещё нет в адресе.
-
+- `McpStdio` deliberately does not take the SDK transport: a substitution with
+  `StdioClientTransport` would return the servers to the host and break remote
+  workspaces. The environment is extended through `extendEnv` by the spawner, and not in the
+  transport itself, so that the host variables do not cross the boundary.
+- The sign of session expiration is the presence of `sessionId` at the transport: on
+  modern connections it is absent, and a 404 on an unknown method would wrongly be taken for
+  an expiration.
+- The sign "the server is not connected yet" in `callTool` is taken from the status: the text
+  for the model suggests reconnecting or logging in via `/mcps`.
+  `tools()` returns what is connected right now, so the servers in the `pending` status
+  will get into the list after the publication of `ToolsChanged`.
+- `prompts()` hides a failure: an error of loading the prompts turns into an empty
+  list, whereas a failure of the tools on connection — into the `failed` status.
+  The collection of the resource catalog goes in parallel, and a failure of one server gives an empty
+  catalog instead of an error of the whole call.
+- The refresh of shared refresh tokens in `connectProvider` deletes the credential
+  row only if it still holds the presented token, otherwise it could
+  have wiped someone else's refresh. On the revocation of a credential the scopes
+  `verifier` and `discovery` are skipped: they do not mean that the token has expired.
+- The redirect address and `state` are passed to the provider only during a real
+  login. Without them the provider **refuses** to register the client and
+  to redirect, and the connection ends in `needs_auth`, and not with an empty
+  token. The absence of `redirectUrl` switches the SDK to the
+  client-credentials grant, therefore the placeholder address `http://127.0.0.1/callback`
+  is set always. The OAuth state (`state`) is 32 random bytes in
+  base64url; on a mismatch the login is rejected before the code exchange, and the
+  `codemode=false` parameter is added only if it is not yet in the address.

@@ -1,23 +1,23 @@
-# @opencode/plugin — хост расширений
+# @opencode/plugin — extension host
 
-## Что это
+## What This Is
 
-Хост плагинов opencode: 60 файлов, ~3.1 тыс. строк в `src/`. Пакет отвечает
-за то, как плагин находится, загружается, перезагружается при изменении
-файлов и получает доступ к ядру: сессиям, инструментам, командам, событиям,
-разрешениям, MCP, навыкам.
+The opencode plugin host: 60 files, ~3.1k lines in `src/`. The package is
+responsible for how a plugin is found, loaded, reloaded when files change,
+and given access to the core: sessions, tools, commands, events,
+permissions, MCP, skills.
 
-У пакета три «лица» под разные рантаймы — промис, Effect и TUI — плюс
-собственный серверный API.
+The package has three "faces" for different runtimes — promise, Effect and
+TUI — plus its own server API.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L3**: зависит от `ai`, `client`, `protocol`, `schema`, `util`.
+Layer **L3**: depends on `ai`, `client`, `protocol`, `schema`, `util`.
 
-Кто подключает: `cli`, `core`, `gui-extensions`, `latex`, `merman`,
-`sdk`, `simulation`, `tui`, `plugin-browser` и сам `plugin`.
+Who depends on it: `cli`, `core`, `gui-extensions`, `latex`, `merman`,
+`sdk`, `simulation`, `tui`, `plugin-browser` and `plugin` itself.
 
-Экспорт (`packages/plugin/package.json`):
+Export (`packages/plugin/package.json`):
 
 ```json
 ".": "./src/promise/index.ts",
@@ -27,74 +27,74 @@
 "./*": "./src/*.ts"
 ```
 
-Плюс условный импорт `#plugin-source`: на bun — `source.bun.ts`,
-на node и по умолчанию — `source.node.ts`.
+Plus the conditional import `#plugin-source`: on bun — `source.bun.ts`,
+on node and by default — `source.node.ts`.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Загрузчик плагина** — `packages/plugin/src/host.ts` → namespace `Host`:
-типы `Target` (каталог и опциональное имя) и `Entrypoints`
-(`server` / `tui` / `rpc`), функция `resolve(target)` ищет точки входа
-через `resolveModule` из `@opencode/util/runtime-import`, пропуская
+**Plugin loader** — `packages/plugin/src/host.ts` → namespace `Host`:
+types `Target` (directory and optional name) and `Entrypoints`
+(`server` / `tui` / `rpc`), function `resolve(target)` looks up entry points
+through `resolveModule` from `@opencode/util/runtime-import`, skipping
 `ENOENT`.
 
-**Чтение исходников** — `packages/plugin/src/source.ts` →
-`createPluginSources(watch)`: берёт хеш файлов (`@opencode/util/hash`),
-следит за изменениями и перезагружает только изменённый граф. Рантайм-варианты
-лежат в `source.bun.ts` и `source.node.ts`, общий — `source.package.ts`.
+**Source reading** — `packages/plugin/src/source.ts` →
+`createPluginSources(watch)`: takes file hashes (`@opencode/util/hash`),
+watches for changes and reloads only the changed graph. Runtime variants
+live in `source.bun.ts` and `source.node.ts`, the shared one — `source.package.ts`.
 
-**Серверный API плагина** — `packages/plugin/src/app.ts`: интерфейс `App`
-(`name`, `version`, `channel`) и остальная часть файлов корня — `options.ts`,
+**Plugin server API** — `packages/plugin/src/app.ts`: the `App` interface
+(`name`, `version`, `channel`) and the rest of the root files — `options.ts`,
 `rpc.ts`, `storage.ts`, `worktree.ts`.
 
-**Серверная поверхность (Effect)** — каталог
-`packages/plugin/src/effect/`: по файлу на каждую возможность —
+**Server surface (Effect)** — directory
+`packages/plugin/src/effect/`: one file per capability —
 `session.ts`, `tool.ts`, `command.ts`, `agent.ts`, `event.ts`,
 `permission.ts`, `provider.ts`, `model.ts`, `mcp.ts`, `skill.ts`,
 `shell.ts`, `vcs.ts`, `worktree.ts`, `websearch.ts`, `reference.ts`,
 `integration.ts`, `storage.ts`, `registration.ts`, `aisdk.ts`,
-`rpc.ts`, `plugin.ts` — и `index.ts` сверху.
+`rpc.ts`, `plugin.ts` — plus `index.ts` on top.
 
-**Та же поверхность на промисах** — каталог
-`packages/plugin/src/promise/` (зеркальный набор + `adapter.ts`,
-`types.ts`), это корневой экспорт `"."`.
+**The same surface on promises** — directory
+`packages/plugin/src/promise/` (a mirror set + `adapter.ts`,
+`types.ts`), this is the root export `"."`.
 
-**TUI-поверхность** — каталог `packages/plugin/src/tui/`: `index.ts`,
-`plugin.ts`, `context.ts`, `solid.ts` — что плагин может менять в
-интерфейсе; экспорт `./tui`.
+**TUI surface** — directory `packages/plugin/src/tui/`: `index.ts`,
+`plugin.ts`, `context.ts`, `solid.ts` — what a plugin can change in the
+interface; export `./tui`.
 
-## Точки входа
+## Entry Points
 
-1. `packages/plugin/package.json` → `"."` — `Plugin.define(...)`, так
-   плагин пишется по умолчанию (промис-вариант).
-2. `packages/plugin/src/effect/index.ts` — тот же API на `effect`
+1. `packages/plugin/package.json` → `"."` — `Plugin.define(...)`, how a
+   plugin is written by default (the promise variant).
+2. `packages/plugin/src/effect/index.ts` — the same API on `effect`
    (`@opencode/plugin/effect`).
-3. `packages/plugin/src/host.ts` → `Host.resolve(...)` — поиск точек входа
-   плагина на диске.
-4. `packages/plugin/src/tui/index.ts` — регистрация в интерфейсе
-   (именно его используют `latex`, `merman`).
+3. `packages/plugin/src/host.ts` → `Host.resolve(...)` — lookup of a
+   plugin's entry points on disk.
+4. `packages/plugin/src/tui/index.ts` — registration in the interface
+   (exactly what `latex`, `merman` use).
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/core/PACKAGE.md` — где хост встраивается в сессию
-  (`plugin/host.ts` и `plugin/internal.ts` собирают графы).
+- `packages/core/PACKAGE.md` — where the host is embedded into the session
+  (`plugin/host.ts` and `plugin/internal.ts` assemble the graphs).
 - `packages/latex/PACKAGE.md`, `packages/merman/PACKAGE.md`,
-  `packages/plugin-browser/PACKAGE.md` — три реальных плагина как примеры.
-- `packages/util/PACKAGE.md` — `runtime-import`, на котором стоит загрузка.
-- `packages/ai/PACKAGE.md` — `@ai-sdk/provider` и инструменты модели.
+  `packages/plugin-browser/PACKAGE.md` — three real plugins as examples.
+- `packages/util/PACKAGE.md` — `runtime-import`, which the loader is built on.
+- `packages/ai/PACKAGE.md` — `@ai-sdk/provider` and model tools.
 
-## Ловушки
+## Pitfalls
 
-1. **Три варианта API не взаимозаменяемы.** `"."` — промисы,
-   `"./effect"` — Effect, `"./tui"` — интерфейс. Плагин на `Plugin.define`
-   из `@opencode/plugin/tui` и плагин из `@opencode/plugin/effect` —
-   разные форматы (`id` + `setup` против `id` + `effect`).
-2. **`#plugin-source` выбирается сборщиком.** Код, написанный под
-   `source.bun.ts`, на node получит `source.node.ts` — поведение горячей
-   перезагрузки отличается.
-3. **Хеши в `source.ts` держат отслеживание.** Если перезагрузка не
-   срабатывает, причина обычно в том, что хеш файла не изменился — watch
-   отрабатывает, а перезагрузка не нужна.
-4. **`host.ts` молча пропускает отсутствующие точки входа** (`ENOENT` —
-   нормальный путь). Плагин без `tui`-точки входа не упадёт, а просто
-   ничего не покажет в интерфейсе.
+1. **The three API variants are not interchangeable.** `"."` — promises,
+   `"./effect"` — Effect, `"./tui"` — the interface. A plugin on `Plugin.define`
+   from `@opencode/plugin/tui` and a plugin from `@opencode/plugin/effect` are
+   different formats (`id` + `setup` versus `id` + `effect`).
+2. **`#plugin-source` is chosen by the bundler.** Code written for
+   `source.bun.ts` gets `source.node.ts` on node — hot reload behavior
+   differs.
+3. **Hashes in `source.ts` drive the tracking.** If the reload does not
+   fire, the usual cause is that the file hash did not change — the watch
+   fires, but no reload is needed.
+4. **`host.ts` silently skips missing entry points** (`ENOENT` —
+   a normal path). A plugin without a `tui` entry point will not fail, it will
+   simply show nothing in the interface.

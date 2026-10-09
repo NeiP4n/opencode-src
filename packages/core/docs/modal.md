@@ -1,49 +1,49 @@
-# core/modal — приведение каталога моделей Modal к моделям OpenCode
+# core/modal — bringing the Modal model catalog to OpenCode models
 
-## Что в папке
+## What's In This Folder
 
-- `models.ts` — единственный файл: схема ответа провайдера, загрузка списка моделей по HTTP и слияние ответа с уже известными моделями.
-- Ни клиента, ни плагина провайдера в папке нет: только преобразование данных.
+- `models.ts` — the only file: the response schema of the provider, the loading of the model list over HTTP and the merging of the response with the already known models.
+- There is neither a client nor a provider plugin in the folder: only data conversion.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/modal/models.ts` — `load`, `get`, `derive`, `Snapshot`, локальные схемы `RemoteModel` и `ReasoningOption`.
+- `packages/core/src/modal/models.ts` — `load`, `get`, `derive`, `Snapshot`, the local schemas `RemoteModel` and `ReasoningOption`.
 
-## Важные детали
+## Important Details
 
-- Идентификатор провайдера задан один раз: `const providerID = Provider.ID.make("modal")`. Он попадает в каждую собранную модель.
-- `RemoteModel` — схема Effect для одного элемента каталога. Поля: `id`, необязательные `base_model_id`, `hugging_face_id`, `name`, `input_modalities`, `output_modalities`, `context_length`, `max_output_length`, `pricing`, `supported_sampling_parameters`, `supported_features`, `reasoning_options`, `interleaved`.
-- `pricing` допускает и строки, и числа (`Schema.Union([Schema.String, Schema.Number])`) для `prompt`, `completion` и `input_cache_read`. Типа `input_cache_write` в схеме нет: запись в кэш всегда берётся из ранее известной модели, иначе ноль.
-- `interleaved` — либо булево значение, либо объект с полем `field`, которое обязано быть одним из `reasoning`, `reasoning_content`, `reasoning_details`. Это формат раздельного потока рассуждений у совместимых провайдеров.
-- `reasoning_options` — массив объектов вида `{ type: "effort", values: [...] }`, где значения допускают `null`. `null` в значении означает режим без рассуждений и превращается в вариант с идентификатором `none`.
-- Конверт ответа (`{ data: [...] }`) декодируется строго через `decodeUnknownSync`, а каждый элемент — мягко через `decodeUnknownOption`. Комментарий в коде объясняет смысл: один негодный элемент не должен выбрасывать весь список, но негодный конверт провайдера — уже ошибка протокола.
-- `load(baseURL, apiKey)` делает `fetch` на путь `/models` с заголовком `Authorization: Bearer` и таймаутом `AbortSignal.timeout(3_000)`. Не-2xx даёт `Error` с текстом `Failed to fetch Modal models: <статус>`.
-- Базовый адрес чистится от хвостовых слэшей регуляркой `replace(/\/+$/, "")`, поэтому и `https://host`, и `https://host/` дают одинаковый URL.
-- `get` — это `derive` поверх `load`: удобная обёртка для вызывающего, у которого уже есть свои модели.
-- `derive(baseURL, remote, existing)` строит две карты: шаблоны из `existing` по `model.id` и результат по `Model.ID.make(item.id)`. Шаблон для удалённой модели ищется по `base_model_id ?? hugging_face_id ?? id` — то есть модель на Modal наследует настройки модели-источника, если её базовая модель известна локально. Комментарий предупреждает: за основу берутся **исходные** модели, а не результат предыдущего преобразования.
-- `build` собирает `Model.Info` поверх `Model.Info.default(providerID, id)` и перезаписывает только известные поля. Всё, чего нет в ответе, берётся из `previous`: `family`, `headers`, `body`, `status`, `enabled`, время выпуска, часть настроек, лимит входных токенов.
-- Пакет провайдера фиксирован строкой `"@opencode/ai/providers/openai-compatible"`. Это не имя npm-пакета, а идентификатор маршрута в `packages/ai`.
-- Настройки объединяются через `Provider.mergeOverlay(previous?.settings, { baseURL, provider: providerID })`: база и провайдер имеют приоритет, прочее наследуется.
-- Совместимость выводится из `interleaved` только если поле присутствует: `remote.interleaved === undefined ? previous?.compatibility : (Model.compatibility(...) ?? previous?.compatibility)`. Отсутствие поля не значит «не поддерживается», это значит «не изменилось».
-- Цены нормализуются функцией `price`: значение умножается на миллион и превращается в `Money.USDPerMillionTokens`. Нечисловой результат или отсутствие значения дают запасной вариант — предыдущую цену или ноль. Ноль в качестве последнего запасного варианта означает, что модель выглядит бесплатной, а не неизвестной по цене.
-- Лимиты проходят через `limit`: дробная часть отбрасывается через `Math.trunc`, отрицательное или нецелое значение заменяется запасным. Отсутствие значения берёт запасной, а не ноль; ноль получается только явно.
-- Способности выводятся из массивов модальностей, а поддержка инструментов — из наличия `"tools"` в `supported_features`. Отсутствие списка функций даёт `true` (инструменты считаются доступными), потому что запасной вариант берётся из `previous`, а при его отсутствии — `?? true`.
-- `variants` строит список режимов рассуждений, убирая дубликаты по идентификатору через `Map`. Вариант без заданной настройки наследует `previous?.variants` целиком: пустой массив на сервере не стирает локальные варианты.
+- The provider identifier is set once: `const providerID = Provider.ID.make("modal")`. It goes into every assembled model.
+- `RemoteModel` — an Effect schema for one catalog element. Fields: `id`, the optional `base_model_id`, `hugging_face_id`, `name`, `input_modalities`, `output_modalities`, `context_length`, `max_output_length`, `pricing`, `supported_sampling_parameters`, `supported_features`, `reasoning_options`, `interleaved`.
+- `pricing` admits both strings and numbers (`Schema.Union([Schema.String, Schema.Number])`) for `prompt`, `completion` and `input_cache_read`. There is no `input_cache_write` type in the schema: a cache write is always taken from a previously known model, otherwise zero.
+- `interleaved` — either a boolean, or an object with a `field` that must be one of `reasoning`, `reasoning_content`, `reasoning_details`. This is the separate reasoning stream format of compatible providers.
+- `reasoning_options` — an array of objects of the form `{ type: "effort", values: [...] }`, where the values admit `null`. A `null` in a value means the mode without reasoning and turns into a variant with the identifier `none`.
+- The response envelope (`{ data: [...] }`) is decoded strictly through `decodeUnknownSync`, and each element — softly through `decodeUnknownOption`. The comment in the code explains the meaning: one bad element must not throw away the whole list, but a bad envelope from the provider is already a protocol error.
+- `load(baseURL, apiKey)` does a `fetch` to the path `/models` with the header `Authorization: Bearer` and the timeout `AbortSignal.timeout(3_000)`. A non-2xx gives an `Error` with the text `Failed to fetch Modal models: <status>`.
+- The base address is cleaned of trailing slashes by the regular expression `replace(/\/+$/, "")`, so both `https://host` and `https://host/` give the same URL.
+- `get` is `derive` on top of `load`: a convenient wrapper for a caller that already has its own models.
+- `derive(baseURL, remote, existing)` builds two maps: the templates from `existing` by `model.id` and the result by `Model.ID.make(item.id)`. The template for a remote model is looked for by `base_model_id ?? hugging_face_id ?? id` — that is, a model on Modal inherits the settings of the source model if its base model is known locally. The comment warns: the basis is the **original** models, not the result of a previous conversion.
+- `build` assembles `Model.Info` on top of `Model.Info.default(providerID, id)` and overwrites only the known fields. Everything that is not in the response is taken from `previous`: `family`, `headers`, `body`, `status`, `enabled`, the release time, part of the settings, the input token limit.
+- The provider package is fixed by the string `"@opencode/ai/providers/openai-compatible"`. This is not an npm package name, but a route identifier in `packages/ai`.
+- The settings are merged through `Provider.mergeOverlay(previous?.settings, { baseURL, provider: providerID })`: the base and the provider have priority, the rest is inherited.
+- Compatibility is derived from `interleaved` only if the field is present: `remote.interleaved === undefined ? previous?.compatibility : (Model.compatibility(...) ?? previous?.compatibility)`. The absence of the field does not mean "not supported", it means "unchanged".
+- The prices are normalized by the function `price`: the value is multiplied by a million and turned into `Money.USDPerMillionTokens`. A non-numeric result or the absence of a value falls back to the previous price or zero. Zero as the last default means that the model looks free, not unknown in price.
+- The limits go through `limit`: the fractional part is discarded via `Math.trunc`, a negative or non-integer value falls back to the previous limit. The absence of a value also falls back and not to zero; zero is obtained only explicitly.
+- The capabilities are derived from the arrays of modalities, and the tool support — from the presence of `"tools"` in `supported_features`. The absence of a feature list gives `true` (tools are considered available), because the default is taken from `previous`, and in its absence — `?? true`.
+- `variants` builds the list of reasoning modes, removing duplicates by identifier through a `Map`. A variant without a set setting inherits `previous?.variants` entirely: an empty array on the server does not erase the local variants.
 
-## Связи
+## Connections
 
-- `packages/core/src/modal/models.ts` — потребитель найден поиском по `ModalModels`: `packages/core/src/plugin/provider/modal.ts`, то есть плагин провайдера вызывает `get` или связку `load` и `derive`.
-- `packages/core/src/model.ts` — источник `Model.Info`, `Model.ID`, `Model.VariantID` и функции `Model.compatibility`, в которые собираются поля из ответа.
-- `packages/core/src/provider.ts` — источник `Provider.ID` и `Provider.mergeOverlay`.
-- `packages/schema/src/money.ts` — `Money.USDPerMillionTokens`, в котором хранится цена после умножения на миллион.
-- `packages/core/src/models-dev.ts` — соседний механизм: приводит каталог моделей к внутреннему виду, но из другого источника (`models.opencode.ai`).
-- `packages/core/src/models-dev/snapshot.txt` — встроенный снимок того же рода данных для каталога OpenCode.
+- `packages/core/src/modal/models.ts` — the consumer was found by searching for `ModalModels`: `packages/core/src/plugin/provider/modal.ts`, that is, the provider plugin calls `get` or the `load` and `derive` pair.
+- `packages/core/src/model.ts` — the source of `Model.Info`, `Model.ID`, `Model.VariantID` and the function `Model.compatibility`, into which the fields from the response are assembled.
+- `packages/core/src/provider.ts` — the source of `Provider.ID` and `Provider.mergeOverlay`.
+- `packages/schema/src/money.ts` — `Money.USDPerMillionTokens`, in which the price is stored after multiplication by a million.
+- `packages/core/src/models-dev.ts` — a neighboring mechanism: it brings a model catalog to the internal form, but from another source (`models.opencode.ai`).
+- `packages/core/src/models-dev/snapshot.txt` — a built-in snapshot of the same kind of data for the OpenCode catalog.
 
-## Ловушки
+## Pitfalls
 
-- Негодный элемент списка исчезает молча. Список короче ожидаемого — ещё не повод считать, что провайдер отдал не всё: разбирать нужно каждый отброшенный элемент по логам, которых здесь нет.
-- Цена из строки, которая не является числом, даёт ноль, а не ошибку. Модель с такой ценой будет выглядеть бесплатной в расчётах и статистике.
-- Запасной ноль для цены и запасной ноль для лимита означают разное: цена ноль — «считаем бесплатной», лимит ноль — «неизвестно или отсутствует». Путать их нельзя.
-- Локальные модели (`existing`) участвуют в слиянии как шаблоны. Если туда попадёт уже преобразованная модель, поля будут наследоваться дважды — отсюда запрет в комментарии на смешивание источника и результата.
-- Пустой список на сервере не сбрасывает ни варианты рассуждений, ни статус, ни лимиты: запасные варианты берутся из `previous`.
-- Таймаут запроса — 3 секунды. На медленной сети список моделей Modal не загрузится вовсе, и ошибка будет выглядеть как отказ провайдера, а не как нехватка времени.
+- A bad list element disappears silently. A list shorter than expected is not yet a reason to think the provider did not return everything: each discarded element has to be parsed out of the logs, and there are none here.
+- A price from a string that is not a number gives zero, not an error. A model with such a price will look free in the calculations and statistics.
+- A default of zero for a price and a default of zero for a limit mean different things: price zero — "we count it as free", limit zero — "unknown or absent". They must not be confused.
+- Local models (`existing`) take part in the merge as templates. If an already converted model gets there, the fields will be inherited twice — hence the prohibition in the comment on mixing the source and the result.
+- An empty list on the server resets neither the reasoning variants, nor the status, nor the limits: the defaults are taken from `previous`.
+- The request timeout is 3 seconds. On a slow network the list of Modal models will not load at all, and the error will look like a provider refusal, and not like a lack of time.

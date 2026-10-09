@@ -1,54 +1,54 @@
-# core/effect — сборка графа слоёв: подстановка per-location сервисов и платформенные реализации
+# core/effect — layer graph assembly: per-location service substitution and platform implementations
 
-## Что в папке
+## What's In This Folder
 
-- `app-node-builder.ts` — функция `build`: превращает граф узлов в готовый `Layer`, подменив узел `Instance` и карту сервисов по location.
-- `app-node-platform.ts` — готовые платформенные узлы: исполнитель HTTP-запросов, клиент LLM и конструктор WebSocket.
-- `websocket-constructor.ts` — реализация конструктора WebSocket с учётом прокси и переменных окружения.
-- `keyed-mutex.ts` — блокировки по ключу: одна очередь на ключ, независимые ключи выполняются параллельно.
-- Все файлы — точки сборки внедрения зависимостей. Здесь нет бизнес-логики ядра.
+- `app-node-builder.ts` — the function `build`: turns a node graph into a ready `Layer`, substituting the `Instance` node and the per-location service map.
+- `app-node-platform.ts` — ready platform nodes: the HTTP request executor, the LLM client and the WebSocket constructor.
+- `websocket-constructor.ts` — an implementation of the WebSocket constructor taking proxy and environment variables into account.
+- `keyed-mutex.ts` — per-key locks: one queue per key, independent keys run in parallel.
+- All files are dependency injection assembly points. There is no core business logic here.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/effect/app-node-builder.ts` — `build`, приватный узел `instances`.
+- `packages/core/src/effect/app-node-builder.ts` — `build`, the private node `instances`.
 - `packages/core/src/effect/app-node-platform.ts` — `requestExecutor`, `llmClient`, `webSocketConstructor`.
 - `packages/core/src/effect/keyed-mutex.ts` — `makeUnsafe`, `make`, `KeyedMutex`.
-- `packages/core/src/effect/websocket-constructor.ts` — `WebSocketConstructor` с полями `layer` и `proxy`.
+- `packages/core/src/effect/websocket-constructor.ts` — `WebSocketConstructor` with the fields `layer` and `proxy`.
 
-## Важные детали
+## Important Details
 
-- `build(root, replacements)` формирует две подстановки: собственную реализацию `Instance.Service` и переданные вызывающим замены. Собственная реализация поднимается из `LocationServiceMap.Service` и отдаёт `Effect.provide(locations.get(session.location))` — ровно та подстановка, которую объявляет контракт в `packages/core/src/instance/service.ts`.
-- Подмены применяются дважды и по-разному: `LocationServiceMap.node.replace(buildLocationServiceMap(bindings))` собирает карту сервисов с учётом замен, а `Instance.node.replace(instances)` — сам узел инстанса. Пропуск любой из двух подстановок оставит в графе несвязанный узел.
-- Замены кладутся в один массив `bindings`, который одновременно является и списком для карты сервисов, и набором подмен самого `Instance`. Экономия достигается тем, что сервисы, заменённые снаружи, видны и в карте location, и в инстансе.
-- `app-node-platform.ts` объявляет три узла с явными зависимостями: `requestExecutor` требует `httpClient` из `@opencode/util/effect/app-node-platform`, `llmClient` — `requestExecutor`, `webSocketConstructor` — ничего.
-- Конструктор WebSocket выбирает реализацию по наличию глобального `Bun`. В Bun используется `globalThis.WebSocket` с полями `headers`, `protocols` и опциональным `proxy`. В Node — `NodeWS.WebSocket` из `@effect/platform-node/NodeSocket` с агентом прокси и `followRedirects: false`. Отключение редиректов объяснено комментарием: иначе заголовки могут пересечь границу origin, и вызывающий безопасно откатится на HTTP.
-- Выбор прокси учитывает `WS_PROXY`/`WSS_PROXY`, затем `HTTP_PROXY`/`HTTPS_PROXY`, затем `ALL_PROXY`. Имя переменной ищется сначала как есть, потом в нижнем регистре — на Windows это важно.
-- `NO_PROXY` разбирается вручную: список через пробелы и запятые, `*` означает «всё», запись `host:port` сравнивается с портом, а ведущая точка в имени означает суффиксное совпадение. Отдельный случай: `127.0.0.1`, `localhost` и `::1` проксируются всегда, независимо от `NO_PROXY`.
-- Агент прокси выбирается по схеме: `wss:` или прокси с `https:` дают `HttpsProxyAgent`, иначе `HttpProxyAgent`. Это важное отличие от большинства клиентов, где `wss` сам по себе не требует HTTPS-прокси, но здесь решение принимается по обоим признакам.
-- В Bun доверие остаётся в хранилище времени выполнения, чтобы `NODE_EXTRA_CA_CERTS` продолжал работать как дополнение. Это же зафиксировано комментарием.
-- `constructorOptions` приводит вход Effect, который приходит браузероподобным объектом, к `{ headers, protocols }`. Строка и массив строк трактуются как список протоколов, всё прочее — как опции рукопожатия.
-- `WebSocketConstructor.proxy` вынесен наружу вместе со слоем: правила выбора прокси можно проверить без запуска сокета.
-- `KeyedMutex.makeUnsafe` хранит `Map` вида ключ → `{ semaphore, users }`. Счётчик `users` растёт на каждом входе в `withLock` и падает в `Effect.ensuring`, поэтому запись удаляется из карты только когда не осталось ни владельцев, ни ожидающих. Это и есть защита от того, что ожидающий воспользуется уже удалённой записью.
-- Тело критической секции всегда оборачивается в `semaphore.withPermit(effect)`, то есть блокировка покрывает и успех, и отказ. Снятие блокировки происходит в `ensuring`, а не в успешном пути.
-- `size` отдаёт `Effect.sync(() => locks.size)` — это синхронный снимок, который сам по себе не гарантирует, что следующая операция увидит ровно столько же записей.
-- В шапке `websocket-constructor.ts` зафиксирована причина узкой реализации: платформенный barrel ещё экспортирует Redis с опциональным нативным загрузчиком хэшей, который workerd не может разобрать. Поэтому этот файл импортирует `@effect/platform-node/NodeSocket` напрямую.
+- `build(root, replacements)` forms two substitutions: its own implementation of `Instance.Service` and the replacements passed by the caller. Its own implementation is lifted from `LocationServiceMap.Service` and gives `Effect.provide(locations.get(session.location))` — exactly the substitution declared by the contract in `packages/core/src/instance/service.ts`.
+- The replacements are applied twice and in different ways: `LocationServiceMap.node.replace(buildLocationServiceMap(bindings))` collects the service map with the replacements, and `Instance.node.replace(instances)` is the instance node itself. Skipping either of the two substitutions leaves an unbound node in the graph.
+- The replacements go into a single `bindings` array, which is at the same time the list for the service map and the set of substitutions of the `Instance` itself. The saving is that services replaced from outside are visible both in the location map and in the instance.
+- `app-node-platform.ts` declares three nodes with explicit dependencies: `requestExecutor` requires `httpClient` from `@opencode/util/effect/app-node-platform`, `llmClient` requires `requestExecutor`, `webSocketConstructor` requires nothing.
+- The WebSocket constructor chooses the implementation by the presence of the global `Bun`. In Bun it uses `globalThis.WebSocket` with the fields `headers`, `protocols` and an optional `proxy`. In Node — `NodeWS.WebSocket` from `@effect/platform-node/NodeSocket` with a proxy agent and `followRedirects: false`. Disabling redirects is explained by a comment: otherwise headers can cross the origin boundary, and the caller safely falls back to HTTP.
+- The proxy choice takes into account `WS_PROXY`/`WSS_PROXY`, then `HTTP_PROXY`/`HTTPS_PROXY`, then `ALL_PROXY`. The variable name is looked up first as is, then in lower case — on Windows this matters.
+- `NO_PROXY` is parsed by hand: a list separated by spaces and commas, `*` means "everything", a `host:port` record is compared with the port, and a leading dot in the name means a suffix match. A separate case: `127.0.0.1`, `localhost` and `::1` are always proxied, regardless of `NO_PROXY`.
+- The proxy agent is chosen by the scheme: `wss:` or a proxy with `https:` give `HttpsProxyAgent`, otherwise `HttpProxyAgent`. This is an important difference from most clients, where `wss` by itself does not require an HTTPS proxy, but here the decision is made by both signs.
+- In Bun the trust is left in the runtime store, so that `NODE_EXTRA_CA_CERTS` keeps working as an addition. The same is recorded in a comment.
+- `constructorOptions` brings the Effect input that arrives as a browser-like object down to `{ headers, protocols }`. A string and an array of strings are treated as a protocol list, everything else as handshake options.
+- `WebSocketConstructor.proxy` is moved out along with the layer: the proxy selection rules can be tested without starting a socket.
+- `KeyedMutex.makeUnsafe` holds a `Map` of the form key → `{ semaphore, users }`. The `users` counter grows on every entry into `withLock` and drops in `Effect.ensuring`, so a record is removed from the map only when neither owners nor waiters are left. That is the protection against a waiter using an already removed record.
+- The body of the critical section is always wrapped in `semaphore.withPermit(effect)`, that is, the lock covers both success and failure. The lock is released in `ensuring`, not in the success path.
+- `size` gives `Effect.sync(() => locks.size)` — a synchronous snapshot, which by itself does not guarantee that the next operation will see exactly as many records.
+- At the top of `websocket-constructor.ts` the reason for the narrow implementation is recorded: the platform barrel still exports Redis with an optional native hash loader that workerd cannot parse. Therefore this file imports `@effect/platform-node/NodeSocket` directly.
 
-## Связи
+## Connections
 
-- `packages/core/src/instance/service.ts` — контракт, который реализует `app-node-builder.ts`.
-- `packages/core/src/location-service-map.ts` и `packages/core/src/location-services.ts` — карта сервисов по location, из которой `build` собирает подстановку.
-- `packages/util/src/effect/app-node.ts` и `packages/util/src/effect/layer-node.ts` — конструкторы `makeGlobalNode`, `LayerNode.unbound`, `LayerNode.compile`, `LayerNode.replace` и `Node.tags`, на которых стоит вся папка.
-- `packages/util/src/effect/app-node-platform.ts` — источник `httpClient`, от которого зависит `requestExecutor`.
-- `packages/core/src/effect/keyed-mutex.ts` — потребители найдены поиском по `KeyedMutex`: `packages/core/src/bus.ts`, `packages/core/src/file-mutation.ts`, `packages/core/src/git.ts`, `packages/core/src/mcp/index.ts`, `packages/core/src/plugin/update.ts`, `packages/core/src/session/inbox.ts`, `packages/core/src/workspace.ts`. То есть блокировка по ключу нужна везде, где один и тот же ресурс могут править два потока.
-- `packages/ai/src/route` — источник `LLMClient` и `RequestExecutor`, которые объявляются узлами в `app-node-platform.ts`.
-- `effect/unstable/socket` — тип `Socket.WebSocketConstructor`, который реализует слой.
-- `packages/core/docs/instance.md` — документ по контракту, который здесь реализуется.
+- `packages/core/src/instance/service.ts` — the contract that `app-node-builder.ts` implements.
+- `packages/core/src/location-service-map.ts` and `packages/core/src/location-services.ts` — the per-location service map from which `build` assembles the substitution.
+- `packages/util/src/effect/app-node.ts` and `packages/util/src/effect/layer-node.ts` — the constructors `makeGlobalNode`, `LayerNode.unbound`, `LayerNode.compile`, `LayerNode.replace` and `Node.tags`, on which the whole folder stands.
+- `packages/util/src/effect/app-node-platform.ts` — the source of `httpClient`, on which `requestExecutor` depends.
+- `packages/core/src/effect/keyed-mutex.ts` — the consumers were found by searching for `KeyedMutex`: `packages/core/src/bus.ts`, `packages/core/src/file-mutation.ts`, `packages/core/src/git.ts`, `packages/core/src/mcp/index.ts`, `packages/core/src/plugin/update.ts`, `packages/core/src/session/inbox.ts`, `packages/core/src/workspace.ts`. In other words a per-key lock is needed everywhere where two threads may edit the same resource.
+- `packages/ai/src/route` — the source of `LLMClient` and `RequestExecutor`, which are declared as nodes in `app-node-platform.ts`.
+- `effect/unstable/socket` — the type `Socket.WebSocketConstructor` that the layer implements.
+- `packages/core/docs/instance.md` — the document about the contract implemented here.
 
-## Ловушки
+## Pitfalls
 
-- `build` требует подменять и `Instance`, и карту сервисов. Замена только одного из них даст граф, который компилируется и падает при первом `provide` в середине работы.
-- На Bun путь через `globalThis.WebSocket` расширяется полем `proxy`, которого нет в стандартном типе. В коде это подавление проверки типов с объяснением в комментарии; удалять комментарий и подавление нельзя, пока код обращается к нестандартному полю.
-- В Node отключены редиректы. Клиент, который полагался на автоматическое следование редиректу, получит ответ с кодом перенаправления и должен обработать его сам — с безопасным откатом на HTTP.
-- `NO_PROXY` парсится вручную и не понимает записи сCIDR или без точки в начале. Домен, который пользователь записал как `example.com`, совпадёт только с этим доменом, а не с поддоменами: для поддоменов нужна ведущая точка.
-- `KeyedMutex` удаляет запись, когда счётчик `users` падает до нуля. Между удалением и следующим входом карта снова создаст семафор, поэтому две последовательные критические секции по одному ключу не гарантированно попадут в одну очередь — это не блокировка уровня транзакции.
-- `makeUnsafe` не имеет области жизни: блокировки живут, пока жив объект. Создавать его на каждый запрос нельзя, иначе сериализация перестанет работать.
+- `build` requires substituting both `Instance` and the service map. Replacing only one of them gives a graph that compiles and fails at the first `provide` in the middle of the work.
+- On Bun the path through `globalThis.WebSocket` is extended with a `proxy` field, which the standard type does not have. In the code this is a type check suppression with an explanation in a comment; the comment and the suppression must not be removed while the code reaches for a non-standard field.
+- In Node redirects are disabled. A client that relied on automatic redirect following will get a response with a redirect code and must handle it itself — with a safe fallback to HTTP.
+- `NO_PROXY` is parsed by hand and does not understand records with CIDR or without a leading dot. A domain the user wrote as `example.com` will match only that domain, not the subdomains: for subdomains a leading dot is needed.
+- `KeyedMutex` removes a record when the `users` counter drops to zero. Between the removal and the next entry the map will create a semaphore again, so two consecutive critical sections on one key are not guaranteed to land in one queue — this is not a transaction-level lock.
+- `makeUnsafe` has no lifetime scope: the locks live as long as the object lives. Creating it per request is not allowed, otherwise serialization stops working.

@@ -1,60 +1,61 @@
-# @opencode/enterprise — корпоративная поверхность
+# @opencode/enterprise — corporate surface
 
-## Что это
+## What This Is
 
-Небольшой SSR-пакет: 12 файлов, ~1.4 тыс. строк в `src/`. Корпоративная
-поверхность opencode — серверный рендер приложения с отдельными маршрутами
-и ядром (`core/`).
+A small SSR package: 12 files, ~1.4k lines in `src/`. The corporate
+surface of opencode — a server-side render of the application with separate
+routes and core (`core/`).
 
-Пакет `private`, `exports` в `package.json` нет — он собирается, а не
-подключается как модуль.
+The package is `private`, there are no `exports` in `package.json` — it is
+built, not imported as a module.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L6 — поверхность**: зависит от `client`, `core`, `schema`,
+Layer **L6 — surface**: depends on `client`, `core`, `schema`,
 `session-ui`, `ui`, `util`.
 
-Потребителей в `packages/*/src` нет — пакет запускается как своё приложение.
+There are no consumers in `packages/*/src` — the package runs as its own
+application.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-Каталоги и файлы `packages/enterprise/src/`:
+Directories and files in `packages/enterprise/src/`:
 
-- `entry-server.tsx` — серверный рендер (точка входа SSR);
-- `entry-client.tsx` — клиентская гидратация;
-- `app.tsx`, `app.css` — приложение и стили;
-- `routes/` — маршруты корпоративной поверхности;
-- `core/` — связка с ядром (доступ к `@opencode/core`);
-- `global.d.ts`, `custom-elements.d.ts` — декларации типов.
+- `entry-server.tsx` — the server-side render (the SSR entry point);
+- `entry-client.tsx` — client hydration;
+- `app.tsx`, `app.css` — the application and its styles;
+- `routes/` — the routes of the corporate surface;
+- `core/` — the bridge to the core (access to `@opencode/core`);
+- `global.d.ts`, `custom-elements.d.ts` — type declarations.
 
-Тесты лежат рядом: `packages/enterprise/test/` и
-`packages/enterprise/test-debug.ts`; скрипты сборки — в
+Tests live next to it: `packages/enterprise/test/` and
+`packages/enterprise/test-debug.ts`; the build scripts are in
 `packages/enterprise/script/`.
 
-## Точки входа
+## Entry Points
 
-1. `packages/enterprise/src/entry-server.tsx` — SSR, с него начинается
-   обработка запроса.
-2. `packages/enterprise/src/entry-client.tsx` — гидратация на клиенте.
-3. `packages/enterprise/src/routes/` — какие страницы существуют.
-4. Скрипты `package.json` пакета — сборка и запуск.
+1. `packages/enterprise/src/entry-server.tsx` — SSR, where request
+   handling starts.
+2. `packages/enterprise/src/entry-client.tsx` — hydration on the client.
+3. `packages/enterprise/src/routes/` — which pages exist.
+4. The `package.json` scripts of the package — build and run.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/app/PACKAGE.md` — браузерное приложение, с которым пакет
-  пересекается по компонентам.
-- `packages/session-ui/PACKAGE.md` и `packages/ui/PACKAGE.md` —
-  переиспользуемые компоненты.
-- `packages/core/PACKAGE.md` — ядро, к которому идёт доступ из `core/`.
+- `packages/app/PACKAGE.md` — the browser application the package overlaps
+  with in components.
+- `packages/session-ui/PACKAGE.md` and `packages/ui/PACKAGE.md` —
+  reusable components.
+- `packages/core/PACKAGE.md` — the core that `core/` accesses.
 
-## Ловушки
+## Pitfalls
 
-1. **`exports` отсутствует** — импортировать `@opencode/enterprise` из
-   другого пакета нельзя; это отдельное приложение.
-2. **SSR и клиент — две точки входа.** Правка `app.tsx` требует проверки
-   обеих: серверного рендера и гидратации.
-3. **`custom-elements.d.ts` и `global.d.ts` — декларации**, а не код;
-   логики в них нет.
-4. **Пакет меньше остальных поверхностей** — часть функциональности он
-   берёт у `app`, а не дублирует; искать «enterprise-логику» нужно в
-   `routes/`, а не в компонентах.
+1. **`exports` is missing** — `@opencode/enterprise` cannot be imported
+   from another package; it is a separate application.
+2. **SSR and the client are two entry points.** Editing `app.tsx` requires
+   checking both: the server-side render and the hydration.
+3. **`custom-elements.d.ts` and `global.d.ts` are declarations**, not
+   code; there is no logic in them.
+4. **The package is smaller than the other surfaces** — part of its
+   functionality comes from `app` instead of being duplicated; look for
+   "enterprise logic" in `routes/`, not in the components.

@@ -24,8 +24,8 @@ describe("hub hint instructions source", () => {
     const list = HubInstructions.make({ directory: dir.path, availability: ["mlr"], terminals: ["bash"] })
     const text = await rendered(list)
     expect(text).toContain("- mlr —")
-    expect(text).toContain("инструмент hub")
-    expect(text).toContain("Терминалы: bash")
+    expect(text).toContain("the hub tool")
+    expect(text).toContain("Terminals: bash")
   })
 
   test("empty state contributes nothing — prompt stays byte-identical", async () => {
@@ -51,7 +51,7 @@ describe("hub hint instructions source", () => {
   test("changed supersedes the previous list and carries the new block", () => {
     const [source] = HubInstructions.make({ directory: "/nonexistent", availability: [] })
     const text = source.changed("old inventory", "new inventory")
-    expect(text).toContain("отменяет предыдущий")
+    expect(text).toContain("this list replaces the previous one")
     expect(text).toContain("new inventory")
   })
 

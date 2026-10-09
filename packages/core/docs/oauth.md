@@ -1,38 +1,38 @@
-# core/oauth — готовые HTML-страницы для локальных callback-серверов OAuth
+# core/oauth — ready HTML pages for local OAuth callback servers
 
-## Что в папке
+## What's In This Folder
 
-- `page.ts` — единственный файл: три функции, возвращающие самодостаточный HTML-документ без внешних ресурсов.
-- Ни HTTP-сервера, ни обмена токенами в папке нет: это только вёрстка результата, которую отдаёт любой транспорт.
+- `page.ts` — the only file: three functions returning a self-contained HTML document without external resources.
+- There is neither an HTTP server nor a token exchange in the folder: this is only the layout of the result, which any transport hands over.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/oauth/page.ts` — `success`, `error`, `bootstrap`, типы `CallbackPageOptions` и `BootstrapOptions`.
+- `packages/core/src/oauth/page.ts` — `success`, `error`, `bootstrap`, the types `CallbackPageOptions` and `BootstrapOptions`.
 
-## Важные детали
+## Important Details
 
-- `success(options)` и `error(detail, options)` рисуют终 готовую карточку. Успех по умолчанию добавляет `AUTO_CLOSE_SCRIPT`: `window.close()` через 2500 мс в `try/catch`, потому что скрипт закрытия окна браузеры разрешают не всем страницам. Отключается флагом `autoClose: false`.
-- `bootstrap(options)` — сценарий неявного гранта, когда токен приходит во фрагменте URL. Встраиваемый скрипт читает `window.location.hash` и `window.location.search`, достаёт `error`/`error_description` либо `access_token`/`expires_in`/`state`, отправляет это POST-ом на `tokenPath` (путь относительно текущего origin) и уже по ответу сервера переключает карточку в success или error.
-- Ответ сервера трактуется буквально: не-2xx превращается в ошибку с телом ответа как `detail`, а `res.ok` при наличии `error` в теле всё равно ведёт к `fail(...)`.
-- Экранирование двухуровневое. `escapeHtml` закрывает `&`, `<`, `>`, кавычки и апострофы и применяется к `headline`, `message`, `footnote`, `detail` и `<title>`. `scriptString` дополнительно заменяет `<` на `\u003c` после `JSON.stringify` — это не защита от XSS, а способ не дать значению провайдера закрыть тег `script`.
-- Значение `provider` подставляется в уже экранированную строку `message` до `renderCard`, но внутри `bootstrapScript` идёт через `scriptString` — два разных пути для одного и того же значения.
-- Карточка одна и та же для трёх состояний: атрибут `data-status` на `#oc-card` решает, какая из трёх иконок (`ICON_SPINNER`, `ICON_CHECK`, `ICON_CROSS`) показывается. Скрипт bootstrap меняет этот атрибут на месте, без перезагрузки страницы.
-- Оформление задаётся набором CSS-переменных `--oc-*` в двух блоках, `LIGHT_VARS` и `DARK_VARS`. Тёмная тема включается и через `prefers-color-scheme`, и принудительно через `:root[data-theme="dark"]`, поэтому хост может задать схему селектором, не меняя значения по умолчанию.
-- `@media (prefers-reduced-motion: reduce)` отключает анимацию спиннера.
-- Встроенный SVG-логотип `WORDMARK` повторяет геометрию из `packages/ui/src/components/logo.tsx`, а набор токенов — подмножество `packages/ui/src/styles/theme.css`. Это заявлено комментарием в шапке файла: при смене фирменного стиля править нужно и там, и здесь.
-- Документ помечается `noindex` и `lang="en"`, независимо от языка сообщения.
+- `success(options)` and `error(detail, options)` draw a finished card. Success by default adds `AUTO_CLOSE_SCRIPT`: `window.close()` after 2500 ms inside a `try/catch`, because browsers do not allow the window-closing script to every page. It is switched off with the flag `autoClose: false`.
+- `bootstrap(options)` — the implicit grant script, for when the token arrives in the fragment of the URL. The embedded script reads `window.location.hash` and `window.location.search`, takes `error`/`error_description` or `access_token`/`expires_in`/`state`, sends this as a POST to `tokenPath` (a path relative to the current origin) and only then, based on the server response, switches the card to success or error.
+- The server response is taken literally: a non-2xx turns into an error with the response body as `detail`, and `res.ok` with an `error` in the body still leads to `fail(...)`.
+- The escaping is two-level. `escapeHtml` closes `&`, `<`, `>`, quotes and apostrophes and is applied to `headline`, `message`, `footnote`, `detail` and `<title>`. `scriptString` additionally replaces `<` with `\u003c` after `JSON.stringify` — that is not protection from XSS, but a way not to let the provider's value close the `script` tag.
+- The `provider` value is substituted into the already escaped `message` string before `renderCard`, but inside `bootstrapScript` it goes through `scriptString` — two different paths for one and the same value.
+- The card is the same for the three states: the `data-status` attribute on `#oc-card` decides which of the three icons (`ICON_SPINNER`, `ICON_CHECK`, `ICON_CROSS`) is shown. The bootstrap script changes this attribute in place, without a reload of the page.
+- The design is set by a set of CSS variables `--oc-*` in two blocks, `LIGHT_VARS` and `DARK_VARS`. The dark theme is enabled both via `prefers-color-scheme` and forcibly via `:root[data-theme="dark"]`, so the host can set the scheme with a selector without changing the default values.
+- `@media (prefers-reduced-motion: reduce)` switches off the spinner animation.
+- The embedded SVG wordmark `WORDMARK` repeats the geometry from `packages/ui/src/components/logo.tsx`, and the set of tokens is a subset of `packages/ui/src/styles/theme.css`. This is stated by a comment at the top of the file: when the brand style changes, both there and here have to be edited.
+- The document is marked `noindex` and `lang="en"`, regardless of the language of the message.
 
-## Связи
+## Connections
 
-- `packages/core/src/mcp/oauth.ts` — один из потребителей: страница для OAuth-обмена MCP-сервера.
-- `packages/core/src/plugin/provider/chatgpt.ts`, `packages/core/src/plugin/provider/digitalocean.ts`, `packages/core/src/plugin/provider/gitlab.ts`, `packages/core/src/plugin/provider/openai.ts`, `packages/core/src/plugin/provider/poe.ts`, `packages/core/src/plugin/provider/snowflake-cortex.ts` — остальные потребители (найдены поиском по `OauthCallbackPage`).
-- `packages/ui/src/components/logo.tsx` и `packages/ui/src/styles/theme.css` — источники геометрии логотипа и значений токенов.
-- `packages/core/docs/credential.md` — место, где оседает результат обмена: токены интеграций.
+- `packages/core/src/mcp/oauth.ts` — one of the consumers: the page for the OAuth exchange of the MCP server.
+- `packages/core/src/plugin/provider/chatgpt.ts`, `packages/core/src/plugin/provider/digitalocean.ts`, `packages/core/src/plugin/provider/gitlab.ts`, `packages/core/src/plugin/provider/openai.ts`, `packages/core/src/plugin/provider/poe.ts`, `packages/core/src/plugin/provider/snowflake-cortex.ts` — the other consumers (found by searching for `OauthCallbackPage`).
+- `packages/ui/src/components/logo.tsx` and `packages/ui/src/styles/theme.css` — the sources of the logo geometry and the token values.
+- `packages/core/docs/credential.md` — the place where the result of the exchange settles: the tokens of the integrations.
 
-## Ловушки
+## Pitfalls
 
-- `error(detail, ...)` не экранирует `detail` сам по себе — это делает `renderCard`. Любой новый вызов обязан передавать деталь так, чтобы она оказалась в разметке именно через этот путь.
-- Фрагмент, а не query: в `bootstrapScript` значение `hash` берётся срезом `.slice(1)`, и если провайдер вернул параметры в query, а не во фрагменте, обработчик их тоже найдёт — но только потому, что читает оба источника.
-- Страница ничего не хранит и никуда не пишет сама: без вызова `bootstrap` токен из фрагмента останется в адресной строке браузера. Для потоков с PKCE или кодом авторизации этот сценарий не подходит.
-- Автозакрытие окна через 2.5 секунды — не гарантия: скрипт закрытия срабатывает только для страниц, открытых скриптом. `autoClose: false` нужен там, где пользователь должен успеть прочитать результат.
-- Тёмная тема не подхватывается автоматически при `data-theme="light"` на хосте без поддержки `prefers-color-scheme` — селектор `:root:not([data-theme="light"])` внутри медиазапроса оставляет светлую схему по умолчанию.
+- `error(detail, ...)` does not escape `detail` by itself — that is done by `renderCard`. Any new call must pass the detail so that it ends up in the markup exactly through this path.
+- The fragment, and not the query: in `bootstrapScript` the `hash` value is taken by the slice `.slice(1)`, and if the provider returned the parameters in the query and not in the fragment, the handler will find them too — but only because it reads both sources.
+- The page stores nothing and writes nothing by itself: without a `bootstrap` call the token from the fragment will stay in the browser's address bar. For flows with PKCE or an authorization code this scenario does not fit.
+- Autoclosing of the window after 2.5 seconds is not a guarantee: the closing script triggers only for pages opened by a script. `autoClose: false` is needed where the user must have time to read the result.
+- The dark theme is not picked up automatically at `data-theme="light"` on a host without support for `prefers-color-scheme` — the selector `:root:not([data-theme="light"])` inside the media query keeps the light scheme as the default.

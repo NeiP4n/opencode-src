@@ -1,150 +1,147 @@
-# core/src — шина событий, RPC, состояние, джобы и корневые сервисы ядра
+# core/src — event bus, RPC, state, jobs and the root services of the core
 
-## Назначение
+## Purpose
 
-Работающий слой ядра: как события публикуются и переигрываются, как по ним строится
-локальное состояние, как внешние вызовы приходят в сервисы и уходят обратно, чем живёт
-реестр инструментов и как усекается их вывод. Отдельно четыре мелочи без слота: MIME по
-сигнатуре байт, переэкспорт схем, подписчик на шину и политики консоли.
+The working layer of the core: how events are published and replayed, how the local state is built from them, how the external calls come into the services and go back, what keeps the registry of tools alive and how their output is truncated. Separately four small things without a slot: the MIME by the byte signature, the schema re-exports, the subscriber to the bus and the console policies.
 
-## Что в папке
+## What's In This Folder
 
-Четырнадцать файлов корня `src`. Сквозные сервисы: `bus`, `rpc`, `state`, `job`, `session`,
-`tool`, `tool-output`, `command`, `form`, `instance`. Мелкие: `event-logger`, `mime`,
-`schema`, `managed-policy`. Все сервисы на Effect: `Context.Service` + `Layer` + узел
-`makeLocationNode`/`makeGlobalNode` с явными зависимостями.
+Fourteen files of the root `src`. The cross-cutting services: `bus`, `rpc`, `state`, `job`, `session`,
+`tool`, `tool-output`, `command`, `form`, `instance`. The small ones: `event-logger`, `mime`,
+`schema`, `managed-policy`. All the services are on Effect: `Context.Service` + `Layer` + a node
+`makeLocationNode`/`makeGlobalNode` with explicit dependencies.
 
-## Ключевые файлы
+## Key Files
 
-- `bus.ts` — шина событий. Три `PubSub`: `live` (unbounded), `durable` (карта агрегат →
-  набор `sliding(1)`-будильников), `typed` (карта тип → unbounded). Долговечное событие идёт
-  под `KeyedMutex` агрегата в одной транзакции (`behavior: "immediate"`, без прерывания):
-  последний `seq`, проекторы, `commit`-хук, обновление `EventSequenceTable` через
-  `max(seq, …)` и при `persist` запись в `EventTable`. `prepareRoutes` отдаёт замыкание,
-  применяемое только после коммита. `log()` при `follow: true` подписывается ДО чтения
-  истории, снимает `latestSequence`, отдаёт `log.synced` и переходит в живой режим. Есть
-  `replay`, `remove`, `claim` и устаревший `listen`.
-- `rpc.ts` — вызовы по схеме. `register` кладёт `{definition, handlers}` в массив под
-  `rpcID` и возвращает `{dispose, events.emit}`; `call` берёт последнюю регистрацию
-  (`at(-1)`) и прогоняет вход и выход через `parse`/`encode`. Ошибки кодируются как
+- `bus.ts` — the event bus. Three `PubSub`: `live` (unbounded), `durable` (a map of aggregate →
+  a set of `sliding(1)` bell ringers), `typed` (a map of type → unbounded). A durable event goes
+  under the `KeyedMutex` of the aggregate in one transaction (`behavior: "immediate"`, without
+  interruption): the last `seq`, the projectors, the `commit` hook, the update of `EventSequenceTable` via
+  `max(seq, …)` and at `persist` the write into `EventTable`. `prepareRoutes` hands over a closure,
+  applied only after the commit. `log()` at `follow: true` subscribes BEFORE the reading of the
+  history, takes `latestSequence`, hands over `log.synced` and goes into the live mode. There are
+  `replay`, `remove`, `claim` and the obsolete `listen`.
+- `rpc.ts` — the calls by a schema. `register` puts `{definition, handlers}` into an array under
+  `rpcID` and returns `{dispose, events.emit}`; `call` takes the last registration
+  (`at(-1)`) and passes the input and the output through `parse`/`encode`. The errors are encoded as
   `{type, message, data?}`: `rpc.unavailable`, `rpc.method_not_found`,
-  `rpc.invalid_input`, `rpc.invalid_output`, `rpc.internal`. `close` — значение `Effect`, а не
-  функция; вызовы соревнуются с `Deferred.await(closed)` через `raceFirst`, чтобы длинный
-  RPC отпускал локацию. Схемы понимают схемы Effect, Standard SchemaV1 (ключ
-  `~standard`) и JSON Schema (кодек кэшируется в `WeakMap`).
-- `state.ts` — переигрываемое состояние. `create({initial, editor, notify})` держит набор
-  transform-колбэков; `get()` пересобирает значение только при `dirty`, каждый раз создаёт
-  новый объект и никогда не трогает прежние. Правки идут через `transform`, который
-  цепляется финализатором `Scope`. `batch()` копит уведомления и шлёт одно в конце,
-  `shutdown()` навсегда закрывает изменённые состояния. `group(report)` отвязывает State от
-  идентичности плагина: исключение внутри transform отключает всю группу и зовёт `report`;
-  негруппированные исключения пробрасываются. Ещё `invalidate()`, `revision()`, `inherit()`
-  и `reconcile`.
-- `job.ts` — реестр работ. Работа получает `Scope.fork(state.scope, "parallel")`,
-  `Deferred` завершения `done`, отдельный `Deferred` фонового перевода `backgrounded` и
-  счётчик `blockingSessions` с референс-счётом по сессиям. `start` не перезапускает идущую
-  работу. `block` соревнует `done` и `backgrounded`; `backgroundAll` берёт только работы,
-  блокирующие указанную сессию. Восстанавливаемые работы (`recovery`: `shell` или
-  `subagent`) пишутся в `KV` под префиксом `job.background/` и живут до
-  `completeBackground(notificationID)`. История израсходованных работ без `notificationID`
-  ограничена 25 записями.
-- `session.ts` — сервис сессий. `CreateInput` — союз: либо `location`, либо `parentID`, но не
-  оба; отсутствие обоих даёт `Effect.die`, повторный `create` с тем же id возвращает уже
-  записанную сессию. `fork` берёт последнее сообщение по убыванию `seq` и наследует
-  `InstructionState` и `InstructionEntry` родителя одной транзакцией — новейшие значения, а
-  не те, что действовали на границе. Остальное делегировано пообъектно:
+  `rpc.invalid_input`, `rpc.invalid_output`, `rpc.internal`. `close` is an `Effect` value, and not a
+  function; the calls race with `Deferred.await(closed)` through `raceFirst`, so that a long
+  RPC releases the location. The schemas understand the Effect schemas, the Standard SchemaV1 (the key
+  `~standard`) and the JSON Schema (the codec is cached in a `WeakMap`).
+- `state.ts` — a replayable state. `create({initial, editor, notify})` holds a set
+  of transform callbacks; `get()` rebuilds the value only at `dirty`, creates
+  a new object every time and never touches the previous ones. The edits go through `transform`, which
+  is hooked by the `Scope` finalizer. `batch()` accumulates the notifications and sends one at the end,
+  `shutdown()` closes the changed states forever. `group(report)` detaches the State from the
+  identity of a plugin: an exception inside the transform switches the whole group off and calls `report`;
+  the ungrouped exceptions are passed through. There are also `invalidate()`, `revision()`, `inherit()`
+  and `reconcile`.
+- `job.ts` — the registry of the works. A work gets `Scope.fork(state.scope, "parallel")`,
+  a `Deferred` of the completion `done`, a separate `Deferred` of the background transfer `backgrounded` and
+  a counter `blockingSessions` with a reference count by sessions. `start` does not restart the running
+  work. `block` races `done` and `backgrounded`; `backgroundAll` takes only the works
+  blocking the given session. The recoverable works (`recovery`: `shell` or
+  `subagent`) are written into the `KV` under the prefix `job.background/` and live until
+  `completeBackground(notificationID)`. The history of the consumed works without a `notificationID`
+  is limited to 25 records.
+- `session.ts` — the service of the sessions. `CreateInput` is a union: either `location`, or `parentID`, but not
+  both; the absence of both gives `Effect.die`, a repeated `create` with the same id returns the already
+  recorded session. `fork` takes the last message by the descending `seq` and inherits
+  the `InstructionState` and the `InstructionEntry` of the parent in one transaction — the newest values, and
+  not the ones that were in force at the boundary. The rest is delegated per object:
   `sessions.forSession(id).*` — `prompt`, `shell`, `skill`, `synthetic`, `compact`, `wait`,
-  `resume`, `interrupt`, `revert`, `inbox`. Узел глобальный, шестнадцать зависимостей.
-- `tool.ts` — реестр инструментов. Регистрация проверяет сегменты namespace, имя
-  `/^[A-Za-z0-9_-]{1,128}$/`, запрет `execute` при `codemode: false` и собирает
-  `ToolDefinition`; ошибка не бросается, а копится в `Data.errors` и уходит в лог.
-  `snapshot(permissions)` отсекает полностью запрещённые правилами действия, делит
-  инструменты на прямые и code-mode и возвращает `definitions` вместе с `execute`. Та зовёт
-  хуки `tool.execute.before` и `tool.execute.after`. Картинки проходят `normalizeImages`:
-  нечитаемые заменяются строкой с числом пропущенных файлов.
-- `tool-output.ts` — усечение вывода. Пределы `MAX_LINES = 2_000` и `MAX_BYTES = 50 * 1024`,
-  полный текст хранится 7 дней в подкаталоге `tool-output` глобальных данных. `truncate` —
-  no-op, если `metadata.truncated` уже задан; иначе склеивает текстовые части, пишет ПОЛНЫЙ
-  текст в файл `Identifier.ascending("tool")` и вставляет маркер вида `lines 1-N of M`.
-  Элементы типа `file` не урезаются никогда. Уборка раз в час отдельным глобальным узлом.
-- `command.ts` — именованные команды. Ключ реестра — `definition.name`, поэтому повторная
-  регистрация с тем же именем заменяет предыдущую; публикуется `Command.Event.Updated`,
-  неизвестное имя даёт `Command.NotFoundError`, ошибка исполнения логируется и
-  оборачивается в `Command.ExecutionError`.
-- `form.ts` — формы для вопросов пользователю. Живут в `Cache` с бесконечным TTL, пока
-  статус `pending`, и с retention 10 минут после. `create` и `reply` непрерываемы; `ask`
-  ждёт `Deferred` под маской и при прерывании отменяет форму. `validateFields` требует
-  хотя бы одно поле, уникальные ключи и условия `when`, ссылающиеся только на более ранние
-  поля, с типом значения, совпадающим с типом целевого поля. `close` отменяет все висящие
-  формы и навешен как финализатор слоя.
-- `instance.ts` — сборка графа локации. Массив `nodes` перечисляет 53 узла с сервисами
-  локации; `Services` и `Error` выводятся из `LayerNode.group(nodes)`.
-  `Options.discovery: false` подменяет `Config` и `InstructionDiscovery` на не сканирующие
-  (`{project: false, global: false}`), но НЕ отключает подмешивание вложенных `AGENTS.md`
-  при чтении файла. Порядок подмен: ванильные значения, подмены вызывающего, затем
-  привязки локации и списка плагинов. Глобальные узлы шарятся между инстансами через
+  `resume`, `interrupt`, `revert`, `inbox`. The node is global, sixteen dependencies.
+- `tool.ts` — the registry of the tools. The registration checks the segments of the namespace, the name
+  `/^[A-Za-z0-9_-]{1,128}$/`, forbids `execute` at `codemode: false` and assembles
+  the `ToolDefinition`; an error is not thrown, but accumulates in `Data.errors` and goes into the log.
+  `snapshot(permissions)` cuts off the actions completely forbidden by the rules, splits
+  the tools into the direct ones and the code-mode ones and returns the `definitions` along with the `execute`. That one calls
+  the hooks `tool.execute.before` and `tool.execute.after`. The pictures pass `normalizeImages`:
+  the unreadable ones are replaced with a string with the number of the skipped files.
+- `tool-output.ts` — the truncation of the output. The limits `MAX_LINES = 2_000` and `MAX_BYTES = 50 * 1024`,
+  the full text is stored for 7 days in the `tool-output` subdirectory of the global data. `truncate` is
+  a no-op if `metadata.truncated` is already set; otherwise it glues the text parts, writes the FULL
+  text into a file `Identifier.ascending("tool")` and inserts a marker of the form `lines 1-N of M`.
+  The items of the type `file` are never truncated. The cleanup is once an hour by a separate global node.
+- `command.ts` — the named commands. The key of the registry is `definition.name`, therefore a repeated
+  registration with the same name replaces the previous one; `Command.Event.Updated` is published,
+  an unknown name gives `Command.NotFoundError`, an execution error is logged and
+  wrapped into `Command.ExecutionError`.
+- `form.ts` — the forms for the questions to the user. They live in a `Cache` with an infinite TTL while
+  the status is `pending`, and with a retention of 10 minutes after it. `create` and `reply` are uninterruptible; `ask`
+  waits for a `Deferred` under the mask and on an interruption cancels the form. `validateFields` requires
+  at least one field, unique keys and `when` conditions, referring only to the earlier
+  fields, with a value type matching the type of the target field. `close` cancels all the hanging
+  forms and is hooked as a finalizer of the layer.
+- `instance.ts` — the assembly of the graph of a location. The array `nodes` enumerates 53 nodes with the services
+  of the location; `Services` and `Error` are derived from `LayerNode.group(nodes)`.
+  `Options.discovery: false` substitutes `Config` and `InstructionDiscovery` with the non-scanning ones
+  (`{project: false, global: false}`), but does NOT disable the mixing in of the nested `AGENTS.md`
+  on a file read. The order of the substitutions: the vanilla values, the substitutions of the caller, then
+  the bindings of the location and the list of the plugins. The global nodes are shared between the instances via
   `shared: Node.tags.values.global`.
-- `event-logger.ts` — подписчик на шину. Через устаревший `listen` логирует в
-  `Effect.logInfo` только пять типов: `agent.updated`, `provider.updated`, `model.updated`,
-  `command.updated`, `config.updated`. Финализатор снимает подписку.
-- `mime.ts` — определение типа по сигнатуре: PNG, JPEG, GIF, BMP, PDF, WEBP (`RIFF` +
-  `WEBP` со смещения 8) и AVIF (`ftyp` со смещения 4 плюс `avif`/`avis` со смещения 8).
-  Дальше `text/plain`, если байты похожи на текст, иначе `application/octet-stream`. Текстом
-  считается непустой буфер без нулевых байт, строгая расшифровка UTF-8 и не более 30%
-  управляющих байт.
-- `schema.ts` — переэкспорт `AbsolutePath`, `DateTimeUtcFromMillis`, `NonNegativeInt`,
-  `optional`, `PositiveInt`, `RelativePath`, `statics` и тип `DeepMutable`; кода нет.
-- `managed-policy.ts` — политики подключённой консоли OpenCode: массив `ConfigPolicy.Info`
-  и необязательное имя организации. `current()` синхронный намеренно — преобразования
-  каталогов читают утверждения во время работы; `set()` заменяет состояние целиком, а
-  утверждения из разных подключений не сливаются. Узел глобальный, без зависимостей.
+- `event-logger.ts` — the subscriber to the bus. Through the obsolete `listen` it logs into
+  `Effect.logInfo` only five types: `agent.updated`, `provider.updated`, `model.updated`,
+  `command.updated`, `config.updated`. The finalizer removes the subscription.
+- `mime.ts` — the determination of the type by the signature: PNG, JPEG, GIF, BMP, PDF, WEBP (`RIFF` +
+  `WEBP` at an offset of 8) and AVIF (`ftyp` at an offset of 4 plus `avif`/`avis` at an offset of 8).
+  Then `text/plain`, if the bytes look like text, otherwise `application/octet-stream`. Text is
+  considered to be a non-empty buffer without null bytes, a strict UTF-8 decoding and at most 30%
+  of the control bytes.
+- `schema.ts` — the re-export of `AbsolutePath`, `DateTimeUtcFromMillis`, `NonNegativeInt`,
+  `optional`, `PositiveInt`, `RelativePath`, `statics` and the type `DeepMutable`; there is no code.
+- `managed-policy.ts` — the policies of the connected OpenCode console: an array of `ConfigPolicy.Info`
+  and an optional organization name. `current()` is synchronous deliberately — the catalog
+  conversions read the statements during the work; `set()` replaces the state entirely, and
+  the statements from different connections are not merged. The node is global, without dependencies.
 
-## Важные детали
+## Important Details
 
-- Долговечность события задаёт само определение события: поле `durable` с именем агрегата и
-  номером версии. Поле агрегата обязано быть строкой, иначе публикация падает дефектом
+- The durability of an event is set by the definition of the event itself: the field `durable` with the name of the aggregate and
+  a version number. The field of the aggregate must be a string, otherwise the publication dies with a defect
   `Bus.InvalidDurableEvent`.
-- Нарушения инвариантов в `bus.ts` и `rpc.ts` — это `Effect.die`, а не типизированные
-  ошибки: расхождение при replay, несовпадение владельца, неверная последовательность и
-  необъявленный тип ошибки RPC в канал ошибок не попадают.
-- `bus.ts` импортирует `Location` и `SessionTable` отложенным `import()` внутри слоя:
-  статический импорт замкнул бы цикл `bus → location → project → bus` и упал на привязках
-  узлов из-за temporal dead zone.
-- `tool.ts` и `command.ts` не бросают исключений на плохую регистрацию: плохой инструмент
-  или команда просто не появляются. Ключ реестра в `tool.ts` — не `name`, а `effectiveName`,
-  а `update` жёстко возвращает прежние `name` и `namespace`.
+- The violations of the invariants in `bus.ts` and `rpc.ts` are `Effect.die`, and not typed
+  errors: a divergence during replay, a mismatch of the owner, a wrong sequence and
+  an undeclared RPC error type do not get into the error channel.
+- `bus.ts` imports `Location` and `SessionTable` by a deferred `import()` inside the layer:
+  a static import would close the cycle `bus → location → project → bus` and fall on the bindings
+  of the nodes because of the temporal dead zone.
+- `tool.ts` and `command.ts` do not throw exceptions on a bad registration: a bad tool
+  or command simply does not appear. The key of the registry in `tool.ts` is not `name`, but `effectiveName`,
+  and `update` strictly returns the previous `name` and `namespace`.
 
-## Связи
+## Connections
 
-- `packages/core/src/event/sql.ts` и `packages/core/src/database/database.ts` — таблицы
-  событий и доступ к базе для `bus.ts`.
-- `packages/core/src/session/store.ts` — `ListInput` и история сообщений для `session.ts`;
-  `packages/core/src/session/diff.ts` и `packages/core/src/location-service-map.ts` — дифф хода.
-- `packages/core/src/session/execution.ts`, `packages/core/src/session/model-transport.ts` и
-  `packages/core/src/session/projector.ts` подключены к `session.ts` как узлы;
-  `packages/core/src/kv.ts` — и к нему, и к `job.ts`.
-- `packages/core/src/file-retention.ts`, `packages/core/src/id/id.ts` и
-  `packages/core/src/tool/runtime.ts` — зависимости `tool-output.ts` и `tool.ts`;
-  `packages/core/src/plugin/hooks.ts` и `packages/core/src/image.ts` — хуки и картинки.
-- `instance.ts` перечисляет `Command`, `Rpc`, `Tool`, `ToolOutput`, `Form` и `Session` среди
-  прочих узлов, собирая их в один граф локации; `event-logger.ts` зависит только от шины.
+- `packages/core/src/event/sql.ts` and `packages/core/src/database/database.ts` — the event
+  tables and the access to the database for `bus.ts`.
+- `packages/core/src/session/store.ts` — `ListInput` and the history of the messages for `session.ts`;
+  `packages/core/src/session/diff.ts` and `packages/core/src/location-service-map.ts` — the diff of a turn.
+- `packages/core/src/session/execution.ts`, `packages/core/src/session/model-transport.ts` and
+  `packages/core/src/session/projector.ts` are attached to `session.ts` as nodes;
+  `packages/core/src/kv.ts` — both to it and to `job.ts`.
+- `packages/core/src/file-retention.ts`, `packages/core/src/id/id.ts` and
+  `packages/core/src/tool/runtime.ts` — the dependencies of `tool-output.ts` and `tool.ts`;
+  `packages/core/src/plugin/hooks.ts` and `packages/core/src/image.ts` — the hooks and the pictures.
+- `instance.ts` enumerates `Command`, `Rpc`, `Tool`, `ToolOutput`, `Form` and `Session` among
+  the other nodes, assembling them into one graph of the location; `event-logger.ts` depends only on the bus.
 
-## Ловушки
+## Pitfalls
 
-- `bus.ts` по умолчанию не сохраняет payloads (`persist: false`): последовательности растут,
-  а историческое чтение `log` не вернёт ничего.
-- `log()` в `bus.ts` пропускает типы, которых нет в манифесте долговественных событий, и
-  двигает курсор по сырой последней `seq` — номер `log.synced` может быть больше последнего.
-- Порядок применения маршрутов привязан к коммиту транзакции: провалившаяся транзакция
-  переноса сессии не перенаправит события в сторону несуществующего места.
-- `DeepMutable` в `schema.ts` — локальная замена: ветка объекта ограничена
-  `extends object`, иначе `unknown` схлопывается в `{}`; примитивы проверяются первыми.
-- `call` в `rpc.ts` берёт последнюю регистрацию: повторная регистрация перебивает прежнюю.
-- `tool-output.ts` пишет полный вывод на диск ДО усечения и независимо от того, сколько строк
-  поместилось: файл появляется даже при маркере `0 lines`.
-- `form.ts` считает условие ложным для обоих операторов, если зависимое поле не ответили;
-  вместе с запретом отвечать на скрытое поле это каскадом обнуляет все ссылки на него.
-- `form.ts` публикует событие ответа до обновления состояния и до завершения ожидающего
-  `Deferred`: подписчик на `Form.Event.Replied` ещё не увидит `answered` в кэше.
-- `job.ts` не убирает завершённую восстановленную работу из памяти: запись в `KV` снимается
-  только через `completeBackground` по `notificationID`.
+- `bus.ts` by default does not store the payloads (`persist: false`): the sequences grow,
+  and the historical reading of `log` will not return anything.
+- `log()` in `bus.ts` skips the types that are not in the manifest of the durable events, and
+  moves the cursor by the raw last `seq` — the number of `log.synced` can be greater than the last one.
+- The order of applying the routes is tied to the commit of the transaction: a failed transaction
+  of the transfer of a session will not redirect the events toward a non-existent place.
+- `DeepMutable` in `schema.ts` is a local substitute: the branch of an object is limited by
+  `extends object`, otherwise `unknown` collapses into `{}`; the primitives are checked first.
+- `call` in `rpc.ts` takes the last registration: a repeated registration overrides the previous one.
+- `tool-output.ts` writes the full output to the disk BEFORE the truncation and independently of how many lines
+  fit: the file appears even at the marker `0 lines`.
+- `form.ts` considers the condition false for both operators if the dependent field was not answered;
+  together with the prohibition to answer a hidden field this cascades into zeroing all the references to it.
+- `form.ts` publishes the answer event before the update of the state and before the completion of the waiting
+  `Deferred`: the subscriber to `Form.Event.Replied` will not yet see `answered` in the cache.
+- `job.ts` does not remove the completed recovered work from memory: the record in the `KV` is removed
+  only via `completeBackground` by `notificationID`.

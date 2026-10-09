@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""Оракул O-CORE-DOCS: проверяет документацию папок packages/core/docs/.
+"""Oracle O-CORE-DOCS: checks the documentation of the packages/core/docs/ folders.
 
-Список папок берётся из самого дерева packages/core/src/*, а не из захардкоженного
-списка: иначе оракул молча зеленеет, когда появляются новые папки без документов.
+The list of folders is taken from the packages/core/src/* tree itself, not from a
+hardcoded list: otherwise the oracle silently turns green when new folders appear
+without documents.
 
-Запуск (из любого каталога):
-  python3 .opencode/check_core_docs.py            # проверяет боевой packages/core/docs
-  python3 .opencode/check_core_docs.py <каталог>  # проверяет копию (для отрицательного контроля)
+Run (from any directory):
+  python3 .opencode/check_core_docs.py            # checks the real packages/core/docs
+  python3 .opencode/check_core_docs.py <directory>  # checks a copy (for the negative control)
 
-Шаблон документа (решение владельца DEC-6, 07.10): один файл на одну папку ядра,
-разделы «Что в папке / Ключевые файлы / Важные детали / Связи / Ловушки».
+Document template (owner decision DEC-6, 07.10): one file per core folder,
+sections «What's In This Folder / Key Files / Important Details / Connections / Pitfalls».
 
-Код возврата: 0 — все папки описаны и оформлены, 1 — нарушения.
+Exit code: 0 — all folders are described and formatted, 1 — violations.
 """
 
 import os
@@ -22,24 +23,41 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CORE_SRC = os.path.join(REPO, "packages", "core", "src")
 DOCS = os.path.join(REPO, "packages", "core", "docs")
 
-# Темы без собственной папки в src: документ обязатежен, но каталога нет.
+# Topics without their own folder in src: a document is mandatory, but there is no directory.
 EXTRA_TOPICS = ["models-dev"]
 
-SECTIONS = ["Что в папке", "Ключевые файлы", "Важные детали", "Связи", "Ловушки"]
+SECTIONS = [
+    "What's In This Folder",
+    "Key Files",
+    "Important Details",
+    "Connections",
+    "Pitfalls",
+]
 MIN_LINES = 20
-# Мелкая папка — короткий документ, большая — длиннее: иначе пришлось бы молчать
-# о сложном коде или писать простыни в обход всех правил.
+# A small folder — a short document, a big one — longer: otherwise we would have to stay
+# silent about complex code or write essays bypassing all the rules.
 SMALL_CODE = 1000
 MAX_LINES_SMALL = 150
 MAX_LINES_BIG = 260
-BANNED = ["TODO", "FIXME", "Lorem", "раскрыть позже", "дописать позже", "coming soon"]
+# The Russian entries stay on purpose: they still catch documents written in Russian.
+BANNED = [
+    "TODO",
+    "FIXME",
+    "Lorem",
+    "раскрыть позже",
+    "дописать позже",
+    "expand later",
+    "fill in later",
+    "describe later",
+    "coming soon",
+]
 PATH_RE = re.compile(r"`(packages/[^`\s]+)`")
-# В имени папки бывают цифры (v1, oauth2), иначе заголовок такой папки даёт ложное нарушение.
+# Folder names contain digits (v1, oauth2), otherwise such a folder heading gives a false violation.
 HEAD_RE = re.compile(r"^# core/([a-z0-9-]+) — \S")
 
 
 def code_lines(folder):
-    """Сколько строк .ts/.tsx в папке — от этого зависит потолок длины документа."""
+    """How many .ts/.tsx lines the folder has — the document length ceiling depends on it."""
     total = 0
     for root, _dirs, names in os.walk(os.path.join(CORE_SRC, folder)):
         for name in names:
@@ -71,7 +89,7 @@ def main():
         path = os.path.join(root, folder + ".md")
         label = f"core/{folder}"
         if not os.path.isfile(path):
-            problems.append(f"{label}: нет файла {folder}.md")
+            problems.append(f"{label}: no file {folder}.md")
             continue
         with open(path, encoding="utf-8") as handle:
             text = handle.read()
@@ -79,46 +97,46 @@ def main():
         checked.append(label)
 
         if not text.strip():
-            problems.append(f"{label}: файл пуст")
+            problems.append(f"{label}: file is empty")
             continue
         if len(lines) < MIN_LINES:
-            problems.append(f"{label}: {len(lines)} строк, минимум {MIN_LINES}")
+            problems.append(f"{label}: {len(lines)} lines, minimum is {MIN_LINES}")
 
         size = code_lines(folder)
         limit = MAX_LINES_SMALL if size < SMALL_CODE else MAX_LINES_BIG
         if len(lines) > limit:
             problems.append(
-                f"{label}: {len(lines)} строк при коде {size}, потолок для такой папки {limit}"
+                f"{label}: {len(lines)} lines for {size} lines of code, the ceiling for such a folder is {limit}"
             )
 
         head = HEAD_RE.match(lines[0]) if lines else None
         if not head:
             problems.append(
-                f"{label}: первая строка не заголовок вида '# core/<папка> — назначение'"
+                f"{label}: the first line is not a heading of the form '# core/<folder> — purpose'"
             )
         elif head.group(1) != folder:
-            problems.append(f"{label}: заголовок называет папку {head.group(1)}")
+            problems.append(f"{label}: the heading names the folder {head.group(1)}")
 
         for section in SECTIONS:
             if f"## {section}" not in text:
-                problems.append(f"{label}: нет раздела «{section}»")
+                problems.append(f"{label}: missing section «{section}»")
 
         for word in BANNED:
             if re.search(r"\b" + re.escape(word) + r"\b", text, re.IGNORECASE):
-                problems.append(f"{label}: запрещённое слово «{word}»")
+                problems.append(f"{label}: banned word «{word}»")
 
         for raw in PATH_RE.findall(text):
             candidate = raw.rstrip(".,;:)")
             if "*" in candidate or candidate.endswith(".md"):
                 continue
             if not os.path.exists(os.path.join(REPO, candidate)):
-                problems.append(f"{label}: путь не существует — {candidate}")
+                problems.append(f"{label}: path does not exist — {candidate}")
 
     for problem in problems:
-        print("ПРОБЛЕМА ", problem)
+        print("PROBLEM  ", problem)
 
-    verdict = "нарушений нет" if not problems else f"{len(problems)} нарушение(й)"
-    print(f"\nИТОГ: {verdict} — {len(checked)}/{len(folders)} документов в {root}")
+    verdict = "no violations" if not problems else f"{len(problems)} violation(s)"
+    print(f"\nTOTAL: {verdict} — {len(checked)}/{len(folders)} documents in {root}")
     return 1 if problems else 0
 
 

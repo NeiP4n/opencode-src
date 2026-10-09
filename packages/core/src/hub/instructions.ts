@@ -47,9 +47,9 @@ export const make = (options: Options = {}): Instructions.List =>
     render: {
       initial: (text) => text,
       changed: (_previous, text) =>
-        ["Включённые инструменты хаба изменились; этот список отменяет предыдущий:", text].join("\n"),
+        ["The enabled hub tools have changed; this list replaces the previous one:", text].join("\n"),
       removed: () =>
-        "Включённые вручную инструменты хаба больше не подсказываются: не полагайся на перечисленное ранее.",
+        "The manually enabled hub tools are no longer hinted at: do not rely on what was listed before.",
     },
   })
 

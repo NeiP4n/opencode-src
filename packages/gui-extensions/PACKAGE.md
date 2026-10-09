@@ -1,20 +1,20 @@
-# @opencode/gui-extensions — расширения интерфейса
+# @opencode/gui-extensions — interface extensions
 
-## Что это
+## What This Is
 
-Набор расширений для браузерного приложения: 799 файлов, ~45 тыс. строк в
-`src/` (много мелких файлов). Каждый каталог — отдельная возможность:
-браузер, обзор изменений (review), терминал, SSH, WSL, пары устройств,
-обновления, статистика использования и другие.
+A set of extensions for the browser application: 799 files, ~45k lines in
+`src/` (many small files). Each directory is a separate feature:
+browser, change review, terminal, SSH, WSL, device pairing,
+updates, usage statistics and others.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L6 — поверхность**: зависит от `client`, `plugin-browser`,
+Layer **L6 — surface**: depends on `client`, `plugin-browser`,
 `schema`, `session-ui`, `ui`, `util`.
 
-Кто подключает: `packages/app` и `packages/desktop`.
+Who imports it: `packages/app` and `packages/desktop`.
 
-Экспорт (`packages/gui-extensions/package.json`):
+Exports (`packages/gui-extensions/package.json`):
 
 ```json
 "./renderer": "./src/renderer.ts",
@@ -25,51 +25,52 @@
 "./updater": "./src/updater/contract.ts"
 ```
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-Каталоги `packages/app`-стиля в `packages/gui-extensions/src/`:
+`packages/app`-style directories in `packages/gui-extensions/src/`:
 
-- `browser/` — инструменты браузера (работают с
+- `browser/` — browser tools (they work with
   `@opencode/plugin-browser`);
-- `review/` — обзор изменений, ревью файлов;
-- `terminal/` — терминал в интерфейсе;
-- `file/` — работа с файлами;
-- `pair/` — пары устройств (доступ с телефона);
-- `ssh/`, `wsl/` — удалённые окружения;
-- `updater/` — обновления (`contract.ts` вынесен отдельным экспортом);
-- `usage/` — статистика использования;
-- `summary/` — сводки;
-- `debug/` — отладочные панели;
-- `btw/`, `sdk/` — служебные модули;
-- `main.ts`, `renderer.ts` — две половины: главный процесс и рендер.
+- `review/` — change review, file review;
+- `terminal/` — the terminal in the interface;
+- `file/` — working with files;
+- `pair/` — device pairing (access from a phone);
+- `ssh/`, `wsl/` — remote environments;
+- `updater/` — updates (`contract.ts` is a separate export);
+- `usage/` — usage statistics;
+- `summary/` — summaries;
+- `debug/` — debug panels;
+- `btw/`, `sdk/` — service modules;
+- `main.ts`, `renderer.ts` — the two halves: main process and renderer.
 
-## Точки входа
+## Entry Points
 
-1. `packages/gui-extensions/src/main.ts` (экспорт `./main`) — главный
-   процесс расширений.
-2. `packages/gui-extensions/src/renderer.ts` (экспорт `./renderer`) —
-   рендер-часть.
-3. `packages/gui-extensions/src/sdk/index.ts` (экспорт `./sdk`) — API для
-   написания своих расширений.
-4. `packages/gui-extensions/src/updater/contract.ts` (экспорт `./updater`) —
-   контракт обновлений.
+1. `packages/gui-extensions/src/main.ts` (export `./main`) — the main
+   process of the extensions.
+2. `packages/gui-extensions/src/renderer.ts` (export `./renderer`) —
+   the renderer part.
+3. `packages/gui-extensions/src/sdk/index.ts` (export `./sdk`) — the API
+   for writing your own extensions.
+4. `packages/gui-extensions/src/updater/contract.ts` (export `./updater`) —
+   the update contract.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/app/PACKAGE.md` — приложение, куда расширения собираются.
-- `packages/plugin-browser/PACKAGE.md` — серверная сторона инструментов
-  браузера.
-- `packages/session-ui/PACKAGE.md` — компоненты, переиспользуемые
-  расширениями.
-- `packages/ui/PACKAGE.md` — базовые компоненты.
+- `packages/app/PACKAGE.md` — the application the extensions are built
+  into.
+- `packages/plugin-browser/PACKAGE.md` — the server side of the browser
+  tools.
+- `packages/session-ui/PACKAGE.md` — the components reused by the
+  extensions.
+- `packages/ui/PACKAGE.md` — the base components.
 
-## Ловушки
+## Pitfalls
 
-1. **Корневого экспорта нет.** Только `./main`, `./renderer`, `./sdk`
-   и т. д.; импорт `@opencode/gui-extensions` не работает.
-2. **799 файлов при 45 тыс. строк** — средний файл мелкий: правки обычно
-   локальны, но поиск по имени надёжнее, чем по памяти.
-3. **`main` и `renderer` — разные процессы** (паттерн Electron):
-   общий код живёт в `sdk/`, а не в одном из двух.
-4. **`updater/contract.ts` вынесен отдельно**, чтобы потребитель брал
-   только типы, не подтягивая реализацию обновления.
+1. **There is no root export.** Only `./main`, `./renderer`, `./sdk`
+   and so on; importing `@opencode/gui-extensions` does not work.
+2. **799 files at 45k lines** — the average file is small: edits are
+   usually local, but searching by name is more reliable than by memory.
+3. **`main` and `renderer` are different processes** (the Electron
+   pattern): the shared code lives in `sdk/`, not in one of the two.
+4. **`updater/contract.ts` is separate**, so a consumer takes only the
+   types without pulling in the update implementation.

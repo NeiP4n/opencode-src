@@ -1,91 +1,91 @@
-# @opencode/theme — схема и разрешение тем интерфейса
+# @opencode/theme — interface theme schema and resolution
 
-## Что это
+## What This Is
 
-Темы терминального интерфейса: 10 файлов, ~1.6 тыс. строк в `src/tui/`.
-Пакет описывает, из чего состоит тема (цвета, оттенки, состояния кнопок),
-как её разрешить в конкретные цвета, как мигрировать старый формат и как
-переключать светлую/тёмную схему.
+Terminal interface themes: 10 files, ~1.6k lines in `src/tui/`.
+The package describes what a theme consists of (colors, hues, button states),
+how to resolve it into concrete colors, how to migrate the old format, and how
+to switch between the light and dark schemes.
 
-`src` лежит целиком в подкаталоге `tui/` — это темы именно для TUI, других
-поверхностей в пакете нет.
+`src` lies entirely in the `tui/` subdirectory — these are themes for the TUI
+specifically, the package has no other surfaces.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L0 — лист**: от пакетов `@opencode/*` не зависит, схемы описаны на
-`effect` `Schema`.
+Layer **L0 — leaf**: it does not depend on any `@opencode/*` packages, the
+schemas are described on `effect` `Schema`.
 
-Кто подключает (два потребителя):
+Who imports it (two consumers):
 
-- `packages/tui` — рендерит интерфейс в выбранных цветах;
-- `packages/plugin` — отдаёт темы наружу, чтобы плагины могли их читать.
+- `packages/tui` — renders the interface in the selected colors;
+- `packages/plugin` — exposes themes outward, so that plugins can read them.
 
-Карта экспортируемых путей в `packages/theme/package.json`:
+The map of exported paths in `packages/theme/package.json`:
 
 ```json
 "./tui": "./src/tui/index.ts",
 "./tui/v1": "./src/tui/v1.ts"
 ```
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Схема темы** — `packages/theme/src/tui/schema.ts`: константы-типы на
+**Theme schema** — `packages/theme/src/tui/schema.ts`: type constants on
 Effect Schema: `HueStep` (100…900), `SemanticHue`
 (`accent` | `interactive` | `neutral`), `ActionVariant`
 (`primary` | `secondary` | `destructive`), `ActionState`
 (`disabled` | `pressed` | `focused` | `selected` | `hovered`),
-`SurfaceName` (только `dialog`), `FeedbackKind`
+`SurfaceName` (only `dialog`), `FeedbackKind`
 (`error` | `warning` | `success` | `info`), `CategoricalDefinition`.
-Это словарь, на котором стоит весь остальной код темы.
+This is the vocabulary all the rest of the theme code is built on.
 
-**Разрешение** — `packages/theme/src/tui/resolve.ts`: `parseThemeDocument`,
-`resolveTheme`, `resolveThemeDocument`, `themeDecodeError` — превращение
-описания темы в готовые значения, плюс ошибка декодирования.
+**Resolution** — `packages/theme/src/tui/resolve.ts`: `parseThemeDocument`,
+`resolveTheme`, `resolveThemeDocument`, `themeDecodeError` — turning a theme
+description into ready values, plus the decoding error.
 
-**Расширение** — `packages/theme/src/tui/expand.ts` → `expandTheme`:
-разворачивание темы-шаблона в полный набор цветов.
+**Expansion** — `packages/theme/src/tui/expand.ts` → `expandTheme`:
+unfolding a theme template into the full set of colors.
 
-**Выбор схемы** — `packages/theme/src/tui/select.ts`: `selectTheme`,
-`selectThemeMode`, `supportsThemeMode`, `themeModes` — светлая/тёмная схема
-и поддерживаемые режимы.
+**Scheme selection** — `packages/theme/src/tui/select.ts`: `selectTheme`,
+`selectThemeMode`, `supportsThemeMode`, `themeModes` — the light/dark scheme
+and the supported modes.
 
-**Цвет** — `packages/theme/src/tui/color.ts` → `rgbToOklch`; сопутствуют
-`packages/theme/src/tui/syntax.ts` (→ `generateSyntax` — цвета подсветки
-синтаксиса) и `packages/theme/src/tui/types.ts`.
+**Color** — `packages/theme/src/tui/color.ts` → `rgbToOklch`; accompanied by
+`packages/theme/src/tui/syntax.ts` (→ `generateSyntax` — syntax highlighting
+colors) and `packages/theme/src/tui/types.ts`.
 
-**Миграция** — `packages/theme/src/tui/v1.ts` и
-`packages/theme/src/tui/v1-migrate.ts` (→ `migrateV1`): старый формат
-темы v1 переводится в текущий.
+**Migration** — `packages/theme/src/tui/v1.ts` and
+`packages/theme/src/tui/v1-migrate.ts` (→ `migrateV1`): the old theme format
+v1 is converted to the current one.
 
-**Сборка пакета** — `packages/theme/src/tui/index.ts`: реэкспорт всего
-вышеописанного (строки 1–49), это и есть публичное лицо.
+**Package assembly** — `packages/theme/src/tui/index.ts`: a re-export of
+everything described above (lines 1–49), this is the public face.
 
-## Точки входа
+## Entry Points
 
-1. `packages/theme/src/tui/index.ts` — весь API (`resolveTheme`,
+1. `packages/theme/src/tui/index.ts` — the whole API (`resolveTheme`,
    `expandTheme`, `selectTheme`, `generateSyntax`, `migrateV1`,
-   `rgbToOklch` и типы).
-2. `packages/theme/src/tui/v1.ts` — отдельный экспорт `./tui/v1` для чтения
-   тем старого формата.
-3. `packages/theme/src/tui/resolve.ts` → `resolveTheme` — с неё начинается
-   применение темы.
+   `rgbToOklch` and the types).
+2. `packages/theme/src/tui/v1.ts` — the separate `./tui/v1` export for reading
+   themes of the old format.
+3. `packages/theme/src/tui/resolve.ts` → `resolveTheme` — theme application
+   starts here.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/tui/PACKAGE.md` — потребитель: где цвета попадают в отрисовку.
-- `packages/plugin/PACKAGE.md` — второй потребитель, доступ к темам из плагинов.
-- `packages/ui/PACKAGE.md` — веб-компоненты, у которых своя тематизация.
-- `themes/` в `.opencode` конфига владельца — реальные файлы тем.
+- `packages/tui/PACKAGE.md` — consumer: where the colors reach the drawing.
+- `packages/plugin/PACKAGE.md` — second consumer, theme access from plugins.
+- `packages/ui/PACKAGE.md` — web components, which have their own theming.
+- `themes/` in the owner's `.opencode` config — real theme files.
 
-## Ловушки
+## Pitfalls
 
-1. **Весь `src` — подкаталог `tui/`.** Файла `index.ts` в корне `src` нет:
-   точка входа задана в `exports` как `./tui`.
-2. **`v1-migrate.ts` и `v1.ts` — не одно и то же:** первый мигрирует,
-   второй описывает старый формат. Подключение `./tui/v1` не мигрирует тему,
-   а только читает её старым кодом.
-3. **Схема жёсткая:** `HueStep` допускает только девять значений, а
-   `SurfaceName` — только `dialog`. Своя тема с любым другим оттенком не
-   пройдёт декодирование, упадёт `themeDecodeError`.
-4. **`generateSyntax` — производная.** Цвета подсветки синтаксиса считаются
-   из базовых оттенков; правка одного поля темы меняет и их.
+1. **All of `src` is the `tui/` subdirectory.** There is no `index.ts` in the
+   root of `src`: the entry point is declared in `exports` as `./tui`.
+2. **`v1-migrate.ts` and `v1.ts` are not the same thing:** the first migrates,
+   the second describes the old format. Importing `./tui/v1` does not migrate
+   a theme, it only reads it with the old code.
+3. **The schema is strict:** `HueStep` allows only nine values, and
+   `SurfaceName` — only `dialog`. A custom theme with any other hue will not
+   pass decoding, `themeDecodeError` will be thrown.
+4. **`generateSyntax` is derived.** Syntax highlighting colors are computed
+   from the base hues; editing one field of the theme changes them too.

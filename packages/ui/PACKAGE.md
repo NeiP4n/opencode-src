@@ -1,92 +1,94 @@
-# @opencode/ui — библиотека компонентов интерфейса
+# @opencode/ui — interface component library
 
-## Что это
+## What This Is
 
-Веб-компоненты на Solid.js: 214 файлов, ~35 тыс. строк в `src/`. Кнопки,
-диалоги, таблицы, иконки, темы, стили — весь визуальный набор для браузерных
-поверхностей opencode (приложение, расширения, страница сессии).
+Web components on Solid.js: 214 files, ~35k lines in `src/`. Buttons,
+dialogs, tables, icons, themes, styles — the whole visual set for opencode's
+browser surfaces (app, extensions, session page).
 
-Пакет публикуется (`publishConfig.access: public`) и подключается
-по компонентам: в `exports` десятки строк вида `"./button":
-"./src/actions/button/button.tsx"`.
+The package is published (`publishConfig.access: public`) and imported
+component by component: `exports` contains dozens of entries of the form
+`"./button": "./src/actions/button/button.tsx"`.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L0 — лист**: от пакетов `@opencode/*` не зависит. Опора — `solid-js`
-(peer) и `@kobalte/core` (headless-компоненты), плюс `shiki`/`marked`/`katex`
-(подсветка, Markdown, формулы), `motion`, `fuzzysort`, `solid-sonner`.
+Layer **L0 — leaf**: it does not depend on any `@opencode/*` packages. It
+relies on `solid-js` (peer) and `@kobalte/core` (headless components), plus
+`shiki`/`marked`/`katex` (highlighting, Markdown, formulas), `motion`,
+`fuzzysort`, `solid-sonner`.
 
-Кто подключает (число файлов с импортом `@opencode/ui`):
+Who imports it (number of files with an `@opencode/ui` import):
 
-| Пакет | Файлов |
+| Package | Files |
 | --- | --- |
 | `packages/app/src` | 133 |
 | `packages/gui-extensions/src` | 44 |
 | `packages/session-ui/src` | 35 |
-| `packages/ui/src` | 26 (внутренние импорты) |
+| `packages/ui/src` | 26 (internal imports) |
 | `packages/desktop/src` | 4 |
 | `packages/tui/src` | 3 |
 | `packages/enterprise/src` | 3 |
 | `packages/cli/src` | 1 |
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-Каталоги `packages/ui/src/` разложены по назначению:
+The directories of `packages/ui/src/` are laid out by purpose:
 
-**Категории компонентов:**
-- `actions/` — `button/`, `icon-button/`, `split-button/` (плюс `submit.css`);
+**Component categories:**
+- `actions/` — `button/`, `icon-button/`, `split-button/` (plus `submit.css`);
 - `data-display/` — `accordion/`, `avatar/`, `badge/`, `card/`,
-  `animated-number/`, `collapsible/`, таблицы и списки;
+  `animated-number/`, `collapsible/`, tables and lists;
 - `overlays/` — `dialog/`, `tooltip/`;
 - `forms/`, `feedback/`, `navigation/`, `layout/`, `typography/` —
-  остальные группы;
-- `components/` — компоненты шире категорий: `app-icon.tsx`, `card.tsx`,
-  `animated-number.tsx`, спрайты `app-icons/`, `file-icons/`,
+  the remaining groups;
+- `components/` — components broader than the categories: `app-icon.tsx`,
+  `card.tsx`, `animated-number.tsx`, sprites `app-icons/`, `file-icons/`,
   `provider-icons/`.
 
-**Темы и стили** — `packages/ui/src/theme/` (включая `themes/*.json`),
-`packages/ui/src/styles/`. CSS лежит рядом с компонентом
-(`button/button.css`), а `sideEffects: ["**/*.css"]` говорит сборщику,
-что стили подключать обязательно.
+**Themes and styles** — `packages/ui/src/theme/` (including `themes/*.json`),
+`packages/ui/src/styles/`. The CSS sits next to the component
+(`button/button.css`), and `sideEffects: ["**/*.css"]` tells the bundler that
+the styles must be included.
 
-**Иконки и ассеты** — `packages/ui/src/icons/`, `packages/ui/src/assets/`
-(иконки, шрифты, звуки), спрайты собирает `vite-plugin-icons-spritesheet`.
+**Icons and assets** — `packages/ui/src/icons/`, `packages/ui/src/assets/`
+(icons, fonts, sounds), the sprites are built by `vite-plugin-icons-spritesheet`.
 
-**Интернационализация и демо** — `packages/ui/src/i18n/`,
-`packages/ui/src/storybook/` (истории), `*.stories.tsx` рядом с
-компонентами.
+**Internationalization and demo** — `packages/ui/src/i18n/`,
+`packages/ui/src/storybook/` (stories), `*.stories.tsx` next to the
+components.
 
-**Хуки и контекст** — `packages/ui/src/hooks/`, `packages/ui/src/context/`;
-`custom-elements.d.ts` — декларация кастомных элементов.
+**Hooks and context** — `packages/ui/src/hooks/`, `packages/ui/src/context/`;
+`custom-elements.d.ts` — declaration of custom elements.
 
-## Точки входа
+## Entry Points
 
-1. `packages/ui/package.json` → `exports` — карта компонентов; путь
-   `@opencode/ui/button` открывает `src/actions/button/button.tsx`.
-2. `packages/ui/src/actions/button/button.tsx` — показывает стиль компонента:
-   `Root` из Kobalte, пропсы `size` / `variant`, локальный `.css`.
-3. `packages/ui/src/theme/` — если нужна тема, а не компонент.
+1. `packages/ui/package.json` → `exports` — the component map; the path
+   `@opencode/ui/button` opens `src/actions/button/button.tsx`.
+2. `packages/ui/src/actions/button/button.tsx` — shows the component style:
+   Kobalte's `Root`, the `size` / `variant` props, local `.css`.
+3. `packages/ui/src/theme/` — when you need a theme, not a component.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/app/PACKAGE.md` — главный потребитель (133 файла).
-- `packages/session-ui/PACKAGE.md` — страница сессии, построенная на этих
-  компонентах.
-- `packages/gui-extensions/PACKAGE.md` — расширения, подключающие `ui`
-  напрямую.
-- `packages/theme/PACKAGE.md` — темы терминального интерфейса (другая
-  поверхность, не путать с `ui/theme`).
+- `packages/app/PACKAGE.md` — the main consumer (133 files).
+- `packages/session-ui/PACKAGE.md` — the session page built on these
+  components.
+- `packages/gui-extensions/PACKAGE.md` — extensions that import `ui`
+  directly.
+- `packages/theme/PACKAGE.md` — terminal interface themes (a different
+  surface, do not confuse them with `ui/theme`).
 
-## Ловушки
+## Pitfalls
 
-1. **Каждый компонент — отдельный экспорт.** Импорта `"@opencode/ui"` не
-   существует: только `@opencode/ui/button`, `@opencode/ui/icon` и т. д.
-2. **CSS — часть пакета.** `sideEffects` намеренно сохраняет `**/*.css`;
-   отключение tree-shaking стилей даёт «кнопку без стилей».
-3. **Тесты и истории не публикуются:** `files` в `package.json` исключает
-   `*.test.ts(x)` и `*.stories.ts(x)` — в `dist` они не попадают.
-4. **`ui/theme` (веб-темы) ≠ `@opencode/theme` (TUI-темы).** Два разных
-   пакета с похожими именами.
-5. **Спрайты иконок собираются сборкой** (`app-icons/sprite.svg`,
-   `file-icons/sprite.svg` в `files`) — их нельзя править руками,
-   они генерируются из `src/assets`.
+1. **Each component is a separate export.** An `"@opencode/ui"` import does
+   not exist: only `@opencode/ui/button`, `@opencode/ui/icon`, and so on.
+2. **CSS is part of the package.** `sideEffects` deliberately keeps
+   `**/*.css`; disabling tree-shaking of the styles gives you a "button
+   without styles".
+3. **Tests and stories are not published:** `files` in `package.json` excludes
+   `*.test.ts(x)` and `*.stories.ts(x)` — they do not end up in `dist`.
+4. **`ui/theme` (web themes) ≠ `@opencode/theme` (TUI themes).** Two different
+   packages with similar names.
+5. **Icon sprites are produced by the build** (`app-icons/sprite.svg`,
+   `file-icons/sprite.svg` in `files`) — they cannot be edited by hand,
+   they are generated from `src/assets`.

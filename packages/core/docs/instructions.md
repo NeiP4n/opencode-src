@@ -1,93 +1,91 @@
-# core/instructions — движок составных инструкций: значения, хеши, дельты, рендер
+# core/instructions — the engine of composite instructions: values, hashes, deltas, render
 
-## Что в папке
+## What's In This Folder
 
-Два файла: `packages/core/src/instructions/index.ts` — сам механизм, и
-`packages/core/src/instructions/builtins.ts` — два встроенных источника
-(дата и сведения об окружении).
+Two files: `packages/core/src/instructions/index.ts` — the mechanism itself, and
+`packages/core/src/instructions/builtins.ts` — two built-in sources
+(the date and information about the environment).
 
-Механизм решает задачу: инструкции для модели меняются во времени (дата,
-каталоги, доступные скиллы), и нужно отдавать модели не весь список заново,
-а дельту — что добавилось, что изменилось, что пропало.
+The mechanism solves this problem: instructions for the model change over time (the date,
+catalogs, available skills), and one has to give the model not the whole list anew,
+but a delta — what was added, what changed, what disappeared.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/instructions/index.ts` — типы `Source`, `List`,
-  `ReadResult`, `Admission`; функции `make`, `combine`, `read`, `diff`,
+- `packages/core/src/instructions/index.ts` — the types `Source`, `List`,
+  `ReadResult`, `Admission`; the functions `make`, `combine`, `read`, `diff`,
   `renderInitial`, `renderUpdate`, `hash`, `applyHashDelta`, `diffByKey`;
-  ошибки `InitializationBlocked` и `DuplicateKeyError`.
-- `packages/core/src/instructions/builtins.ts` — сервис
-  `InstructionBuiltIns` (`@opencode/InstructionBuiltIns`) с ключами
-  `core/date` и `core/environment`.
+  the errors `InitializationBlocked` and `DuplicateKeyError`.
+- `packages/core/src/instructions/builtins.ts` — the service
+  `InstructionBuiltIns` (`@opencode/InstructionBuiltIns`) with the keys
+  `core/date` and `core/environment`.
 
-## Важные детали
+## Important Details
 
-- Источник (`Source`) — это пара «прочитать значение» плюс три функции
-  рендера: `initial`, `changed`, `removed`. Значение всегда проходит через
-  `codec` в канонический JSON: один и тот же JSON хешируется, хранится и
-  проигрывается.
-- Три состояния значения, а не два: обычное значение, `unavailable` (чтение
-  временно не удалось — хранимое значение остаётся в силе) и `removed`
-  (источник есть, но значения больше нет).
-- Различение состояний сделано **по ссылочному равенству**, а не по
-  структуре: `isUnavailable` сравнивает с синглтоном `unavailable`. В коде
-  это оговорено отдельно, потому что само значение `A` может быть
-  JSON-подобным объектом с теми же полями.
-- `make` закрывает типизированное определение в `Source` и умеет
-  декодировать историческое значение: если `decode` даёт `undefined`
-  (значение не подходит под схему), рендер пропускается и строка не
-  попадает в вывод.
-- `changed` при недоступном предыдущем значении откатывается к `initial` —
-  частичное обновление не показывается.
-- Пустой текст от рендера — исключение (`requireText`), а не тихий пропуск.
-- `diff` считает `blocked` только при первом чтении (`previous` не передан):
-  `InitializationBlocked` с перечнем ключей. Если значения уже есть,
-  `unavailable` просто пропускается.
-- `removed` попадает в дельту только если ключ был в `previous` — иначе
-  удаление нечего фиксировать.
-- Хеш: SHA-256 от канонической формы (`canonical`), где ключи объектов
-  отсортированы по возрастанию. Порядок полей в объекте на хеш не влияет.
-- `read` читает все источники параллельно (`concurrency: "unbounded"`),
-  порядок результата совпадает с порядком в списке.
-- `combine` проверяет уникальность ключей и бросает `DuplicateKeyError`
-  синхронно, до чтения.
-- `renderInitial` и `renderUpdate` соединяют части пустой строкой-двойным
-  переносом (`join("\n\n")`).
-- `diffByKey` — общий помощник для сравнения двух списков по ключу с
-  предикатом изменения; используется не только инструкциями (его же зовут
-  `reference` и `skill`).
-- `instructions/builtins.ts`: `core/date` рендерит `date.toDateString()`,
-  `core/environment` — блок `<env>` с рабочим каталогом, корнем workspace,
-  признаком git-репозитория, `process.platform` и подсказкой использовать
-  `global.tmp` вместо `/tmp`.
+- A source (`Source`) is a "read the value" pair plus three render
+  functions: `initial`, `changed`, `removed`. The value always goes through
+  `codec` into canonical JSON: the same JSON is hashed, stored and replayed.
+- Three states of a value, not two: an ordinary value, `unavailable` (reading
+  temporarily failed — the stored value stays in force) and `removed`
+  (the source exists, but there is no value anymore).
+- The states are distinguished **by reference equality**, not by
+  structure: `isUnavailable` compares with the `unavailable` singleton. In the code
+  this is spelled out in a separate note, because the value `A` itself may be
+  a JSON-like object with the same fields.
+- `make` closes the typed definition in `Source` and knows how to
+  decode a historical value: if `decode` gives `undefined`
+  (the value does not fit the schema), the render is skipped and the line does not
+  get into the output.
+- `changed` with an unavailable previous value falls back to `initial` —
+  a partial update is not shown.
+- Empty text from a render is an exception (`requireText`), not a silent skip.
+- `diff` counts `blocked` only on the first read (`previous` not passed):
+  `InitializationBlocked` with a list of keys. If the values already exist,
+  `unavailable` is simply skipped.
+- `removed` lands in the delta only if the key was in `previous` — otherwise
+  there is nothing to record about the removal.
+- Hash: SHA-256 of the canonical form (`canonical`), where the object keys
+  are sorted ascending. The order of fields in the object does not affect the hash.
+- `read` reads all sources in parallel (`concurrency: "unbounded"`),
+  the order of the result matches the order in the list.
+- `combine` checks the uniqueness of the keys and throws `DuplicateKeyError`
+  synchronously, before the reading.
+- `renderInitial` and `renderUpdate` join the parts with two
+  line breaks (`join("\n\n")`).
+- `diffByKey` — a shared helper for comparing two lists by key with
+  a change predicate; it is used not only by instructions (`reference` and `skill` call it too).
+- `instructions/builtins.ts`: `core/date` renders `date.toDateString()`,
+  `core/environment` — a `<env>` block with the working directory, the workspace root,
+  the git-repository flag, `process.platform` and a hint to use
+  `global.tmp` instead of `/tmp`.
 
-## Связи
+## Connections
 
-- `@opencode/schema/instruction` — источник типов `Key`, `Hash`, `Values`,
-  `Delta` и константы `removed`; оттуда же реэкспортируются все четыре.
-- `packages/core/src/location.ts` — даёт `location.directory`,
-  `location.project.directory` и `location.vcs?.type` для блока `<env>`.
-- `@opencode/util/global` — `global.tmp`, путь, который советуют
-  использовать вместо системного временного.
-- `@opencode/util/effect/app-node` — `makeLocationNode` для привязки
-  сервиса в граф зависимостей (`Global.node`, `Location.node`).
-- Потребители механики: `packages/core/src/reference/instructions.ts`
-  (ключ `core/reference-guidance`) и
-  `packages/core/src/skill/instructions.ts` (ключ `core/skill-guidance`).
+- `@opencode/schema/instruction` — the source of the `Key`, `Hash`, `Values`,
+  `Delta` types and the `removed` constant; all four are re-exported from there.
+- `packages/core/src/location.ts` — gives `location.directory`,
+  `location.project.directory` and `location.vcs?.type` for the `<env>` block.
+- `@opencode/util/global` — `global.tmp`, the path that is advised
+  to use instead of the system temporary one.
+- `@opencode/util/effect/app-node` — `makeLocationNode` for binding
+  a service into the dependency graph (`Global.node`, `Location.node`).
+- The consumers of the mechanism: `packages/core/src/reference/instructions.ts`
+  (key `core/reference-guidance`) and
+  `packages/core/src/skill/instructions.ts` (key `core/skill-guidance`).
 
-## Ловушки
+## Pitfalls
 
-- `unavailable` и `removed` различаются тождеством, а не формой: если
-  значение-источник содержит объект с теми же полями, это не состояние
-  удаления. Проверять структурно здесь нельзя.
-- `diff` при первом чтении падает с `InitializationBlocked`, если хоть один
-  источник `unavailable`. Список ключей в ошибке — то, что блокирует старт.
-- `renderUpdate` для удалённого ключа требует наличия ключа в `previous`;
-  иначе строка пропускается молча.
-- Канонизация учитывает только порядок ключей объектов и массивов. Порядок
-  элементов массива значим, и это меняет хеш.
-- `codec` в `make` применяется и на запись, и на чтение: значение, которое
-  не проходит `Schema.encodeSync`, роняет весь `read` источника.
-- Функции рендера в `Source` возвращают `string | undefined`, в
-  `Source.Definition` — обязательный `string`. Расхождение сделано намеренно,
-  чтобы исторические значения могли пропускаться.
+- `unavailable` and `removed` are distinguished by identity, not by shape: if
+  the source value contains an object with the same fields, that is not the removal
+  state. Checking structurally is not allowed here.
+- `diff` on the first read falls with `InitializationBlocked` if at least one
+  source is `unavailable`. The list of keys in the error is exactly what blocks the start.
+- `renderUpdate` for a removed key requires the key to be present in `previous`;
+  otherwise the line is silently skipped.
+- Canonicalization takes into account only the order of the keys of objects and arrays. The order
+  of the array elements is meaningful, and it changes the hash.
+- `codec` in `make` is applied both on write and on read: a value that
+  does not pass `Schema.encodeSync` brings down the whole `read` of the source.
+- The render functions in `Source` return `string | undefined`, in
+  `Source.Definition` — a mandatory `string`. The mismatch is deliberate,
+  so that historical values can be skipped.

@@ -1,22 +1,22 @@
-# @opencode/tui — интерфейс в терминале
+# @opencode/tui — the terminal interface
 
-## Что это
+## What This Is
 
-TUI: 281 файл, ~62 тыс. строк в `src/` — второй по объёму пакет после
-`app`. Полноценный терминальный интерфейс opencode: сессии, вкладки,
-промпт, диалоги, темы, звуки внимания, интеграция с редактором.
+TUI: 281 files, ~62k lines in `src/` — the second largest package after
+`app`. A full terminal interface for opencode: sessions, tabs, prompt, dialogs,
+themes, attention sounds, editor integration.
 
-Запускается командой `opencode tui` из `packages/cli`.
+Started with the `opencode tui` command from `packages/cli`.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L6 — поверхность**: зависит от `client`, `core`, `latex`, `merman`,
+Layer **L6 — surface**: depends on `client`, `core`, `latex`, `merman`,
 `plugin`, `schema`, `simulation`, `theme`, `ui`, `util`.
 
-Кто подключает: `packages/cli` — единственный импортёр в `src`
-(плюс сам `tui` внутри себя).
+Who imports it: `packages/cli` — the only importer in `src`
+(plus `tui` itself internally).
 
-Карта экспорта большая (45 путей в `package.json`), основные:
+The export map is large (45 paths in `package.json`), the main ones:
 
 ```json
 ".": "./src/index.tsx",
@@ -28,72 +28,72 @@ TUI: 281 файл, ~62 тыс. строк в `src/` — второй по объ
 "./theme/discovery": "./src/theme/discovery.ts"
 ```
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Крупные каталоги `packages/tui/src/`** (по размеру):
+**The large directories of `packages/tui/src/`** (by size):
 
-| Каталог | Строк | Содержимое |
+| Directory | Lines | Contents |
 | --- | --- | --- |
-| `mini/` | 18.2k | отдельный фронтенд-рантайм, запускается командой CLI `mini` |
-| `component/` | 14.0k | ~50 виджетов: `dialog-*.tsx`, `session-tabs.tsx`, промпт |
-| `routes/` | 8.9k | `home.tsx` и `session/index.tsx` (3610 строк) |
+| `mini/` | 18.2k | a separate frontend runtime, started by the CLI command `mini` |
+| `component/` | 14.0k | ~50 widgets: `dialog-*.tsx`, `session-tabs.tsx`, prompt |
+| `routes/` | 8.9k | `home.tsx` and `session/index.tsx` (3610 lines) |
 | `feature-plugins/` | 4.9k | `home/`, `prompt/`, `sidebar/`, `system/` |
-| `context/` | 3.8k | ~30 Solid-контекстов: `client.tsx`, `data.tsx`, `permission.tsx`, `keymap.tsx`, `theme.tsx` |
+| `context/` | 3.8k | ~30 Solid contexts: `client.tsx`, `data.tsx`, `permission.tsx`, `keymap.tsx`, `theme.tsx` |
 
-**Подключение к серверу** — `packages/tui/src/context/client.tsx`
-(61 строка) — единственная точка, где TUI подключается к API.
+**Server connection** — `packages/tui/src/context/client.tsx`
+(61 lines) — the single point where the TUI connects to the API.
 
-**Конфигурация** — `packages/tui/src/config/` (включая `keybind.ts`,
-`v1/` для старого формата) — настройки и раскладка клавиш.
+**Configuration** — `packages/tui/src/config/` (including `keybind.ts`,
+`v1/` for the old format) — settings and key layout.
 
-**Темы** — `packages/tui/src/theme/` (плюс экспорт `./theme/discovery`) —
-работа с `@opencode/theme`.
+**Themes** — `packages/tui/src/theme/` (plus the `./theme/discovery` export) —
+work with `@opencode/theme`.
 
-**Редактор** — `editor.ts`, `editor-zed.ts`, `editor-zed-sqlite.bun.ts` /
-`editor-zed-sqlite.node.ts` (варианты под рантайм), `context/editor.ts`.
+**Editor** — `editor.ts`, `editor-zed.ts`, `editor-zed-sqlite.bun.ts` /
+`editor-zed-sqlite.node.ts` (per-runtime variants), `context/editor.ts`.
 
-**Звук и внимание** — `attention.ts`, `audio.ts`,
+**Sound and attention** — `attention.ts`, `audio.ts`,
 `attention-sounds.bun.ts` / `attention-sounds.node.ts`.
 
-**Рендер** — `app.tsx`, `index.tsx`, `runtime.tsx`, каталоги `ui/`
+**Rendering** — `app.tsx`, `index.tsx`, `runtime.tsx`, the `ui/` directories
 (`dialog.tsx`, `spinner.ts`, `toast.tsx`), `component/`,
 `prompt/` (`content.ts`, `display.ts`), `devtools/`, `simulation/`,
-`plugin/` (плагины интерфейса, `discovery.ts`).
+`plugin/` (interface plugins, `discovery.ts`).
 
-**Прочее** — `clipboard.ts`, `logo.ts`, `model-preference.ts`,
-`parsers-config.ts` (tree-sitter парсеры), `util/` (7 файлов: `session.ts`,
+**Misc** — `clipboard.ts`, `logo.ts`, `model-preference.ts`,
+`parsers-config.ts` (tree-sitter parsers), `util/` (7 files: `session.ts`,
 `form.ts`, `string-width.ts`, `persistence.ts`, …), `terminal-win32.ts`.
 
-## Точки входа
+## Entry Points
 
-1. `packages/tui/src/index.tsx` (экспорт `"."`) — корень интерфейса.
-2. `packages/tui/src/context/client.tsx` — подключение к серверу; менять
-   здесь способ связи.
-3. `packages/tui/src/runtime.tsx` (экспорт `./runtime`) — рантайм рендера.
-4. `packages/tui/src/mini/index.ts` (экспорт `./mini`) — отдельный
-   мини-фронтенд.
-5. `packages/tui/src/config/index.tsx` (экспорт `./config`) — настройки.
+1. `packages/tui/src/index.tsx` (the `"."` export) — the root of the interface.
+2. `packages/tui/src/context/client.tsx` — server connection; change the way
+   the connection works here.
+3. `packages/tui/src/runtime.tsx` (the `./runtime` export) — the render runtime.
+4. `packages/tui/src/mini/index.ts` (the `./mini` export) — a separate
+   mini-frontend.
+5. `packages/tui/src/config/index.tsx` (the `./config` export) — settings.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/cli/PACKAGE.md` — команды, запускающие TUI (`tui`, `mini`).
-- `packages/theme/PACKAGE.md` — схемы тем, которые здесь применяются.
-- `packages/latex/PACKAGE.md`, `packages/merman/PACKAGE.md` — рендереры
-  кодовых блоков, подключаемые через плагины.
-- `packages/client/PACKAGE.md` → `./solid` — источник данных.
+- `packages/cli/PACKAGE.md` — the commands that start the TUI (`tui`, `mini`).
+- `packages/theme/PACKAGE.md` — the theme schemas applied here.
+- `packages/latex/PACKAGE.md`, `packages/merman/PACKAGE.md` — code block
+  renderers plugged in through plugins.
+- `packages/client/PACKAGE.md` → `./solid` — data source.
 
-## Ловушки
+## Pitfalls
 
-1. **`mini/` — не «урезанный TUI».** Это самостоятельный фронтенд-рантайм
-   на 18 тыс. строк со своим рендером, запускаемый отдельной командой
+1. **`mini/` is not a "cut-down TUI".** It is an independent frontend runtime
+   of 18k lines with its own renderer, started by a separate command
    (`packages/cli/src/commands/handlers/mini.ts`).
-2. **Рантайм-варианты рядом:** `attention-sounds.bun.ts` /
+2. **Runtime variants sit side by side:** `attention-sounds.bun.ts` /
    `attention-sounds.node.ts`, `editor-zed-sqlite.bun.ts` /
-   `editor-zed-sqlite.node.ts`. Правка одного не правит другой.
-3. **Слой declared L6 не отражает связность:** `mini/` тянет ядро напрямую,
-   мимо `context/client.tsx`. Проверяй конкретный файл.
-4. **45 экспортов — не публичное API для плагинов.** Для плагинов есть
-   отдельный `./plugin` и `@opencode/plugin/tui`; остальные пути —
-   внутренние.
-5. **`context/storage.tsx` и `component/session-tabs.tsx`** в этом дереве
-   изменены локально (правки прошлой работы владельца) — не перезаписывать.
+   `editor-zed-sqlite.node.ts`. Editing one does not edit the other.
+3. **The declared L6 layer does not reflect coupling:** `mini/` pulls the core
+   directly, bypassing `context/client.tsx`. Check the specific file.
+4. **The 45 exports are not the public plugin API.** Plugins have a separate
+   `./plugin` and `@opencode/plugin/tui`; the other paths are internal.
+5. **`context/storage.tsx` and `component/session-tabs.tsx`** in this tree
+   were changed locally (edits from the owner's earlier work) — do not
+   overwrite them.

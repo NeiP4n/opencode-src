@@ -1,115 +1,116 @@
-# @opencode/core — ядро opencode
+# @opencode/core — the opencode core
 
-## Что это
+## What This Is
 
-Сердце системы: 431 файл, ~65 тыс. строк в `src/` (плюс ~96 тыс. строк
-тестов в `core/test/` — логика живёт в `src/`). Здесь всё, что делает
-opencode opencode: сессии, инструменты модели, провайдеры, разрешения,
-база данных, конфигурация, плагины, файловая система, git, MCP, навыки.
+The heart of the system: 431 files, ~65k lines in `src/` (plus ~96k lines
+of tests in `core/test/` — the logic lives in `src/`). Everything that
+makes opencode opencode lives here: sessions, model tools, providers,
+permissions, database, configuration, plugins, filesystem, git, MCP,
+skills.
 
-Слой `server` монтирует эти подсистемы в HTTP-API, а `tui` показывает их
-пользователю; сам `core` о них ничего не знает.
+The `server` layer mounts these subsystems into the HTTP API, while `tui`
+shows them to the user; `core` itself knows nothing about them.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L4 — ядро**: зависит от `ai`, `codemode`, `plugin`,
+Layer **L4 — core**: depends on `ai`, `codemode`, `plugin`,
 `plugin-browser`, `schema`, `util`.
 
-Кто подключает: `server`, `cli`, `sdk`, `tui`, `simulation`, `client`
-(тесты), `enterprise`.
+Who imports it: `server`, `cli`, `sdk`, `tui`, `simulation`, `client`
+(tests), `enterprise`.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Сборка графа** — `packages/core/src/instance.ts`, строка 114:
-`export const graph = LayerNode.group(nodes)` — точка сборки зависимостей
-ядра. Ещё два похожих графа собирают требования плагинов:
-`packages/core/src/plugin/host.ts` (строка 574) и
-`packages/core/src/plugin/internal.ts` (строка 160).
+**Graph assembly** — `packages/core/src/instance.ts`, line 114:
+`export const graph = LayerNode.group(nodes)` — where core dependencies are
+assembled. Two similar graphs assemble plugin requirements:
+`packages/core/src/plugin/host.ts` (line 574) and
+`packages/core/src/plugin/internal.ts` (line 160).
 
-**Шина событий** — `packages/core/src/bus.ts` (908 строк) — реальный
-движок событий. Каталог `packages/core/src/event/` содержит только
-`sql.ts` (таблица), не ищи логику там.
+**Event bus** — `packages/core/src/bus.ts` (908 lines) — the real event
+engine. The `packages/core/src/event/` directory contains only `sql.ts`
+(a table); do not look for the logic there.
 
-**База данных** — каталог `packages/core/src/database/` (77 файлов).
-Три рантайм-варианта: `sqlite.bun.ts`, `sqlite.node.ts`,
-`sqlite.workerd.ts` — правка одного не правит остальные.
+**Database** — the `packages/core/src/database/` directory (77 files).
+Three runtime variants: `sqlite.bun.ts`, `sqlite.node.ts`,
+`sqlite.workerd.ts` — editing one does not edit the others.
 
-**Сессии** — `packages/core/src/session.ts` (483 строки) и каталог
-`packages/core/src/session/` (49 файлов): жизненный цикл, сообщения,
-fork/revert, компакция, инбокс.
+**Sessions** — `packages/core/src/session.ts` (483 lines) and the
+`packages/core/src/session/` directory (49 files): lifecycle, messages,
+fork/revert, compaction, inbox.
 
-**Инструменты** — `packages/core/src/tool.ts` (332 строки) и каталог
-`packages/core/src/tool/` (20 файлов): `bash`, `edit`, `read`, `write`,
-`grep`, `glob`, `patch`, `task`, `todowrite`, `webfetch`, `lsp`, `skill`,
-`session`, `snapshot`, `formatter`, `filesystem`, `instruction`,
+**Tools** — `packages/core/src/tool.ts` (332 lines) and the
+`packages/core/src/tool/` directory (20 files): `bash`, `edit`, `read`,
+`write`, `grep`, `glob`, `patch`, `task`, `todowrite`, `webfetch`, `lsp`,
+`skill`, `session`, `snapshot`, `formatter`, `filesystem`, `instruction`,
 `credential`, `job`, `kv`, `codemode`, `effect`.
 
-**Плагины ядра** — каталог `packages/core/src/plugin/` (67 файлов):
-`host.ts`, `internal.ts` (графы), плюс хосты инструментов и регистраций.
+**Core plugins** — the `packages/core/src/plugin/` directory (67 files):
+`host.ts`, `internal.ts` (the graphs), plus tool and registration hosts.
 
-**Конфигурация** — `packages/core/src/config.ts` (374 строки) и каталог
-`packages/core/src/config/` (26 файлов): схемы конфига, агентов, команд,
-вопросов.
+**Configuration** — `packages/core/src/config.ts` (374 lines) and the
+`packages/core/src/config/` directory (26 files): schemas for config,
+agents, commands, questions.
 
-**Провайдеры и модели** — `provider.ts` (468), `model.ts` (299),
-`model-resolver.ts` (470), `models-dev.ts` (439), каталог
-`github-copilot/` (24 файла), `oauth/`, `credential.ts`.
+**Providers and models** — `provider.ts` (468), `model.ts` (299),
+`model-resolver.ts` (470), `models-dev.ts` (439), the
+`github-copilot/` directory (24 files), `oauth/`, `credential.ts`.
 
-**Вызов модели** — `aisdk.ts` (1082 строки) и `aisdk-native.ts` (321)
-— мост к AI SDK.
+**Model invocation** — `aisdk.ts` (1082 lines) and `aisdk-native.ts` (321)
+— the bridge to the AI SDK.
 
-**Файлы и поиск** — `filesystem.ts` + каталог `filesystem/` (11 файлов:
-`watcher.ts`, `search.ts`, `ignore.ts`, `protected.ts`, `fff.ts`),
-`ripgrep.ts`, `file-access.ts`, `file-mutation.ts`, `file-retention.ts`.
+**Files and search** — `filesystem.ts` + the `filesystem/` directory
+(11 files: `watcher.ts`, `search.ts`, `ignore.ts`, `protected.ts`,
+`fff.ts`), `ripgrep.ts`, `file-access.ts`, `file-mutation.ts`,
+`file-retention.ts`.
 
-**Git** — `git.ts` (758 строк), `snapshot.ts` (снапшоты файлов
+**Git** — `git.ts` (758 lines), `snapshot.ts` (file snapshots
 `capture|files|diff|restore`), `repository.ts`, `repository-cache.ts`,
-каталоги `vcs/`, `worktree/`.
+the `vcs/`, `worktree/` directories.
 
-**Разрешения** — `permission.ts` (347) + `permission/` (включая
+**Permissions** — `permission.ts` (347) + `permission/` (including
 `permission/saved.ts`), `managed-policy.ts`.
 
-**Разное** — `shell.ts` (455), `job.ts` (482), `kv.ts`, `form.ts` (370),
-`instruction-discovery.ts` (поиск AGENTS.md по дереву) +
-`instructions/` (сборка и хеширование в системный промпт),
+**Miscellaneous** — `shell.ts` (455), `job.ts` (482), `kv.ts`, `form.ts` (370),
+`instruction-discovery.ts` (searching the tree for AGENTS.md) +
+`instructions/` (assembly and hashing into the system prompt),
 `skill.ts` + `skill/`, `mcp/`, `pty.ts` + `pty/` + `persistent-pty/`,
 `websearch.ts`, `image.ts`, `location*.ts`, `project.ts`, `workspace.ts`,
-`variant.ts` (608), `rpc.ts` (289), `bus.ts`.
+`variant.ts` (608), `rpc.ts` (289), `bus.ts`, `effect/` (layer helpers),
+`environment/`, `util/`, `id/`, `modal/`, `v1/` (16 migration files),
+`account/` (dead code — zero imports).
 
-**Прочее** — `effect/` (хелперы слоёв), `environment/`, `util/`, `id/`,
-`modal/`, `v1/` (16 файлов миграций), `account/` (мёртвый код — импортов
-ноль).
+## Entry Points
 
-## Точки входа
+1. `packages/core/src/instance.ts` → `graph` — assembly of all core layers.
+2. `packages/core/src/config.ts` — reading and validating the configuration.
+3. `packages/core/src/session.ts` — working with sessions.
+4. `packages/core/src/tool.ts` — the tool registry.
+5. `packages/core/src/bus.ts` — subscribing to core events.
 
-1. `packages/core/src/instance.ts` → `graph` — сборка всех слоёв ядра.
-2. `packages/core/src/config.ts` — чтение и валидация конфигурации.
-3. `packages/core/src/session.ts` — работа с сессиями.
-4. `packages/core/src/tool.ts` — реестр инструментов.
-5. `packages/core/src/bus.ts` — подписка на события ядра.
+## Where to Look Next
 
-## На что смотреть дальше
+- `packages/server/PACKAGE.md` — how these layers become the HTTP API.
+- `packages/protocol/PACKAGE.md` and `packages/schema/PACKAGE.md` — the
+  contract and the types.
+- `packages/ai/PACKAGE.md` — the providers that `aisdk.ts` calls.
+- `packages/plugin/PACKAGE.md` — how to extend the core without changing
+  its code.
+- `packages/core/test/session-runner-recorded.test.ts` — an example of a
+  session run with traffic recording.
 
-- `packages/server/PACKAGE.md` — как эти слои становятся HTTP-API.
-- `packages/protocol/PACKAGE.md` и `packages/schema/PACKAGE.md` — контракт
-  и типы.
-- `packages/ai/PACKAGE.md` — провайдеры, которые `aisdk.ts` вызывает.
-- `packages/plugin/PACKAGE.md` — как расширять ядро без правки его кода.
-- `packages/core/test/session-runner-recorded.test.ts` — пример прогона
-  сессии с записью трафика.
+## Pitfalls
 
-## Ловушки
-
-1. **Папка не равна подсистеме.** `provider/`, `event/`, `credential/`,
-   `permission/` — это одиночные `.ts` рядом с одноимёнными каталогами,
-   которые существуют ради `sql.ts`. Ищи файл, а не папку.
-2. **События — в `bus.ts`, а не в `event/`.** `event/sql.ts` — только
-   таблица для журнала.
-3. **Три рантайма базы:** `sqlite.bun.ts` / `sqlite.node.ts` /
-   `sqlite.workerd.ts`. Правка одного не переносится на другие.
-4. **`test/` больше `src/`.** 96.5 тыс. строк тестов против 65 тыс.
-   логики — не ищи реализацию в тестах.
-5. **`account/sql.ts` — мёртвый код:** импортов ноль, таблица существует
-   отдельно в `console/core/src/schema/account.sql`.
-6. **`node-ffi.d.ts` и `markdown.d.ts` — декларации типов**, а не код;
-   `models-dev/` пуст (логика в `models-dev.ts`).
+1. **A folder is not a subsystem.** `provider/`, `event/`, `credential/`,
+   `permission/` are single `.ts` files next to same-named directories
+   that exist only for `sql.ts`. Look for the file, not the folder.
+2. **Events live in `bus.ts`, not in `event/`.** `event/sql.ts` is only
+   the journal table.
+3. **Three database runtimes:** `sqlite.bun.ts` / `sqlite.node.ts` /
+   `sqlite.workerd.ts`. An edit to one does not carry over to the others.
+4. **`test/` is bigger than `src/`.** 96.5k lines of tests against 65k
+   lines of logic — do not look for the implementation in the tests.
+5. **`account/sql.ts` is dead code:** zero imports, the table exists
+   separately in `console/core/src/schema/account.sql`.
+6. **`node-ffi.d.ts` and `markdown.d.ts` are type declarations**, not
+   code; `models-dev/` is empty (the logic is in `models-dev.ts`).

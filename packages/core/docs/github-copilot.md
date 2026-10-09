@@ -1,108 +1,108 @@
-# core/github-copilot — клиент GitHub Copilot: два протокола (chat и responses), каталог моделей, обход рассуждений
+# core/github-copilot — the GitHub Copilot client: two protocols (chat and responses), model catalog, reasoning bypass
 
-## Что в папке
+## What's In This Folder
 
-- `chat/` — реализация протокола `/chat/completions` для Copilot: сборка тела запроса, разбор потока и обычного ответа, перевод промпта в сообщения.
-- `responses/` — реализация протокола `/responses` для Copilot: тот же класс модели, но с другим форматом входа, выхода и потока событий, плюс встроенные инструменты провайдера.
-- `models.ts` — приведение каталога моделей Copilot к моделям OpenCode.
-- `copilot-provider.ts` — фабрика провайдера: собирает заголовки, базовый URL и выбирает нужную реализацию протокола.
-- `openai-compatible-error.ts` — схема ошибки совместимого провайдера и структура обработки ошибок.
-- Всего 23 файла; два самых больших — `chat/openai-compatible-chat-language-model.ts` (817 строк) и `responses/openai-responses-language-model.ts` (1636 строк).
+- `chat/` — the implementation of the `/chat/completions` protocol for Copilot: request body assembly, stream and regular response parsing, prompt to message translation.
+- `responses/` — the implementation of the `/responses` protocol for Copilot: the same model class, but with another input, output and event stream format, plus the provider's built-in tools.
+- `models.ts` — bringing the Copilot model catalog to OpenCode models.
+- `copilot-provider.ts` — the provider factory: assembles the headers, the base URL and chooses the needed protocol implementation.
+- `openai-compatible-error.ts` — the error schema of the compatible provider and the structure of error handling.
+- 23 files in total; the two largest are `chat/openai-compatible-chat-language-model.ts` (817 lines) and `responses/openai-responses-language-model.ts` (1636 lines).
 
-## Ключевые файлы
+## Key Files
 
 - `packages/core/src/github-copilot/copilot-provider.ts` — `createOpenaiCompatible(options)`.
 - `packages/core/src/github-copilot/chat/openai-compatible-chat-language-model.ts` — `OpenAICompatibleChatLanguageModel`.
-- `packages/core/src/github-copilot/responses/openai-responses-language-model.ts` — `OpenAIResponsesLanguageModel` и все схемы чанков.
+- `packages/core/src/github-copilot/responses/openai-responses-language-model.ts` — `OpenAIResponsesLanguageModel` and all the chunk schemas.
 - `packages/core/src/github-copilot/models.ts` — `load`, `derive`, `usable`, `variants`.
 - `packages/core/src/github-copilot/responses/openai-responses-prepare-tools.ts` — `prepareResponsesTools`, `getResponsesHostedTool`.
 - `packages/core/src/github-copilot/responses/convert-to-openai-responses-input.ts` — `convertToOpenAIResponsesInput`.
 - `packages/core/src/github-copilot/chat/convert-to-openai-compatible-chat-messages.ts` — `convertToOpenAICompatibleChatMessages`.
 
-## Важные детали
+## Important Details
 
-- Фабрика `createOpenaiCompatible` возвращает функцию с четырьмя равнозначными способами создать модель: сам вызов провайдера, `chat`, `responses`, `languageModel`. По умолчанию все они дают chat-реализацию, кроме явного `responses`.
-- Имя провайдера в модели строится как `${options.name ?? "openai-compatible"}.chat` или `.responses`. Имя класса опций для парсинга берётся как первая часть до точки: `this.config.provider.split(".")[0]`.
-- Базовый URL нормализуется через `withoutTrailingSlash`, а URL запроса собирается как `${baseURL}${path}`. Значение по умолчанию — `https://api.openai.com/v1`.
-- Заголовки собираются один раз в момент вызова `getHeaders`: заголовок `Authorization: Bearer` добавляется только если задан `apiKey`, затем поверх идут пользовательские `headers`, а в конце `withUserAgentSuffix` добавляет `ai-sdk/openai-compatible/0.1.0`. Версия провайдера задана константой `VERSION` в этом же файле.
-- В chat-реализации опции провайдера читаются дважды: сначала из ключа `copilot`, затем из имени провайдера. Значения из второго источника перекрывают первый, потому что идут вторым в `Object.assign`.
-- `topK` в chat-протоколе не поддерживается и даёт предупреждение `unsupported`. В responses-протоколе не поддерживаются `topK`, `seed`, `presencePenalty`, `frequencyPenalty` и `stopSequences`.
-- В chat-реализации любые ключи провайдера, которых нет в известной схеме, копируются в тело запроса как есть. Это позволяет прокинуть параметры, ещё не описанные в `openaiCompatibleProviderOptions`, без правок кода.
-- `response_format` в chat-реализации зависит от флага `supportsStructuredOutputs`: при нём и наличии схемы уходит `json_schema` с именем (по умолчанию `response`), иначе — `json_object`. Предупреждение об отсутствии поддержки приходит в список предупреждений.
-- `stream_options: { include_usage: true }` добавляется только при `config.includeUsage`: это режим строгой совместимости, в котором сервер присылает usage.
-- Обработка ошибок настраивается через `errorStructure`: у класса есть собственная схема ошибки, собранная из схемы, заданной в конструкторе. Дефолт — `defaultOpenAICompatibleErrorStructure`.
-- Схемы ответов и чанков намеренно урезаны: в коде дважды повторяется причина — так меньше поломок при изменении API и выше эффективность. Всё, что не описано, игнорируется.
-- Чанк в chat-протоколе — объединение нормального чанка и схемы ошибки. Поэтому ошибка может прийти в потоке как отдельное событие, и она обрабатывается внутри `transform`.
-- Ключевая особенность Copilot в chat-протоколе — поля `reasoning_text` (видимый текст рассуждений) и `reasoning_opaque` (непрозрачное состояние для многоходового рассуждения). В потоке рассуждение всегда закрывается раньше текста и раньше вызовов инструментов, даже если те пришли в одном чанке.
-- При втором `reasoning_opaque` внутри одного ответа выбрасывается `InvalidResponseDataError` с сообщением о том, что на ответ допустима только одна часть рассуждения.
-- В потоке chat-протокола идентификаторы частей жёстко заданы: `reasoning-0` и `txt-0`. Это не идентификаторы провайдера, а внутренние, и они переиспользуются при каждом ответе.
-- Вызовы инструментов в chat-потоке склеиваются по `index` чанка, а не по `id`. Первый чанк создаёт запись, последующие дописывают `arguments`. Завершение определяется проверкой `isParsableJson` — то есть приходят полные валидные аргументы.
-- Если провайдер прислал полный вызов инструмента одним чанком, дельта аргументов сразу не отправляется, а вызов приходит сразу после `tool-input-end`.
-- В `flush` незакрытые вызовы инструментов достреливаются принудительно: сначала `tool-input-end`, потом `tool-call`. Так поток не теряет вызов, если провайдер не отметил его завершение.
-- `usage` в потоке chat-протокола собирается по частям, а в `finish` считается `noCache` как `promptTokens - cachedTokens`, но только если оба значения известны. При отсутствии данных о кэше `noCache` остаётся `undefined`.
-- В `flush` chat-потока `providerMetadata` собирается из расширителя метаданных и `reasoningOpaque`, причём ключ `copilot` присутствует только при наличии непрозрачного рассуждения.
-- В responses-реализации сообщение системы всегда отправляется как `system`: режимы `developer` и `remove` есть в функции преобразования, но вызывающий код передаёт `systemMessageMode: "system"`.
-- Признак `store` (по умолчанию `false`) переключает сразу несколько веток поведения: ссылки на элементы вместо рассуждений, отправку `id` для сообщений и вызовов, и передачу или пропуск результатов встроенных инструментов.
-- `include` собирается принудительно: `reasoning.encrypted_content` добавляется всегда, `message.output_text.logprobs` — при запросе logprobs, `web_search_call.action.sources` — при наличии веб-поиска, `code_interpreter_call.outputs` — при наличии интерпретатора кода. Дубликаты не добавляются.
-- `logprobs: true` превращается в `TOP_LOGPROBS_MAX` (20), число — используется как есть. Значение вне диапазона отсекается схемой опций.
-- `text` в теле запроса появляется только при JSON-формате ответа или заданной многословности. Без обоих условий поля `text` в запросе нет.
-- Область `reasoning` в теле собирается из `reasoningEffort` и `reasoningSummary` и тоже только когда хотя бы одно из них задано.
-- Ошибка приходит в поле `error` ответа с кодом 200: она превращается в `APICallError` со статусом 400 и `isRetryable: false`. Комментарий в коде не оставляет сомнений — повторять такой запрос бессмысленно.
-- Разбор вывода в responses-реализации идёт по дискриминируемому объединению типов: `message`, `reasoning`, `function_call`, `web_search_call`, `file_search_call`, `code_interpreter_call`, `image_generation_call`, `computer_call`.
-- Пустой список `summary` у рассуждения дополняется одной пустой частью: без этого кусок рассуждения не попадёт в результат.
-- Встроенные инструменты возвращаются парой `tool-call` с `providerExecuted: true` и `tool-result`. У веб-поиска вход — `JSON.stringify({ action })`, у файлового поиска — строка `{}`, у генерации изображений — строка `{}`, у интерпретатора кода — JSON с `code` и `containerId`, у компьютерного вызова — пустая строка.
-- Имя встроенного инструмента в результате берётся через `getHostedToolName(responseType)`: имя выбранного инструмента, иначе первое найденное с таким типом ответа, иначе сам тип ответа как строка. То есть в нестандартной конфигурации именем может оказаться `file_search`.
-- Компьютерный вызов — единственный, у которого имя инструмента фиксировано строкой `computer_use`, а не берётся из конфигурации.
-- Аннотации цитат превращаются в части типа `source`: URL-цитата даёт `sourceType: "url"`, цитата файла — `sourceType: "document"` с заголовком из цитаты, затем имени файла, затем строки `Document`. Идентификатор источника берётся из `config.generateId`, иначе генерируется.
-- Признак `hasFunctionCall` отмечается только на `function_call`. В потоке он же взводится на событии завершения элемента. Он влияет на итоговую причину завершения.
-- Поток responses ведёт учёт рассуждения по `output_index`, а не по `item.id`. Причина зафиксирована в коде: Copilot меняет зашифрованные идентификаторы элементов на каждом событии. Идентификаторы частей имеют вид `${item.id}:${summary_index}`.
-- Для текста ведётся отдельный стабильный идентификатор `currentTextId`, потому что `item_id` меняется между дельтами. Он нормализуется в один идентификатор на сообщение.
-- Суммарии рассуждения имеют собственное состояние `active`, `can-conclude` и `concluded`. Состояние `can-conclude` используется при `store === false`: в этом случае закрыть часть можно только при появлении следующей части, но не по событию завершения.
-- Дельты кода интерпретатора экранируются через `JSON.stringify(...).slice(1, -1)` и в конце закрываются кавычкой: код передаётся внутри JSON-строки параметров вызова инструмента.
-- Схема потока responses заканчивается запасным вариантом `{ type: z.string() }.loose()`, то есть неизвестные события не ломают разбор. Каждый известный тип проверяется отдельной функцией-предикатом.
-- Списки аргументов встроенных инструментов проверяются `parse` из zod при каждой сборке запроса: неверные аргументы приводят к исключению до обращения к сети.
-- Для генерации изображений схема аргументов `.strict()`: лишние поля запрещены. Ограничения заданы явно: `outputCompression` и `partialImages` в пределах от 0 до 100 и от 0 до 3, `moderation` допускает только `auto`.
-- В `prepareResponsesTools` вводятся проверки неоднозначности: несколько определений с одинаковым именем, два инструмента с одинаковым типом ответа и неоднозначный выбор встроенного инструмента дают `UnsupportedFunctionalityError` с перечислением имён.
-- Класс `ResponsesHostedTool` хранит отдельно `type` (для выбора) и `responseType` (для разбора ответа). Они различаются для веб-поиска: `web_search_preview` в запросе даёт `responseType: "web_search"`.
-- `strict` у обычной функции-инструмента берётся из определения инструмента, а при отсутствии — из общего флага `strictJsonSchema`.
-- В `models.ts` модель считается пригодной только при выполнении четырёх условий: политика не `disabled`, заданы `max_output_tokens`, заданы `max_prompt_tokens` и определено `tool_calls`. Остальные модели отбрасываются без диагностики.
-- Эндпоинт выбирается по возможностям в порядке `messages`, `responses`, `chat`. При отсутствии подходящего значения поле `endpoint` просто не попадает в настройки.
-- Поддержка PDF в моделях Copilot требует одновременно и `vision`, и наличие `application/pdf` среди поддерживаемых типов. Для изображений достаточно любого из двух.
-- Пересчёт цен в `models.ts` использует `10_000 / batch_size`: Copilot сообщает стоимость за размер пакета, а модель хранит цену за миллион токенов. При отсутствии цен или нулевом размере пакета получается ноль.
-- Время выпуска берётся из локальных данных модели, а если их нет — из `Date.parse` поля `version`, у которого убирается префикс вида `${id}-`. Неразбираемая дата даёт ноль.
-- Поле `enabled` модели равно `model_picker_enabled` из ответа: провайдер сам решает, показывать ли модель в выборе.
-- Варианты рассуждения в `models.ts` строятся тремя способами. Для не-Anthropic протокола с заданными уровнями усилия — варианты с `reasoningEffort`, `reasoningSummary: "auto"` и `include: ["reasoning.encrypted_content"]`. Для Anthropic-протокола с адаптивным мышлением — варианты с `thinking: { type: "adaptive", display: "summarized" }`. Если уровней нет, но задан `max_thinking_budget`, делаются ровно два варианта: `max` с бюджетом `max - 1` и `high` с половиной бюджета.
-- Вычитание единицы из максимального бюджета сделано намеренно: максимальное значение бюджета недопустимо для API.
-- Слияние с локальными моделями в `models.ts` начинается с существующих моделей, а не с пустой карты: локальные псевдонимы и настройки переживают обновление каталога. Но модель удаляется, если её объявленный `modelID` больше не встречается в ответе. Комментарий объясняет причину: частичный или негодный элемент не должен создавать сломанную модель.
-- Импорт `snapshot.txt` для этого каталога не используется: `load` всегда ходит в сеть. Встроенный снимок есть только у каталога OpenCode.
+- The `createOpenaiCompatible` factory returns a function with four equivalent ways to create a model: the provider call itself, `chat`, `responses`, `languageModel`. By default all of them give the chat implementation, except an explicit `responses`.
+- The provider name in the model is built as `${options.name ?? "openai-compatible"}.chat` or `.responses`. The options class name for parsing is taken as the first part before the dot: `this.config.provider.split(".")[0]`.
+- The base URL is normalized through `withoutTrailingSlash`, and the request URL is assembled as `${baseURL}${path}`. The default value is `https://api.openai.com/v1`.
+- The headers are assembled once at the moment of the `getHeaders` call: the `Authorization: Bearer` header is added only if `apiKey` is set, then the custom `headers` go on top, and at the end `withUserAgentSuffix` adds `ai-sdk/openai-compatible/0.1.0`. The provider version is set by the constant `VERSION` in the same file.
+- In the chat implementation the provider options are read twice: first from the `copilot` key, then from the provider name. Values from the second source override the first, because they come second in `Object.assign`.
+- `topK` is not supported in the chat protocol and gives an `unsupported` warning. In the responses protocol `topK`, `seed`, `presencePenalty`, `frequencyPenalty` and `stopSequences` are not supported.
+- In the chat implementation any provider keys that are not in the known schema are copied into the request body as is. This lets you pass through parameters not yet described in `openaiCompatibleProviderOptions` without code changes.
+- `response_format` in the chat implementation depends on the flag `supportsStructuredOutputs`: with it and with a schema present `json_schema` goes out with a name (`response` by default), otherwise — `json_object`. The warning about the missing support arrives in the warnings list.
+- `stream_options: { include_usage: true }` is added only at `config.includeUsage`: that is the strict compatibility mode in which the server sends usage.
+- Error handling is configured through `errorStructure`: the class has its own error schema, assembled from the schema given in the constructor. The default is `defaultOpenAICompatibleErrorStructure`.
+- The response and chunk schemas are deliberately cut down: the code repeats the reason twice — there are fewer breakages on an API change and higher efficiency. Everything not described is ignored.
+- A chunk in the chat protocol is a union of a normal chunk and the error schema. Therefore an error can arrive in the stream as a separate event, and it is handled inside `transform`.
+- The key feature of Copilot in the chat protocol is the fields `reasoning_text` (visible reasoning text) and `reasoning_opaque` (opaque state for multi-turn reasoning). In the stream the reasoning is always closed earlier than the text and earlier than the tool calls, even if they came in one chunk.
+- On a second `reasoning_opaque` inside one response an `InvalidResponseDataError` is thrown with a message saying that only one reasoning part is allowed for a response.
+- In the stream of the chat protocol the part identifiers are hardcoded: `reasoning-0` and `txt-0`. These are not provider identifiers but internal ones, and they are reused for every response.
+- Tool calls in the chat stream are glued by the `index` of the chunk, not by `id`. The first chunk creates a record, the following ones append `arguments`. The completion is determined by an `isParsableJson` check — that is, complete valid arguments have arrived.
+- If the provider sent a complete tool call in one chunk, the argument delta is not sent at all, and the call arrives right after `tool-input-end`.
+- In `flush` unclosed tool calls are fired forcibly: first `tool-input-end`, then `tool-call`. Thus the stream does not lose a call if the provider did not mark its completion.
+- `usage` in the stream of the chat protocol is collected in parts, and in `finish` `noCache` is counted as `promptTokens - cachedTokens`, but only if both values are known. Without cache data `noCache` stays `undefined`.
+- In `flush` of the chat stream `providerMetadata` is assembled from the metadata extender and `reasoningOpaque`, and the `copilot` key is present only when there is opaque reasoning.
+- In the responses implementation the system message is always sent as `system`: the `developer` and `remove` modes exist in the conversion function, but the calling code passes `systemMessageMode: "system"`.
+- The `store` flag (default `false`) switches several branches of behavior at once: references to items instead of reasoning, sending `id` for messages and calls, and passing or skipping the results of built-in tools.
+- `include` is assembled forcibly: `reasoning.encrypted_content` is always added, `message.output_text.logprobs` — when logprobs are requested, `web_search_call.action.sources` — when web search is present, `code_interpreter_call.outputs` — when the code interpreter is present. Duplicates are not added.
+- `logprobs: true` turns into `TOP_LOGPROBS_MAX` (20), a number is used as is. A value outside the range is cut off by the options schema.
+- `text` in the request body appears only with a JSON response format or with a set verbosity. Without both conditions there is no `text` field in the request.
+- The `reasoning` area in the body is assembled from `reasoningEffort` and `reasoningSummary`, and again only when at least one of them is set.
+- An error arrives in the `error` field of the response with code 200: it turns into an `APICallError` with status 400 and `isRetryable: false`. The comment in the code leaves no doubt — repeating such a request is pointless.
+- Parsing of the output in the responses implementation goes by a discriminated union of types: `message`, `reasoning`, `function_call`, `web_search_call`, `file_search_call`, `code_interpreter_call`, `image_generation_call`, `computer_call`.
+- An empty `summary` list of the reasoning is supplemented with one empty part: without this the reasoning piece will not get into the result.
+- Built-in tools are returned by a `tool-call` with `providerExecuted: true` and a `tool-result` pair. For web search the input is `JSON.stringify({ action })`, for file search — the string `{}`, for image generation — the string `{}`, for the code interpreter — JSON with `code` and `containerId`, for the computer call — an empty string.
+- The name of a built-in tool in the result is taken via `getHostedToolName(responseType)`: the name of the selected tool, otherwise the first found with such a response type, otherwise the response type itself as a string. In other words in a non-standard configuration the name may turn out to be `file_search`.
+- The computer call is the only one whose tool name is fixed by the string `computer_use`, and not taken from the configuration.
+- Citation annotations turn into parts of the type `source`: a URL citation gives `sourceType: "url"`, a file citation — `sourceType: "document"` with the title from the citation, then the file name, then the `Document` line. The source identifier is taken from `config.generateId`, otherwise it is generated.
+- The flag `hasFunctionCall` is set only on `function_call`. In the stream it is raised on the element completion event. It influences the final finish reason.
+- The responses stream keeps track of the reasoning by `output_index`, not by `item.id`. The reason is recorded in the code: Copilot changes the encrypted item identifiers on every event. The part identifiers have the form `${item.id}:${summary_index}`.
+- For the text a separate stable identifier `currentTextId` is kept, because `item_id` changes between deltas. It is normalized into one identifier per message.
+- The reasoning summaries have their own state `active`, `can-conclude` and `concluded`. The `can-conclude` state is used at `store === false`: in that case a part can only be closed when the next part appears, but not on the completion event.
+- The deltas of the code interpreter are escaped via `JSON.stringify(...).slice(1, -1)` and closed with a quote at the end: the code is passed inside a JSON string of the tool call parameters.
+- The schema of the responses stream ends with a fallback variant `{ type: z.string() }.loose()`, that is, unknown events do not break the parsing. Each known type is checked by a separate predicate function.
+- The argument lists of built-in tools are checked by `parse` from zod on every request assembly: wrong arguments lead to an exception before the network call.
+- For image generation the argument schema is `.strict()`: extra fields are forbidden. The limits are set explicitly: `outputCompression` and `partialImages` within 0 to 100 and 0 to 3, `moderation` admits only `auto`.
+- In `prepareResponsesTools` ambiguity checks are introduced: several definitions with the same name, two tools with the same response type and an ambiguous choice of a built-in tool give `UnsupportedFunctionalityError` with a listing of the names.
+- The `ResponsesHostedTool` class stores `type` separately (for the choice) and `responseType` (for parsing the response). They differ for web search: `web_search_preview` in the request gives `responseType: "web_search"`.
+- `strict` of an ordinary function tool is taken from the tool definition, and in its absence — from the general flag `strictJsonSchema`.
+- In `models.ts` a model is considered usable only when four conditions hold: the policy is not `disabled`, `max_output_tokens` is set, `max_prompt_tokens` is set and `tool_calls` is defined. The other models are discarded without diagnostics.
+- The endpoint is chosen by the capabilities in the order `messages`, `responses`, `chat`. In the absence of a suitable value the `endpoint` field simply does not get into the settings.
+- PDF support in Copilot models requires both `vision` and the presence of `application/pdf` among the supported types. For images either of the two is enough.
+- The price recalculation in `models.ts` uses `10_000 / batch_size`: Copilot reports the cost per batch size, and the model stores the price per million tokens. Without prices or with a zero batch size you get zero.
+- The release time is taken from the local model data, and if there is none — from `Date.parse` of the `version` field, from which a prefix of the form `${id}-` is removed. An unparseable date gives zero.
+- The `enabled` field of the model equals `model_picker_enabled` from the response: the provider itself decides whether to show the model in the picker.
+- Reasoning variants in `models.ts` are built in three ways. For a non-Anthropic protocol with the effort levels set — variants with `reasoningEffort`, `reasoningSummary: "auto"` and `include: ["reasoning.encrypted_content"]`. For the Anthropic protocol with adaptive thinking — variants with `thinking: { type: "adaptive", display: "summarized" }`. If there are no levels but `max_thinking_budget` is set, exactly two variants are made: `max` with the budget `max - 1` and `high` with half the budget.
+- Subtracting one from the maximum budget is done deliberately: the maximum budget value is not allowed by the API.
+- The merge with local models in `models.ts` starts from the existing models, not from an empty map: local aliases and settings survive a catalog update. But a model is removed if its declared `modelID` no longer occurs in the response. The comment explains the reason: a partial or broken element must not create a broken model.
+- The `snapshot.txt` import for this catalog is not used: `load` always goes to the network. The built-in snapshot exists only for the OpenCode catalog.
 
-## Связи
+## Connections
 
-- `packages/core/src/github-copilot/models.ts` — вызывается плагином провайдера `packages/core/src/plugin/provider/github-copilot.ts` (по соседству с остальными файлами в `packages/core/src/plugin/provider/`).
-- `packages/core/src/model.ts` и `packages/core/src/provider.ts` — `Model.Info`, `Model.VariantID`, `Provider.ID.githubCopilot`, `Provider.aisdk`, `Provider.mergeOverlay` и `Model.Info.default`.
-- `packages/schema/src/money.ts` — `Money.USDPerMillionTokens`, в который переводятся цены.
-- `packages/core/src/aisdk-native.ts` — таблица соответствия спецификаторов пакетам `@opencode/ai`, где `@ai-sdk/anthropic` отображается в `@opencode/ai/providers/anthropic`: именно этот спецификатор выбирается для моделей с эндпоинтом `messages`, то есть для тех, у кого Copilot сообщает поддержку `/v1/messages`.
-- `packages/core/src/model-resolver.ts` — разбирает эти спецификаторы и отдельно обрабатывает пару `@opencode/ai/providers/anthropic` и `@opencode/ai/providers/anthropic-compatible`.
-- `@ai-sdk/provider` и `@ai-sdk/provider-utils` — контракт `LanguageModelV3`, `UnsupportedFunctionalityError`, `postJsonToApi`, `parseProviderOptions`, `createEventSourceResponseHandler`.
-- `zod/v4` — все проверки форм: опции провайдера, аргументы встроенных инструментов, схемы ответов и чанков.
-- `packages/core/src/models-dev.ts` — соседний загрузчик каталога моделей, работающий с встроенным снимком; обе подсистемы приводят внешние данные к `Model.Info`, но по разным правилам.
-- `packages/core/src/modal/models.ts` — соседний приводитель каталога: там тоже цены пересчитываются, но множитель другой и приходят они с другого источника.
-- `packages/core/docs/models-dev.md` — документ по встроенному снимку каталога OpenCode.
+- `packages/core/src/github-copilot/models.ts` — called by the provider plugin `packages/core/src/plugin/provider/github-copilot.ts` (neighboring the other files in `packages/core/src/plugin/provider/`).
+- `packages/core/src/model.ts` and `packages/core/src/provider.ts` — `Model.Info`, `Model.VariantID`, `Provider.ID.githubCopilot`, `Provider.aisdk`, `Provider.mergeOverlay` and `Model.Info.default`.
+- `packages/schema/src/money.ts` — `Money.USDPerMillionTokens`, into which the prices are converted.
+- `packages/core/src/aisdk-native.ts` — the table of correspondence of specifiers to `@opencode/ai` packages, where `@ai-sdk/anthropic` maps to `@opencode/ai/providers/anthropic`: exactly this specifier is chosen for models with the `messages` endpoint, that is for those for which Copilot reports support of `/v1/messages`.
+- `packages/core/src/model-resolver.ts` — parses these specifiers and separately handles the pair `@opencode/ai/providers/anthropic` and `@opencode/ai/providers/anthropic-compatible`.
+- `@ai-sdk/provider` and `@ai-sdk/provider-utils` — the `LanguageModelV3` contract, `UnsupportedFunctionalityError`, `postJsonToApi`, `parseProviderOptions`, `createEventSourceResponseHandler`.
+- `zod/v4` — all the shape checks: provider options, built-in tool arguments, response and chunk schemas.
+- `packages/core/src/models-dev.ts` — a neighboring model catalog loader working with the built-in snapshot; both subsystems bring external data to `Model.Info`, but by different rules.
+- `packages/core/src/modal/models.ts` — a neighboring catalog converter: there the prices are also recalculated, but the multiplier is different and they come from another source.
+- `packages/core/docs/models-dev.md` — the document about the built-in snapshot of the OpenCode catalog.
 
-## Ловушки
+## Pitfalls
 
-- В `models.ts` модель с неизвестной ценой получает нулевую цену, а не «неизвестно». Статистика расходов по такой модели покажет ноль как достоверное число.
-- Фильтр `usable` отбрасывает модели без `tool_calls` молча. Для провайдера, который не публикует эту возможность вовсе, список окажется пустым, и причина будет выглядеть как пустой ответ.
-- Локальные псевдонимы удаляются вместе с исходной моделью: проверка идёт по `modelID` ответа. Удаление одной модели из каталога Copilot убирает все её локальные варианты.
-- `tools` в chat-реализации при пустом массиве превращается в `undefined`, а не в пустой список. Провайдер не получает поле `tools`.
-- `reasoning_opaque` допускается только один на ответ, и второе значение бросает исключение прямо в потоке. Многоходовое рассуждение держится на непрозрачном значении от первого хода, а не от последнего.
-- Идентификаторы `reasoning-0` и `txt-0` в chat-потоке фиксированы. Если один и тот же поток читают два потребителя, идентификаторы у них совпадут.
-- `include` в responses добавляется автоматически. Если провайдер не понимает поле `include` целиком, отказ будет выглядеть как ошибка запроса, хотя причина в автодобавлении.
-- При `store: false` результаты встроенных инструментов не отправляются обратно, а только помечаются предупреждением. Многоходовой разговор с `code_interpreter` в этом режиме теряет состояние без явного сообщения об ошибке.
-- События потока, не попавшие ни в одну известную схему, проглатываются запасным вариантом схемы. Новый тип события провайдера не даст ошибки и не попадёт в результат.
-- `computer_use` не берётся из конфигурации: переименовать этот инструмент нельзя, попытка приведёт к расхождению имён между запросом и разбором ответа.
-- Ответ с кодом 200 и заполненным `error` превращается в `APICallError` со статусом 400. Любая логика повторов, смотрящая на настоящий HTTP-статус, этот случай не увидит.
-- Разбор цен в `models.ts` зависит от `batch_size`: при его отсутствии множитель равен нулю и цены обнуляются, даже если сами значения `input_price` и `output_price` пришли.
-- Вариант `max` в моделях Copilot использует `max_thinking_budget - 1`. Значение `max_thinking_budget` равное нулю даст отрицательный бюджет, и отправка такого варианта будет отклонена API.
-- `fileIdPrefixes` в `responses/openai-config.ts` не заданы по умолчанию: без них любая строка в данных файла трактуется как содержимое, а не как идентификатор. Для Azure-подобных адресов префиксы надо задавать явно.
-- Запрещённые правила репозитория соблюдены: код ядра не менялся, в папке только чтение. В тексте этих файлов есть собственные пометки о незавершённой работе — они относятся к исходникам Copilot, а не к документации.
+- In `models.ts` a model with an unknown price gets a zero price, not "unknown". The expense statistics for such a model will show zero as a reliable number.
+- The `usable` filter silently discards models without `tool_calls`. For a provider that does not publish this capability at all, the list will be empty, and the reason will look like an empty response.
+- Local aliases are removed together with the original model: the check goes by the `modelID` of the response. Removing one model from the Copilot catalog removes all of its local variants.
+- `tools` in the chat implementation with an empty array turns into `undefined`, not into an empty list. The provider does not get the `tools` field.
+- `reasoning_opaque` is allowed only one per response, and a second value throws an exception right in the stream. Multi-turn reasoning is held on the opaque value from the first turn, not from the last.
+- The identifiers `reasoning-0` and `txt-0` in the chat stream are fixed. If two consumers read the same stream, their identifiers will coincide.
+- `include` in responses is added automatically. If the provider does not understand the `include` field as a whole, the refusal will look like a request error, although the reason is the auto-adding.
+- At `store: false` the results of built-in tools are not sent back, only marked with a warning. A multi-turn conversation with `code_interpreter` in this mode loses state without an explicit error message.
+- Stream events that did not fall into any known schema are swallowed by the fallback schema variant. A new provider event type will not give an error and will not get into the result.
+- `computer_use` is not taken from the configuration: this tool cannot be renamed, an attempt will lead to a mismatch of names between the request and the response parsing.
+- A response with code 200 and a filled `error` turns into an `APICallError` with status 400. Any retry logic looking at the real HTTP status will not see this case.
+- Price parsing in `models.ts` depends on `batch_size`: in its absence the multiplier is zero and the prices are zeroed out, even if the `input_price` and `output_price` values themselves arrived.
+- The `max` variant in Copilot models uses `max_thinking_budget - 1`. A `max_thinking_budget` value equal to zero will give a negative budget, and sending such a variant will be rejected by the API.
+- `fileIdPrefixes` in `responses/openai-config.ts` are not set by default: without them any string in the file data is treated as content, not as an identifier. For Azure-like addresses the prefixes must be set explicitly.
+- The forbidden repository rules are respected: the core code was not changed, the folder is read only. The text of these files has its own notes about unfinished work — they refer to the Copilot sources, not to the documentation.

@@ -1,70 +1,74 @@
-# @opencode/script — версии и каналы релизов
+# @opencode/script — release versions and channels
 
-## Что это
+## What This Is
 
-Однострочный пакет: 1 файл `src/index.ts`, 88 строк. Это не библиотека для ядра,
-а скрипт сборки, который вычисляет, какой версии и канала достиг текущая сборка.
-Отсюда приходят номера для npm-релизов и превью-сборок.
+A single-file package: 1 file `src/index.ts`, 88 lines. This is not a library
+for the core, but a build script that computes which version and channel the
+current build has reached. The numbers for npm releases and preview builds
+come from here.
 
-Экспортирует один объект `Script` со свойствами `channel`, `version`, `preview`,
-`release`, `team`. При импорте скрипт сразу печатает вычисленные значения в stdout
-(`console.log` в конце файла) — это штатный способ передать данные CI.
+It exports a single object `Script` with the properties `channel`, `version`,
+`preview`, `release`, `team`. On import the script immediately prints the
+computed values to stdout (`console.log` at the end of the file) — this is the
+standard way to hand data to CI.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L0 — лист**: от пакетов `@opencode/*` не зависит. Единственная зависимость
-во время выполнения — `semver`, плюс Bun-API (`import { $ } from "bun"`).
+Layer **L0 — leaf**: does not depend on `@opencode/*` packages. The only runtime
+dependency is `semver`, plus the Bun API (`import { $ } from "bun"`).
 
-Кто подключает пакет:
+Who depends on the package:
 
-- корневой `package.json` (workspace-зависимость),
+- the root `package.json` (workspace dependency),
 - `packages/cli/package.json`.
 
-В `src` ни одного импорта `@opencode/script` нет: пакет запускается как скрипт,
-а не как модуль ядра.
+In `src` there is not a single `@opencode/script` import: the package is run as
+a script, not used as a core module.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-Единственный файл `packages/script/src/index.ts` делает четыре вещи по порядку:
+The only file `packages/script/src/index.ts` does four things in order:
 
-1. **Проверка версии Bun.** Читает поле `packageManager` из корневого
-   `package.json`, сверяет с `process.versions.bun` через `semver.satisfies`
-   (`^x.y.z`) и падает, если версия Bun не подходит.
-2. **Выбор канала.** Переменные окружения `OPENCODE_CHANNEL`, `OPENCODE_BUMP`,
-   `OPENCODE_VERSION`, `OPENCODE_RELEASE`; если канал не задан — берётся имя
-   текущей git-ветки (`git branch --show-current`), иначе `local`. Канал
-   `latest` означает обычный релиз, всё остальное — превью.
-3. **Вычисление версии.** Для превью — `0.0.0-<канал>-<номер сборки>`; номер
-   берётся из `GITHUB_RUN_NUMBER` (и `GITHUB_RUN_ATTEMPT`), а при локальном
-   запуске — из текущего времени. Для релиза версия запрашивается у npm
-   registry (`@opencode/cli/latest`) и инкрементируется по `OPENCODE_BUMP`:
-   `major`/`minor`/`patch` (по умолчанию patch). Порог `2.0.0` — минимальная
-   версия, ниже неё не опускаемся.
-4. **Список команды.** Читает `.github/TEAM_MEMBERS` (строки, `#` — комментарий)
-   и добавляет ботов `actions-user`, `opencode`, `opencode-agent[bot]`.
+1. **Bun version check.** Reads the `packageManager` field from the root
+   `package.json`, compares it with `process.versions.bun` via `semver.satisfies`
+   (`^x.y.z`) and fails if the Bun version does not fit.
+2. **Channel selection.** The environment variables `OPENCODE_CHANNEL`,
+   `OPENCODE_BUMP`, `OPENCODE_VERSION`, `OPENCODE_RELEASE`; if the channel is
+   not set — the name of the current git branch is taken (`git branch --show-current`),
+   otherwise `local`. The `latest` channel means a regular release, everything
+   else — a preview.
+3. **Version computation.** For a preview — `0.0.0-<channel>-<build number>`; the number
+   is taken from `GITHUB_RUN_NUMBER` (and `GITHUB_RUN_ATTEMPT`), and on a local
+   run — from the current time. For a release the version is requested from the npm
+   registry (`@opencode/cli/latest`) and incremented by `OPENCODE_BUMP`:
+   `major`/`minor`/`patch` (patch by default). The `2.0.0` threshold is the minimum
+   version, we do not go below it.
+4. **Team list.** Reads `.github/TEAM_MEMBERS` (lines, `#` — a comment)
+   and adds the bots `actions-user`, `opencode`, `opencode-agent[bot]`.
 
-## Точки входа
+## Entry Points
 
-1. `packages/script/src/index.ts` — единственный файл, он же точка входа из
-   `exports` (`".": "./src/index.ts"`).
-2. Импорт происходит только из скриптов сборки: корневой `package.json` и
+1. `packages/script/src/index.ts` — the only file, and at the same time the entry
+   point from `exports` (`".": "./src/index.ts"`).
+2. The import happens only from build scripts: the root `package.json` and
    `packages/cli/package.json`.
-3. `Script` — единственный именованный экспорт.
+3. `Script` — the only named export.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/cli/PACKAGE.md` — потребитель скрипта: команды CLI, упакованные в
-  релиз.
-- `.github/` в корне репозитория — воркфлоу, где задаются `OPENCODE_VERSION`
-  и `GITHUB_RUN_NUMBER`.
-- `packages/util/PACKAGE.md` — общий слой, откуда ядро берёт пути и хеши.
+- `packages/cli/PACKAGE.md` — the consumer of the script: the CLI commands packaged
+  into a release.
+- `.github/` in the repository root — the workflow where `OPENCODE_VERSION`
+  and `GITHUB_RUN_NUMBER` are set.
+- `packages/util/PACKAGE.md` — the shared layer the core takes paths and hashes from.
 
-## Ловушки
+## Pitfalls
 
-1. **Скрипт выполняется при импорте.** Строки верхнего уровня делают `fetch`
-   к npm registry и запускают git — импорт из теста или песочницы уйдёт в сеть.
-2. **Версия превью зависит от окружения.** Без `GITHUB_RUN_NUMBER` номер
-   собирается из timestamp, то есть две сборки в одну минуту дадут одинаковый
-   номер.
-3. **`console.log` в конце файла** — не отладка, а контракт: CI читает вывод.
-   Убирать нельзя.
+1. **The script runs on import.** Top-level lines do `fetch`
+   to the npm registry and run git — an import from a test or a sandbox will hit
+   the network.
+2. **A preview version depends on the environment.** Without `GITHUB_RUN_NUMBER` the number
+   is assembled from the timestamp, that is, two builds within one minute give the same
+   number.
+3. **`console.log` at the end of the file** is not debugging, it is a contract: CI reads
+   the output. It must not be removed.

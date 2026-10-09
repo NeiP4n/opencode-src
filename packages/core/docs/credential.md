@@ -1,34 +1,34 @@
-# core/credential — хранение учётных данных интеграций в SQLite
+# core/credential — storage of integration credentials in SQLite
 
-## Что в папке
+## What's In This Folder
 
-- `sql.ts` — единственный файл: схема таблицы `credential` на drizzle-orm sqlite.
-- Рантайм-логики в папке нет: чтение и запись живут в корневом `packages/core/src/credential.ts`.
+- `sql.ts` — the only file: the drizzle-orm sqlite schema of the `credential` table.
+- There is no runtime logic in the folder: reading and writing live in the root `packages/core/src/credential.ts`.
 
-## Ключевые файлы
+## Key Files
 
 - `packages/core/src/credential/sql.ts` — `CredentialTable`.
-- `packages/core/src/credential.ts` — сервис, который читает и пишет эту таблицу.
+- `packages/core/src/credential.ts` — the service that reads and writes this table.
 
-## Важные детали
+## Important Details
 
-- Колонки таблицы: `id` (primary key, тип `Credential.ID` из `packages/core/src/credential.ts`), `integration_id`, `label`, `value`, `connector_id`, `method_id`, `active`, плюс общий набор `Timestamps` из `packages/core/src/database/schema.sql.ts`.
-- `value` — колонка `text({ mode: "json" })` с типом `Credential.Value`: секрет лежит как JSON-значение, а не как строка. Тип приходит `import type`-ом, то есть на этапе построения таблицы это только аннотация колонки.
-- `label` объявлен `.notNull()`, а `integration_id`, `connector_id`, `method_id` и `active` — без обязательности. `active` при этом `integer({ mode: "boolean" })`, то есть принимает значения 0/1 и может быть `null`: в SQLite это не то же самое, что `false`.
-- Схема читает только типы и ничего не импортирует сервисы: единственная зависимость папки — `packages/core/src/database/schema.sql.ts` (набор `Timestamps`).
-- Таблица объявлена в терминах сущностей ядра (`Credential.ID`, `Credential.Value`), а не в терминах прикладного домена. Схема таблицы не знает, что такое интеграция и чем она авторизуется.
+- The table columns: `id` (primary key, of type `Credential.ID` from `packages/core/src/credential.ts`), `integration_id`, `label`, `value`, `connector_id`, `method_id`, `active`, plus the shared `Timestamps` set from `packages/core/src/database/schema.sql.ts`.
+- `value` is a `text({ mode: "json" })` column with the type `Credential.Value`: the secret sits as a JSON value, not as a string. The type comes by an `import type`, that is, at the table build stage it is only a column annotation.
+- `label` is declared `.notNull()`, while `integration_id`, `connector_id`, `method_id` and `active` are optional. `active` is at the same time `integer({ mode: "boolean" })`, that is, it accepts the values 0/1 and can be `null`: in SQLite that is not the same as `false`.
+- The schema only reads types and imports no services: the only dependency of the folder is `packages/core/src/database/schema.sql.ts` (the `Timestamps` set).
+- The table is declared in terms of core entities (`Credential.ID`, `Credential.Value`), not in terms of the application domain. The table schema does not know what an integration is or what authorizes it.
 
-## Связи
+## Connections
 
-- `packages/core/src/credential.ts` — единственный потребитель `CredentialTable` (проверено поиском по имени таблицы по `packages/core/src`).
-- `packages/core/src/config.ts` — подписан на `Credential.Event.Switched` и перечитывает конфиг, когда сменилась учётная запись интеграции, участвующей в wellknown-конфиге.
-- `packages/core/src/config.ts` — при загрузке wellknown-записи берёт последнюю учётную запись интеграции и требует, чтобы `credential.value.type === "key"`: записи других типов конфиг не подменяют.
-- `packages/core/docs/permission.md` — соседний по смыслу механизм: разрешения, сохранённые пользователем, тоже живут в SQLite, но по проекту.
-- `packages/core/docs/account.md` — другая таблица с токенами; она не используется (см. ловушки).
+- `packages/core/src/credential.ts` — the only consumer of `CredentialTable` (verified by searching the table name over `packages/core/src`).
+- `packages/core/src/config.ts` — subscribes to `Credential.Event.Switched` and re-reads the config when the account of an integration taking part in a wellknown config has changed.
+- `packages/core/src/config.ts` — when loading a wellknown entry it takes the latest credential of the integration and requires `credential.value.type === "key"`: entries of other types do not substitute the config.
+- `packages/core/docs/permission.md` — a neighboring mechanism in meaning: permissions saved by the user also live in SQLite, but per project.
+- `packages/core/docs/account.md` — another table with tokens; it is unused (see the pitfalls).
 
-## Ловушки
+## Pitfalls
 
-- Таблица не объявляет внешних ключей на `integration_id`, `connector_id`, `method_id`: целостность связей держит код, а не СУБД.
-- `active` допускает `null`. Код, читающий его как флаг, обязан сам решить, что значит отсутствие значения.
-- Тип `Credential.Value` навязан аннотацией `$type`, а не проверкой: значение, записанное в таблицу вопреки схеме, декодировать потом нечем.
-- Общих потребителей у таблицы ровно один, поэтому любая правка колонок ломает только `credential.ts` — но правка в обратную сторону (чтение поля, которого нет в таблице) ломается уже на уровне типов.
+- The table declares no foreign keys on `integration_id`, `connector_id`, `method_id`: the integrity of the relations is held by the code, not by the database.
+- `active` admits `null`. Code reading it as a flag must itself decide what the absence of a value means.
+- The type `Credential.Value` is imposed by a `$type` annotation, not by a check: a value written into the table against the schema will have nothing to decode it later.
+- The table has exactly one consumer in common, so any edit of the columns breaks only `credential.ts` — but an edit in the other direction (reading a field that is not in the table) already breaks at the type level.

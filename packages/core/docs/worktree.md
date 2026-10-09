@@ -1,72 +1,72 @@
-# core/worktree — рабочие копии: стратегии создания, слой сервиса и таблица
+# core/worktree — working copies: the creation strategies, the service layer and the table
 
-## Что в папке
+## What's In This Folder
 
-Четыре файла. Две реализации стратегий работы с рабочими копиями (сейчас только
-git), слой сервиса с редактируемым состоянием и таблица drizzle. Общий смысл:
-локация может работать не в корне проекта, а в отдельной рабочей копии, и
-способ её создания выбирается стратегией, а не зашитым вызовом git.
+Four files. Two implementations of the strategies of working with the working copies (currently only
+git), the service layer with an editable state and a drizzle table. The general meaning:
+a location can work not at the root of the project, but in a separate working copy, and
+the way it is created is chosen by a strategy, and not by a hardcoded git call.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/worktree/strategies.ts` — тип `Strategy` (`create`,
-  `remove`, `list`), тип `Editor`, интерфейс `Interface`, сервис
+- `packages/core/src/worktree/strategies.ts` — the type `Strategy` (`create`,
+  `remove`, `list`), the type `Editor`, the interface `Interface`, the service
   `@opencode/WorktreeStrategies`, `node`.
-- `packages/core/src/worktree/git.ts` — `make()`: реализация стратегии с
+- `packages/core/src/worktree/git.ts` — `make()`: the implementation of the strategy with
   `id` = `git`.
-- `packages/core/src/worktree/directory.ts` — `canonical` и ошибка
+- `packages/core/src/worktree/directory.ts` — `canonical` and the error
   `Worktree.DirectoryUnavailableError`.
-- `packages/core/src/worktree/sql.ts` — таблица `WorktreeTable` для sqlite.
+- `packages/core/src/worktree/sql.ts` — the `WorktreeTable` for sqlite.
 
-## Важные детали
+## Important Details
 
-- `Strategy` — три операции: `create` (из `sourceDirectory` сделать
-  `directory`, опционально на ветке), `remove` (с `force`) и `list` (список
-  записей). Все возвращают `Effect` с неизвестным каналом ошибок.
-- Сервис состояния: имя `worktree`, начальное значение задаёт каталог рабочей
-  копии, карту стратегий с одной записью `git` и выбранный `selected`.
-  Каталог по умолчанию собирается как `Global.data` + `worktree` + первые
-  6 символов id проекта.
-- Редактор состояния: `configure` меняет каталог, `add` регистрирует новую
-  стратегию и сразу делает её выбранной. Замена стратегии с тем же `id`
-  удаляет прежнюю запись из карты.
-- `canonical` разрешает путь через `FSUtil.resolve`, требует, чтобы он был
-  каталогом, и иначе падает `DirectoryUnavailableError` с исходным, а не
-  разрешённым путём.
-- `create` в git-стратегии сначала ищет репозиторий через `repo.discover`;
-  если его нет — `DirectoryUnavailableError`. Само создание делегировано
-  `git.worktree.create`, а наружу отдаётся уже канонизированный каталог.
-- `list` перечисляет записи рабочих копий и для каждой канонизирует каталог;
-  запись, каталог которой исчез, отбрасывается через
+- `Strategy` is three operations: `create` (from `sourceDirectory` make
+  `directory`, optionally on a branch), `remove` (with `force`) and `list` (a list of
+  the records). All of them return an `Effect` with an unknown error channel.
+- The state service: the name `worktree`, the initial value sets the directory of the working
+  copy, the map of the strategies with one entry `git` and the chosen `selected`.
+  The default directory is assembled as `Global.data` + `worktree` + the first
+  6 characters of the project id.
+- The state editor: `configure` changes the directory, `add` registers a new
+  strategy and immediately makes it chosen. A replacement of a strategy with the same `id`
+  removes the previous record from the map.
+- `canonical` resolves the path via `FSUtil.resolve`, requires that it be a
+  directory, and otherwise falls with `DirectoryUnavailableError` with the original, and not
+  the resolved, path.
+- `create` in the git strategy first looks for the repository via `repo.discover`;
+  if there is none — `DirectoryUnavailableError`. The creation itself is delegated
+  to `git.worktree.create`, and the already canonicalized directory is handed outward.
+- `list` enumerates the records of the working copies and canonicalizes the directory for each;
+  a record whose directory has disappeared is discarded via
   `Effect.catchTag("Worktree.DirectoryUnavailableError", ...)`.
-- Тип записи выводится из вида записи git: `main` становится `root`, всё
-  остальное — `worktree`.
-- Таблица `worktree` составная: первичный ключ из `project_id` и `directory`,
-  внешний ключ на проект с удалением каскадом, каталог хранится колонкой
-  абсолютного пути, стратегия — текстом, время создания — с default
+- The type of a record is derived from the kind of the git record: `main` becomes `root`, everything
+  else — `worktree`.
+- The `worktree` table is composite: a primary key from `project_id` and `directory`,
+  a foreign key to the project with a cascade delete, the directory is stored by an absolute path column,
+  the strategy — by text, the creation time — with the default
   `Date.now()`.
 
-## Связи
+## Connections
 
-- Стратегия `git` зависит от сервисов `Git` и `FSUtil`, слой — ещё и от
-  `Location` и `Global`; список зависимостей узла: `Location.node`, `Global.node`,
+- The `git` strategy depends on the services `Git` and `FSUtil`, the layer — also on
+  `Location` and `Global`; the list of the dependencies of the node: `Location.node`, `Global.node`,
   `Git.node`, `FSUtil.node`.
-- `sql.ts` ссылается на таблицу проекта и на колонку абсолютного пути из
-  `../database/path.js`, поэтому каталоги в базе пишутся тем же форматом, что и
-  остальные пути ядра.
-- Домены и id приходят из `@opencode/schema/worktree`; тип пути — `AbsolutePath`
-  из `../schema.js`.
-- Состояние общее с остальным ядром через `State.create` с именем `worktree`.
+- `sql.ts` refers to the project table and to the absolute path column from
+  `../database/path.js`, therefore the directories in the database are written in the same format as
+  the other paths of the core.
+- The domains and the ids come from `@opencode/schema/worktree`; the path type is `AbsolutePath`
+  from `../schema.js`.
+- The state is shared with the rest of the core via `State.create` with the name `worktree`.
 
-## Ловушки
+## Pitfalls
 
-- Стратегия — вещь, добавляемая в рантайме: `add` переключает `selected`, и
-  всё, что читало каталог до этого, работает со старым значением.
-- Каталог по умолчанию обрезает id проекта до 6 символов — длинные id разных
-  проектов могут дать один и тот же каталог, если совпадёт префикс.
-- `list` молча выбрасывает записи с недоступным каталогом: число записей может
-  не совпасть с `git worktree list`, и это не ошибка.
-- `canonical` в ответе `create` может отличаться от запрошенного каталога
-  (симлинки, относительный путь) — возвращать наружу надо именно его.
-- `DirectoryUnavailableError` не в списке типовых ошибок стратегии: он
-  выходит как часть канала `unknown` и обрабатывается по тегу.
+- A strategy is a thing added at runtime: `add` switches `selected`, and
+  everything that read the directory before that works with the old value.
+- The default directory cuts the project id to 6 characters — the long ids of different
+  projects can give one and the same directory if the prefixes coincide.
+- `list` silently discards the records with an unavailable directory: the number of the records may
+  not coincide with `git worktree list`, and that is not an error.
+- The `canonical` in the answer of `create` may differ from the requested directory
+  (symlinks, a relative path) — it is exactly it that must be returned outward.
+- `DirectoryUnavailableError` is not in the list of the typical errors of a strategy: it
+  comes out as a part of the `unknown` channel and is handled by the tag.

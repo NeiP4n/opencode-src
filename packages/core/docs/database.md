@@ -1,76 +1,76 @@
-# core/database — доступ к SQLite на Drizzle и Effect: сервис базы, адаптеры рантаймов, миграции и перенос данных V1 → V2
+# core/database — access to SQLite on Drizzle and Effect: database service, runtime adapters, migrations and V1 → V2 data transfer
 
-## Что в папке
+## What's In This Folder
 
-77 файлов `.ts` в четырёх слоях:
+77 `.ts` files in four layers:
 
-- сервис и запуск: `database.ts`, `sqlite.ts`, `sqlite.bun.ts`, `sqlite.node.ts`, `sqlite.workerd.ts`.
-- типы колонок и общие куски схемы: `path.ts`, `schema.sql.ts`.
-- форк Drizzle под Effect: `drizzle.ts`, `drizzle/index.ts`, `drizzle/effect-sqlite/`, `drizzle/internal/`, `drizzle/sqlite-core/effect/`.
-- миграции и перенос данных: `migration.ts`, `migration.gen.ts`, `schema.gen.ts`, `migration/`, `v1-migration.ts`, `v1-migration.bun.ts`, `v1-migration.noop.ts`.
+- service and startup: `database.ts`, `sqlite.ts`, `sqlite.bun.ts`, `sqlite.node.ts`, `sqlite.workerd.ts`.
+- column types and shared schema pieces: `path.ts`, `schema.sql.ts`.
+- a Drizzle fork under Effect: `drizzle.ts`, `drizzle/index.ts`, `drizzle/effect-sqlite/`, `drizzle/internal/`, `drizzle/sqlite-core/effect/`.
+- migrations and data transfer: `migration.ts`, `migration.gen.ts`, `schema.gen.ts`, `migration/`, `v1-migration.ts`, `v1-migration.bun.ts`, `v1-migration.noop.ts`.
 
-## Ключевые файлы
+## Key Files
 
-- `database.ts` — сервис `Database.Service` (токен `@opencode/storage/Database`, `Interface` с полем `db`), слои `layer`, `layerFromClient`, `configured`, `configuredClient`, `node`; прагмы при старте, `restrictToOwner`, семафоры по пути файла.
-- `sqlite.ts` — общий каркас адаптеров: сервис `Sqlite.Native`, `makeConnection`, `makeClient` (семафор, `acquirer`, `transactionAcquirer`, `spanAttributes` с `db.system.name = sqlite`).
-- `sqlite.bun.ts`, `sqlite.node.ts`, `sqlite.workerd.ts` — три реализации поверх `bun:sqlite`, `node:sqlite` и хранилища Durable Object; каждая объявляет `supportsTuningPragmas` и `supportsForeignKeyToggle`.
-- `migration.ts` — `apply` и `applyOnly`, ведение журнала в таблице `migration`, перенос отметок из `__drizzle_migrations`.
-- `migration.gen.ts` — массив `migrations` из 48 миграций (`m00`…`m47`), порядок применения.
-- `migration/` — 58 файлов миграций, каждый экспортирует `{ id, foreignKeys?, up }` и выполняет SQL через `tx.run`.
-- `schema.gen.ts` — bootstrap-схема целиком: 19 таблиц и 16 индексов, одной функцией `up`.
-- `v1-migration.bun.ts` — перенос V1-базы (таблицы `message`, `part`) в V2 (`session_message`), плюс импорт соседнего `opencode-next.db`.
-- `path.ts` — колонки `absoluteColumn`, `directoryColumn`, `pathColumn`, `absoluteArrayColumn`.
-- `schema.sql.ts` — `Timestamps` с `time_created` и `time_updated`.
-- `drizzle/effect-sqlite/driver.ts` — `make` и `makeWithDefaults`, `DefaultServices`.
+- `database.ts` — the `Database.Service` service (token `@opencode/storage/Database`, `Interface` with a `db` field), the layers `layer`, `layerFromClient`, `configured`, `configuredClient`, `node`; pragmas at startup, `restrictToOwner`, semaphores per file path.
+- `sqlite.ts` — the shared frame of the adapters: the `Sqlite.Native` service, `makeConnection`, `makeClient` (semaphore, `acquirer`, `transactionAcquirer`, `spanAttributes` with `db.system.name = sqlite`).
+- `sqlite.bun.ts`, `sqlite.node.ts`, `sqlite.workerd.ts` — three implementations on top of `bun:sqlite`, `node:sqlite` and Durable Object storage; each declares `supportsTuningPragmas` and `supportsForeignKeyToggle`.
+- `migration.ts` — `apply` and `applyOnly`, keeping the log in the `migration` table, carrying marks over from `__drizzle_migrations`.
+- `migration.gen.ts` — the `migrations` array of 48 migrations (`m00`…`m47`), the order of application.
+- `migration/` — 58 migration files, each exports `{ id, foreignKeys?, up }` and runs SQL through `tx.run`.
+- `schema.gen.ts` — the whole bootstrap schema: 19 tables and 16 indexes, in a single `up` function.
+- `v1-migration.bun.ts` — transfer of a V1 database (tables `message`, `part`) into V2 (`session_message`), plus the import of a neighboring `opencode-next.db`.
+- `path.ts` — the columns `absoluteColumn`, `directoryColumn`, `pathColumn`, `absoluteArrayColumn`.
+- `schema.sql.ts` — `Timestamps` with `time_created` and `time_updated`.
+- `drizzle/effect-sqlite/driver.ts` — `make` and `makeWithDefaults`, `DefaultServices`.
 - `drizzle/effect-sqlite/session.ts` — `EffectSQLiteSession`, `EffectSQLiteTransaction`, `managesTransactionsNatively`.
-- `drizzle/sqlite-core/effect/` — билдеры `select`, `insert`, `update`, `delete`, `count`, `query`, `raw`, `session`, `db`.
-- `drizzle/internal/drizzle-utils.ts` — работа с приватными символами Drizzle и JIT-проверка среды.
+- `drizzle/sqlite-core/effect/` — the builders `select`, `insert`, `update`, `delete`, `count`, `query`, `raw`, `session`, `db`.
+- `drizzle/internal/drizzle-utils.ts` — work with Drizzle's private symbols and a JIT check of the environment.
 
-## Важные детали
+## Important Details
 
-- Старт файловой базы: при `supportsTuningPragmas` выполняются `PRAGMA journal_mode = WAL`, `synchronous = NORMAL`, `busy_timeout = 5000`, `cache_size = -64000`, `wal_checkpoint(PASSIVE)`; при `supportsForeignKeyToggle` — `PRAGMA foreign_keys = ON`. Дальше под локом применяются миграции.
-- Лок базы привязан к конкретной базе, а не к модулю: файловые базы делят семафор по пути из `Map`, `:memory:` получает свой. Причина в комментарии — в workerd у всех объектов изолята общее состояние модуля, и освобождение общего семафора будит ожидающий fiber в контексте чужого I/O.
-- `restrictToOwner` выставляет `0600` на файл и на `-wal`/`-shm`; на win32 ничего не делает. Отсутствующий файл создаётся синхронно (`openSync`/`closeSync`), иначе другое волокно успеет его открыть; комментарий отмечает, что открытие и закрытие готовой базы снимают POSIX-блокировки чужого соединения.
-- `apply` выбирает ветку по таблице `session` или `session_v2`: если такой таблицы нет и база непустая — `Effect.die` с сообщением «Database is not empty and has no session table»; если таблиц нет вообще — выполняется полный bootstrap: `schema.gen.ts`, таблица `migration` и отметка всех миграций сразу. Системные таблицы и имена с ведущим подчёркиванием игнорируются — namespace без префикса принадлежит OpenCode.
-- `applyOnly` при пустом журнале один раз переносит отметки из `__drizzle_migrations`: либо напрямую из колонки `name`, либо сопоставляя `created_at` с префиксом `id` вида `ГГГГММДДЧЧММСС`; несовпадение — `Effect.die`. Дальше каждая незаписанная миграция выполняется в транзакции вместе с записью её `id` и временем.
-- Миграции с `foreignKeys: false` идут с ослаблением проверки: `PRAGMA foreign_keys = OFF` там, где переключение разрешено, иначе `PRAGMA defer_foreign_keys = ON`, с восстановлением в `ensuring`.
-- Миграция `20260804233008_loose_psylocke` — развилка: при наличии в журнале маркера `20260730195856_optional_session_title` она переименовывает `session` в `session_v2` на месте (проверяя, что нет V1-истории без V2-проекции), иначе собирает весь V2-набор таблиц и индексов.
-- Миграция `20260805200742_import_legacy_credentials` читает `auth.json` из `Global.data`, переносит записи `oauth`, `api`, `wellknown` в `credential`, а источники wellknown складывает в `kv` по ключу `wellknown:sources`; метод OAuth выбирается по имени интеграции: `openai` → `chatgpt-browser`, `github-copilot`, `opencode`, `xai` → `device`, иначе `oauth`.
-- `schema.gen.ts` создаёт `account`, `account_state`, `control_account`, `credential`, `event`, `event_sequence`, `kv`, `permission`, `project`, `project_directory`, `instruction_blob`, `instruction_entry`, `instruction_state`, `session_inbox`, `session_message`, `session_pending`, `session_v2`, `workspace`, `worktree`. Уникальные индексы: `event_aggregate_seq_idx`, `session_message_session_seq_idx`, `session_pending_session_admitted_seq_idx`, `session_inbox_session_enqueued_seq_idx`, `permission_project_action_resource_idx`. Частичные: `session_pending_session_compaction_idx` (по `type = 'compaction'`) и `session_v2_time_suspended_idx`.
-- `v1-migration.bun.ts` считает миграцию нужной по наличию таблицы `session` в `sqlite_master`; состояние лежит в `kv` по ключу `migration.v1-v2` с курсором по `session.id`. Старая таблица `event` чистится порциями по 1000 строк. `transformSession` собирает сообщения типов `user`, `assistant`, `compaction`, `synthetic`, `system`, проставляет `seq` и водяной знак в `event_sequence`; битые строки не роняют перенос, а попадают в `warnings` и в лог. Переименования инструментов V1 → V2: `bash` → `shell`, `task` → `subagent`, `apply_patch` → `patch`, аргумент `filePath` → `path`, у `skill` аргумент `name` → `id`, старый инструмент списка дел упразднён; о переименованиях, встреченных в видимой истории, добавляется системное сообщение.
-- Импорт `opencode-next.db` идёт только для чтения, проверяет наличие `project`, `session`, `session_message`, а отсутствующие колонки проецирует через fallback или `NULL` (`icon_url_override` берётся из `icon_url`).
-- `path.ts`: `absolute` бросает исключение на не-абсолютном пути и понимает windows-пути на любой ОС; `directoryColumn` пропускает пустую строку ради легаси-сессий; `pathColumn` только меняет разделители; `absoluteArrayColumn` хранит JSON-массив и декодирует синхронной схемой.
-- Bun и Node читают целые по-разному: Bun — `statement.safeIntegers`, Node — `setReadBigInts` плюс `setReturnArrays(true)` для запросов значениями; оба берут флаг из сервиса `SqlClient.SafeIntegers`. В workerd этот флаг игнорируется, а `ArrayBuffer` из blob приводится к `Uint8Array`.
-- workerd-клиент помечен `transactionStatements: false`, поэтому сессия Drizzle не шлёт `BEGIN`/`COMMIT`/`SAVEPOINT`, а зовёт `withTransaction` поверх `storage.transaction`; вложенные транзакции — ошибка. В обычной сессии вложенность сделана через savepoint с ростом номера и честным `rollback to savepoint`.
-- Форк Drizzle: каждый класс-билдер в конце файла проходит через `applyEffectWrapper`, поэтому билдер сам является `Effect`. В `SQLiteEffectPreparedQuery` результат маппится JIT-маппером либо построчно; внутри транзакции кеш всегда выключен; ошибка оборачивается в `EffectDrizzleQueryError`. `SQLiteEffectTransaction.rollback()` возвращает `EffectTransactionRollbackError`.
-- `drizzle/internal/drizzle-utils.ts` достаёт приватные данные Drizzle через символы `Columns`, `IsAlias`, `Name`, `BaseName` и `ViewBaseConfig`; `jitCompatCheck` выключает JIT-мапперы, если в среде запрещён `new Function`.
+- Startup of a file database: with `supportsTuningPragmas` it runs `PRAGMA journal_mode = WAL`, `synchronous = NORMAL`, `busy_timeout = 5000`, `cache_size = -64000`, `wal_checkpoint(PASSIVE)`; with `supportsForeignKeyToggle` — `PRAGMA foreign_keys = ON`. Then the migrations are applied under the lock.
+- The database lock is bound to a specific database, not to the module: file databases share a semaphore by the path from a `Map`, `:memory:` gets its own. The reason is in the comment — in workerd all objects of an isolate share the module state, and releasing a shared semaphore wakes a waiting fiber in the context of someone else's I/O.
+- `restrictToOwner` sets `0600` on the file and on `-wal`/`-shm`; on win32 it does nothing. A missing file is created synchronously (`openSync`/`closeSync`), otherwise another fiber would open it first; the comment notes that opening and closing a ready database drops POSIX locks of a foreign connection.
+- `apply` chooses a branch by the table `session` or `session_v2`: if there is no such table and the database is not empty — `Effect.die` with the message «Database is not empty and has no session table»; if there are no tables at all — a full bootstrap runs: `schema.gen.ts`, the `migration` table and the mark of all migrations at once. System tables and names with a leading underscore are ignored — a namespace without a prefix belongs to OpenCode.
+- `applyOnly` with an empty log once carries marks over from `__drizzle_migrations`: either directly from the `name` column, or by matching `created_at` with the prefix of an `id` of the form `YYYYMMDDHHMMSS`; a mismatch is `Effect.die`. Then every unrecorded migration is run in a transaction together with the record of its `id` and time.
+- Migrations with `foreignKeys: false` go with the check weakened: `PRAGMA foreign_keys = OFF` where toggling is allowed, otherwise `PRAGMA defer_foreign_keys = ON`, with restoration in `ensuring`.
+- The migration `20260804233008_loose_psylocke` is a fork: if the log has the marker `20260730195856_optional_session_title`, it renames `session` to `session_v2` in place (checking that there is no V1 history without a V2 projection), otherwise it collects the whole V2 set of tables and indexes.
+- The migration `20260805200742_import_legacy_credentials` reads `auth.json` from `Global.data`, carries the `oauth`, `api`, `wellknown` entries over into `credential`, and folds the wellknown sources into `kv` under the key `wellknown:sources`; the OAuth method is chosen by the integration name: `openai` → `chatgpt-browser`, `github-copilot`, `opencode`, `xai` → `device`, otherwise `oauth`.
+- `schema.gen.ts` creates `account`, `account_state`, `control_account`, `credential`, `event`, `event_sequence`, `kv`, `permission`, `project`, `project_directory`, `instruction_blob`, `instruction_entry`, `instruction_state`, `session_inbox`, `session_message`, `session_pending`, `session_v2`, `workspace`, `worktree`. Unique indexes: `event_aggregate_seq_idx`, `session_message_session_seq_idx`, `session_pending_session_admitted_seq_idx`, `session_inbox_session_enqueued_seq_idx`, `permission_project_action_resource_idx`. Partial: `session_pending_session_compaction_idx` (on `type = 'compaction'`) and `session_v2_time_suspended_idx`.
+- `v1-migration.bun.ts` considers the migration needed by the presence of the table `session` in `sqlite_master`; the state lives in `kv` under the key `migration.v1-v2` with a cursor over `session.id`. The old table `event` is cleaned in portions of 1000 rows. `transformSession` collects messages of the types `user`, `assistant`, `compaction`, `synthetic`, `system`, sets `seq` and a watermark in `event_sequence`; broken rows do not bring the transfer down, they land in `warnings` and in the log. V1 → V2 tool renames: `bash` → `shell`, `task` → `subagent`, `apply_patch` → `patch`, the `filePath` argument → `path`, in `skill` the `name` argument → `id`, the old task-list tool is abolished; about the renames met in the visible history, a system message is added.
+- The import of `opencode-next.db` is read-only, checks for the presence of `project`, `session`, `session_message`, and missing columns are projected through a fallback or `NULL` (`icon_url_override` is taken from `icon_url`).
+- `path.ts`: `absolute` throws on a non-absolute path and understands windows paths on any OS; `directoryColumn` lets an empty string through for legacy sessions; `pathColumn` only changes the separators; `absoluteArrayColumn` stores a JSON array and decodes it with a synchronous schema.
+- Bun and Node read integers differently: Bun — `statement.safeIntegers`, Node — `setReadBigInts` plus `setReturnArrays(true)` for value queries; both take the flag from the `SqlClient.SafeIntegers` service. In workerd this flag is ignored, and an `ArrayBuffer` from a blob is cast to `Uint8Array`.
+- The workerd client is marked `transactionStatements: false`, so the Drizzle session does not send `BEGIN`/`COMMIT`/`SAVEPOINT` but calls `withTransaction` on top of `storage.transaction`; nested transactions are an error. In a regular session the nesting is done via a savepoint with an increasing number and an honest `rollback to savepoint`.
+- Drizzle fork: each builder class at the end of the file goes through `applyEffectWrapper`, so the builder itself is an `Effect`. In `SQLiteEffectPreparedQuery` the result is mapped by a JIT mapper or row by row; inside a transaction the cache is always off; an error is wrapped in `EffectDrizzleQueryError`. `SQLiteEffectTransaction.rollback()` returns `EffectTransactionRollbackError`.
+- `drizzle/internal/drizzle-utils.ts` pulls Drizzle's private data out through the symbols `Columns`, `IsAlias`, `Name`, `BaseName` and `ViewBaseConfig`; `jitCompatCheck` disables the JIT mappers if `new Function` is forbidden in the environment.
 
-## Связи
+## Connections
 
-- Условия импортов заданы в `packages/core/package.json`: `#sqlite` → `sqlite.workerd.ts`, `sqlite.bun.ts`, `sqlite.node.ts` (по умолчанию node), `#v1-migration` → полная реализация только для bun, `v1-migration.noop.ts` для node и workerd.
-- `database.ts` → `drizzle.ts` → `drizzle/index.ts` → `drizzle/effect-sqlite/driver.ts` и `session.ts` → `drizzle/sqlite-core/effect/session.ts` → `drizzle/sqlite-core/effect/db.ts` и остальные билдеры → `drizzle/internal/drizzle-utils.ts`.
-- `database.ts` → `migration.ts` → `migration.gen.ts` → `migration/`; `migration.ts` → `schema.gen.ts` и `#sqlite` за флагом `supportsForeignKeyToggle`.
+- The import conditions are set in `packages/core/package.json`: `#sqlite` → `sqlite.workerd.ts`, `sqlite.bun.ts`, `sqlite.node.ts` (node by default), `#v1-migration` → the full implementation only for bun, `v1-migration.noop.ts` for node and workerd.
+- `database.ts` → `drizzle.ts` → `drizzle/index.ts` → `drizzle/effect-sqlite/driver.ts` and `session.ts` → `drizzle/sqlite-core/effect/session.ts` → `drizzle/sqlite-core/effect/db.ts` and the other builders → `drizzle/internal/drizzle-utils.ts`.
+- `database.ts` → `migration.ts` → `migration.gen.ts` → `migration/`; `migration.ts` → `schema.gen.ts` and `#sqlite` behind the `supportsForeignKeyToggle` flag.
 - `v1-migration.bun.ts` → `session/sql.ts`, `kv/sql.ts`, `event/sql.ts`, `session/schema.ts`, `session/message.ts`, `@opencode/schema/session-v1`, `@opencode/schema/project`.
-- Колонки из `schema.sql.ts` и `path.ts` используют `account/sql.ts`, `credential/sql.ts`, `kv/sql.ts`, `permission/sql.ts`, `project/sql.ts`, `session/sql.ts`.
-- Сервис `Database.Service` потребляют `bus.ts`, `credential.ts`, `kv.ts`, `project.ts`, `session.ts` и файлы `session/`: `session/compaction.ts`, `session/context.ts`, `session/diff.ts`, `session/execution.ts`, `session/generate.ts`, `session/history.ts`, `session/inbox.ts`, `session/instruction-entry.ts`, `session/move.ts`, `session/projector.ts`, `session/revert.ts`, `session/session.ts`, `session/stats.ts`, `session/store.ts`, `session/runner/llm.ts`.
+- The columns from `schema.sql.ts` and `path.ts` are used by `account/sql.ts`, `credential/sql.ts`, `kv/sql.ts`, `permission/sql.ts`, `project/sql.ts`, `session/sql.ts`.
+- The `Database.Service` service is consumed by `bus.ts`, `credential.ts`, `kv.ts`, `project.ts`, `session.ts` and the `session/` files: `session/compaction.ts`, `session/context.ts`, `session/diff.ts`, `session/execution.ts`, `session/generate.ts`, `session/history.ts`, `session/inbox.ts`, `session/instruction-entry.ts`, `session/move.ts`, `session/projector.ts`, `session/revert.ts`, `session/session.ts`, `session/stats.ts`, `session/store.ts`, `session/runner/llm.ts`.
 
-## Ловушки
+## Pitfalls
 
-- `#sqlite` и `#v1-migration` резолвятся по рантайму: новый файл адаптера без записи в `packages/core/package.json` в сборку не попадёт.
-- В workerd запрещены `journal_mode`, `synchronous`, `busy_timeout`, `cache_size`, `wal_checkpoint` и `foreign_keys`. Настраивать их можно только через флаги `supportsTuningPragmas` и `supportsForeignKeyToggle`.
-- В workerd `sql.exec` отвергает `BEGIN`, `COMMIT` и `SAVEPOINT`: транзакция идёт только через `withTransaction`, вложенные транзакции не поддержаны вовсе.
-- workerd-адаптер не умеет открывать файл. Для Durable Object нужен `Database.layerFromClient` вместе со `sqliteLayer({ storage })`; попытка дать путь умирает с объяснением в `Effect.die`.
-- `runValues` в node требует `setReturnArrays(true)`: без флага значения приходят не массивами, и результат уезжает в типизацию.
-- SQLite создаёт сайдкары с правами базы, но уже существующие не ужесточает — поэтому `restrictToOwner` chmod-ит и `-wal`, и `-shm`, а отсутствующий файл создаёт синхронно перед правами.
-- Семафор из `locks` нельзя делать общим на модуль: в workerd освобождение будит ожидающий fiber в чужом контексте I/O, и его первый вызов storage отклоняется как cross-object I/O.
-- `apply` умирает на непустой базе без таблицы `session`: это чужая база или не та схема.
-- `id` миграции равен имени файла, а прогон определяется журналом: переименование файла заставит выполнить его повторно, а откатить уже применённые миграции нельзя.
-- Часть миграций необратимо стирает данные: `20260603040000_session_message_projection_order` удаляет `session_message`, `20260604172448_event_sourced_session_input` чистит `session_input`, `session_message`, `event`, `event_sequence` и `workspace`, `20260622202450_simplify_session_input` — то же. Миграция `20260603141458` с автоинкрементом заменяется таблицей без него.
-- Порядок применения задаётся только массивом `migrations` в `migration.gen.ts`: новый файл нужен и импортом, и элементом массива.
-- `insert`, `update`, `delete` без `returning()` дают результат запуска; `all()`, `get()`, `values()` без `returning()` — ошибка типа `DrizzleTypeError`.
-- Внутри транзакции кеш запросов всегда отключён: читать свежее состояние, а не кеш.
-- `jitCompatCheck` гасит JIT-мапперы, если среда запрещает `new Function`; в этом режиме строки маппит `mapResultRow` — медленнее, но корректно.
-- `drizzle/internal/drizzle-utils.ts` и весь `drizzle/sqlite-core/effect/` идут с `/* oxlint-disable */`: линтер здесь молчит, ошибки ловит только проверка типов. Плюс приватные символы Drizzle надо перепроверять после обновления `drizzle-orm`.
-- Статус V1-переноса выводится из наличия таблицы `session`, а на node и workerd всегда «completed»: там работает заглушка, а не перенос.
-- `directoryColumn` терпит пустую строку, `absoluteColumn` — нет: относительное значение из легаси-данных приведёт к исключению при записи.
-- В базе пути лежат со слэшами независимо от ОС, а `toPlatform` превращает их в обратные слэши только на Windows при чтении.
+- `#sqlite` and `#v1-migration` are resolved per runtime: a new adapter file without an entry in `packages/core/package.json` will not get into the build.
+- In workerd `journal_mode`, `synchronous`, `busy_timeout`, `cache_size`, `wal_checkpoint` and `foreign_keys` are forbidden. They can only be tuned through the flags `supportsTuningPragmas` and `supportsForeignKeyToggle`.
+- In workerd `sql.exec` rejects `BEGIN`, `COMMIT` and `SAVEPOINT`: a transaction goes only through `withTransaction`, nested transactions are not supported at all.
+- The workerd adapter cannot open a file. For a Durable Object you need `Database.layerFromClient` together with `sqliteLayer({ storage })`; an attempt to give a path dies with an explanation in `Effect.die`.
+- `runValues` in node requires `setReturnArrays(true)`: without the flag the values arrive not as arrays, and the result drifts into the typing.
+- SQLite creates sidecars with the rights of the database, but does not tighten the already existing ones — so `restrictToOwner` chmods both `-wal` and `-shm`, and creates a missing file synchronously before the rights.
+- The semaphore from `locks` cannot be shared module-wide: in workerd a release wakes a waiting fiber in a foreign I/O context, and its first storage call is rejected as cross-object I/O.
+- `apply` dies on a non-empty database without a `session` table: this is someone else's database or not the right schema.
+- The `id` of a migration equals the file name, and the run is determined by the log: renaming a file will make it run again, and already applied migrations cannot be rolled back.
+- Some migrations irreversibly erase data: `20260603040000_session_message_projection_order` deletes `session_message`, `20260604172448_event_sourced_session_input` cleans `session_input`, `session_message`, `event`, `event_sequence` and `workspace`, `20260622202450_simplify_session_input` — the same. The migration `20260603141458` with autoincrement is replaced by a table without it.
+- The order of application is set only by the `migrations` array in `migration.gen.ts`: a new file needs both an import and an array element.
+- `insert`, `update`, `delete` without `returning()` give a run result; `all()`, `get()`, `values()` without `returning()` — a `DrizzleTypeError` type error.
+- Inside a transaction the query cache is always off: read the fresh state, not the cache.
+- `jitCompatCheck` kills the JIT mappers if the environment forbids `new Function`; in this mode `mapResultRow` maps the rows — slower, but correct.
+- `drizzle/internal/drizzle-utils.ts` and the whole `drizzle/sqlite-core/effect/` come with `/* oxlint-disable */`: the linter stays silent here, only the type check catches errors. Plus the private Drizzle symbols must be re-checked after updating `drizzle-orm`.
+- The V1 transfer status is derived from the presence of the table `session`, and on node and workerd it is always "completed": there a stub works, not the transfer.
+- `directoryColumn` tolerates an empty string, `absoluteColumn` does not: a relative value from legacy data will cause an exception on write.
+- In the database the paths are stored with slashes regardless of the OS, and `toPlatform` turns them into backslashes only on Windows at read time.

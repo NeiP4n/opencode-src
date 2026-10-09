@@ -1,45 +1,45 @@
-# core/models-dev — встроенный снимок каталога моделей OpenCode
+# core/models-dev — the built-in snapshot of the OpenCode model catalog
 
-## Что в папке
+## What's In This Folder
 
-- `snapshot.txt` — единственный файл, и он не TypeScript: это один гигантский JSON-текст размером 5 246 113 байт.
-- Ничего, кроме этого файла, в папке нет. Ни схем, ни функций, ни тестов.
+- `snapshot.txt` — the only file, and it is not TypeScript: it is one giant JSON text of 5 246 113 bytes.
+- There is nothing else in the folder but this file. No schemas, no functions, no tests.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/models-dev/snapshot.txt` — данные каталога.
-- `packages/core/src/models-dev.ts` — единственный потребитель: импортирует файл как текст и декодирует его.
+- `packages/core/src/models-dev/snapshot.txt` — the catalog data.
+- `packages/core/src/models-dev.ts` — the only consumer: it imports the file as text and decodes it.
 
-## Важные детали
+## Important Details
 
-- Файл импортируется в коде как модуль с текстовым типом: `import snapshotText from "./models-dev/snapshot.txt" with { type: "text" }`. Это не чтение файла с диска — содержимое попадает в сборку как строковая константа уровня модуля.
-- Файл не отформатирован: это одна строка без переводов строк. Проверено: `wc -l` даёт 0, размер при этом 5 МБ. Открывать такой файл в редакторе построчно бессмысленно — только поиском по строке.
-- Формат — каталог провайдеров, где ключ верхнего уровня является идентификатором провайдера. Так выглядит начало файла: `deepinfra` с полями `id`, `env` (список имён переменных окружения), `npm`, `name`, `doc` и `models`.
-- Внутри `models` ключом служит идентификатор модели у провайдера, а в значении есть как минимум `id`, `name`, `description` и `family`.
-- Комментарий в коде над импортом называет источник: снимок сделан с `https://models.opencode.ai/api.json`. Скрипт обновления — `bun run script/update-models-snapshot.ts`, он лежит в `packages/core/script/update-models-snapshot.ts`.
-- Второе объяснение в том же комментарии отвечает, зачем снимок встроен в код, а не скачивается при запуске: он декодируется и нормализуется один раз на изолят, а не на каждый рантайм. Причина указана прямо — один изолят может содержать много рантаймов (в Cloudflare это несколько экземпляров Durable Object), и декодирование на каждый рантайм умножило бы стоимость.
-- Механизм кэша: переменная `bundledCache` уровня модуля хранит уже нормализованный результат. Чтение обёрнуто в `Effect.suspend`, поэтому файл не трогается и не парсится до первого обращения.
-- Ключ кэша в хранилище строится функцией `cacheKey`: для источника по умолчанию это `models-dev:catalog`, для любого другого — `models-dev:catalog:` плюс быстрый хэш адреса.
-- Запись кэша хранит `updatedAt`, `body` и опциональный `digest`. Поле `digest` добавлено как хэш сырого тела, чтобы `refresh()` не перепубликовывал побайтово тот же каталог. Комментарий в коде отмечает, что для записей, созданных до появления поля, оно необязательно.
+- The file is imported in the code as a module with a text type: `import snapshotText from "./models-dev/snapshot.txt" with { type: "text" }`. This is not a reading of the file from disk — the content gets into the build as a module-level string constant.
+- The file is not formatted: it is a single line without line breaks. Verified: `wc -l` gives 0, while the size is 5 MB. Opening such a file in an editor line by line is pointless — only a string search is worthwhile.
+- The format is a provider catalog, where the top-level key is the provider identifier. This is how the beginning of the file looks: `deepinfra` with the fields `id`, `env` (a list of environment variable names), `npm`, `name`, `doc` and `models`.
+- Inside `models` the key is the model identifier at the provider, and in the value there is at least `id`, `name`, `description` and `family`.
+- The comment in the code above the import names the source: the snapshot was made from `https://models.opencode.ai/api.json`. The update script is `bun run script/update-models-snapshot.ts`, it lives in `packages/core/script/update-models-snapshot.ts`.
+- A second explanation in the same comment answers why the snapshot is embedded in the code and not downloaded at startup: it is decoded and normalized once per isolate, and not per runtime. The reason is stated outright — one isolate can contain many runtimes (in Cloudflare that is several instances of a Durable Object), and decoding per runtime would multiply the cost.
+- The cache mechanism: the module-level variable `bundledCache` holds the already normalized result. The read is wrapped in `Effect.suspend`, so the file is not touched and not parsed before the first access.
+- The cache key in the storage is built by the function `cacheKey`: for the default source it is `models-dev:catalog`, for any other — `models-dev:catalog:` plus a fast hash of the address.
+- The cache record holds `updatedAt`, `body` and an optional `digest`. The `digest` field was added as a hash of the raw body, so that `refresh()` does not republish the byte-for-byte same catalog. The comment in the code notes that for records created before the field appeared it is optional.
 
-## Связи
+## Connections
 
-- `packages/core/src/models-dev.ts` — единственный импортирующий файл: `models-dev.ts:16` объявляет импорт, и около строки 271 находится комментарий о происхождении и обновлении снимка.
-- `packages/core/src/plugin/models-dev.ts` — потребитель сервиса каталога: подписывается на `ModelsDev.Event.Refreshed`, готовит данные и раскладывает их по провайдерам. Там же объявлены `prepared` как `WeakMap` и `environmentNames(provider)`.
-- `packages/core/src/plugin/internal.ts` — регистрирует `ModelsDev.Service` и `ModelsDev.node` в списке внутренних сервисов.
-- `packages/core/src/kv.ts` — хранилище, в котором лежит кэш каталога вместе с `digest` и `updatedAt`.
-- `packages/core/script/update-models-snapshot.ts` — скрипт, который перезаписывает этот файл.
-- `packages/schema/src/models-dev.ts` — схема снимка: тип `Snapshot`, который используется и во встроенном, и в сетевом варианте.
-- `packages/core/src/github-copilot/models.ts` и `packages/core/src/modal/models.ts` — другие приводители внешних каталогов моделей к `Model.Info`; сравнить полезно, потому что правила слияния у всех трёх разные.
-- `packages/core/docs/github-copilot.md` — документ по клиенту Copilot, где описан другой каталог моделей, уже без снимка.
+- `packages/core/src/models-dev.ts` — the only importing file: `models-dev.ts:16` declares the import, and around line 271 there is a comment about the origin and the update of the snapshot.
+- `packages/core/src/plugin/models-dev.ts` — the consumer of the catalog service: subscribes to `ModelsDev.Event.Refreshed`, prepares the data and lays it out by providers. There too are declared `prepared` as a `WeakMap` and `environmentNames(provider)`.
+- `packages/core/src/plugin/internal.ts` — registers `ModelsDev.Service` and `ModelsDev.node` in the list of internal services.
+- `packages/core/src/kv.ts` — the storage in which the catalog cache lies together with `digest` and `updatedAt`.
+- `packages/core/script/update-models-snapshot.ts` — the script that rewrites this file.
+- `packages/schema/src/models-dev.ts` — the snapshot schema: the `Snapshot` type, which is used both in the built-in and in the network variant.
+- `packages/core/src/github-copilot/models.ts` and `packages/core/src/modal/models.ts` — other converters of external model catalogs to `Model.Info`; it is useful to compare, because the merge rules of all three are different.
+- `packages/core/docs/github-copilot.md` — the document of the Copilot client, where another model catalog is described, already without a snapshot.
 
-## Ловушки
+## Pitfalls
 
-- Файл весит 5 МБ и целиком попадает в сборку. Любая правка рядом с ним (форматирование, переводы строк) увеличит и время сборки, и размер пакета.
-- Формат не имеет версии и схемы в самой папке. Проверить файл на соответствие чему-либо можно только через `decodeCatalog` в `packages/core/src/models-dev.ts`.
-- Содержимое не имеет переводов строк: инструменты, которые печатают файл построчно, покажут одну строку длиной в несколько мегабайт.
-- Путь файла совпадает с именем одноимённой папки-каталога. Поиск по слову `models-dev` в репозитории найдёт и код, и данные, и нужно будет различать их.
-- Снимок молча устаревает: без запуска скрипта обновления данные о моделях, ценах и лимитах остаются на дату коммита. Код не проверяет возраст снимка.
-- Свежесть с сетевым источником не проверяется при запуске. Расхождение встроенного снимка и того, что отдаёт `models.opencode.ai`, — нормальное состояние, а не ошибка.
-- Декодирование отложено до первого обращения, но выполняется один раз на изолят, а не на процесс. В среде с несколькими изолятами память под нормализованный каталог будет занята в каждой.
-- Файл хранит цены и лимиты в чужом формате. Пересчёт в стоимость за миллион токенов делается при нормализации, поэтому искать готовые числа в самом снимке бесполезно.
+- The file weighs 5 MB and gets into the build entirely. Any edit next to it (formatting, line breaks) will increase both the build time and the size of the package.
+- The format has no version and no schema in the folder itself. You can check the file against anything only through `decodeCatalog` in `packages/core/src/models-dev.ts`.
+- The content has no line breaks: tools that print the file line by line will show a single line several megabytes long.
+- The path of the file coincides with the name of the same-named catalog folder. A search for the word `models-dev` in the repository will find both the code and the data, and they will have to be told apart.
+- The snapshot silently gets stale: without running the update script the data about models, prices and limits stays at the date of the commit. The code does not check the age of the snapshot.
+- Freshness against the network source is not checked at startup. A divergence between the built-in snapshot and what `models.opencode.ai` returns is a normal state, and not an error.
+- The decoding is deferred to the first access, but is performed once per isolate, and not per process. In an environment with several isolates the memory for the normalized catalog will be occupied in each.
+- The file stores the prices and limits in a foreign format. The recalculation into a cost per million tokens is done during normalization, so looking for the finished numbers in the snapshot itself is pointless.

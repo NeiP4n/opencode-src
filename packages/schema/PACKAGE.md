@@ -1,28 +1,28 @@
-# @opencode/schema — типы данных всего opencode
+# @opencode/schema — the data types of all of opencode
 
-## Что это
+## What This Is
 
-Самый массовый по охвату пакет ядра: 102 файла, ~5.8 тыс. строк в `src/`.
-Здесь объявлены все данные, которые ходят между частями opencode, — на
-Effect Schema. Ни логики, ни сети, ни файлов: только типы, их валидация и
-сериализация.
+The widest-reaching core package: 102 files, ~5.8k lines in `src/`.
+All the data that flows between the parts of opencode is declared here, on
+Effect Schema. No logic, no network, no files: only types, their validation and
+serialization.
 
-Пакет подключается поимённо (`exports` в `packages/schema/package.json`):
+The package is imported by name (`exports` in `packages/schema/package.json`):
 
 ```json
 ".": "./src/index.ts",
 "./*": "./src/*.ts"
 ```
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L0 — лист**: от других пакетов `@opencode/*` не зависит (в `dependencies`
-их нет), опора — `effect`.
+Layer **L0 — leaf**: does not depend on other `@opencode/*` packages (there are
+none in `dependencies`), the foundation is `effect`.
 
-Кто им пользуется (число файлов в `packages/*/src`, где есть импорт
-`@opencode/schema`):
+Who uses it (number of files in `packages/*/src` where there is an
+`@opencode/schema` import):
 
-| Пакет | Файлов |
+| Package | Files |
 | --- | --- |
 | `packages/core/src` | 132 |
 | `packages/plugin/src` | 34 |
@@ -39,73 +39,73 @@ Effect Schema. Ни логики, ни сети, ни файлов: только
 | `packages/desktop/src` | 1 |
 | `packages/enterprise/src` | 1 |
 
-Правка здесь меняет контракт всех 14 пакетов.
+A change here changes the contract of all 14 packages.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Публичное лицо** — `packages/schema/src/index.ts`: реэкспорт namespace'ов
+**Public face** — `packages/schema/src/index.ts`: re-exports namespaces
 (`Agent`, `Command`, `Config`, `Connection`, `Credential`, `Event`,
 `FileSystem`, `Form`, `Integration`, `LLM`, `Location`, `Mcp`, `Model`,
 `Money`, `Permission`, `Project`, `Worktree`, `Provider`, `Reference`, `Rpc`,
 `Session`, `Vcs`, `Snapshot`, …).
 
-**Сессии** — `session-id.ts`, `session-message.ts`, `session-metadata.ts`,
+**Sessions** — `session-id.ts`, `session-message.ts`, `session-metadata.ts`,
 `session-event.ts`, `session-compaction-event.ts`, `session-error.ts`,
 `session-fork.ts`, `session-revert.ts`, `session-inbox.ts`,
 `session-provider-context.ts`, `session-stats.ts`, `session-transfer.ts`.
 
-**События** — `event.ts`, `event-manifest.ts`, `durable-event-manifest.ts`,
-`event-log.ts`, `server-event.ts`, `legacy-event.ts` плюс событийные
-подтипы: `ide-event.ts`, `lsp-event.ts`, `mcp-event.ts`,
+**Events** — `event.ts`, `event-manifest.ts`, `durable-event-manifest.ts`,
+`event-log.ts`, `server-event.ts`, `legacy-event.ts` plus event subtypes:
+`ide-event.ts`, `lsp-event.ts`, `mcp-event.ts`,
 `installation-event.ts`, `location-event.ts`.
 
-**Конфигурация** — `config.ts` и каталог `packages/schema/src/config/`:
+**Configuration** — `config.ts` and the directory `packages/schema/src/config/`:
 `permission.ts` / `permission-v1.ts` / `permission-saved.ts`, `agent.ts`,
 `command.ts`, `plugin.ts`, `question.ts` / `question-v1.ts`.
 
-**Провайдеры и модели** — `provider.ts`, `model.ts`, `llm.ts`,
+**Providers and models** — `provider.ts`, `model.ts`, `llm.ts`,
 `models-dev.ts`, `credential.ts`, `money.ts`.
 
-**Файлы и VCS** — `filesystem.ts` / `filesystem-v1.ts`, `file-diff.ts`,
+**Files and VCS** — `filesystem.ts` / `filesystem-v1.ts`, `file-diff.ts`,
 `reference.ts`, `project.ts`, `project-id.ts`, `vcs.ts`, `snapshot.ts`
-(поиск в имени: `snapshot` описан в `packages/schema/src`).
+(search by name: `snapshot` is declared in `packages/schema/src`).
 
-**Терминал и внешние сервисы** — `pty.ts`, `persistent-pty.ts`,
+**Terminal and external services** — `pty.ts`, `persistent-pty.ts`,
 `pty-ticket.ts`, `mcp.ts`, `connection.ts`, `integration.ts`,
 `integration-id.ts`, `instruction.ts`, `instruction-entry.ts`.
 
-**Идентификаторы и прочее** — `identifier.ts`, `rpc.ts`, `schema.ts`,
+**Identifiers and the rest** — `identifier.ts`, `rpc.ts`, `schema.ts`,
 `prompt.ts`, `prompt-input.ts`, `websearch.ts`, `form.ts`,
 `session-stats.ts`.
 
-## Точки входа
+## Entry Points
 
-1. `packages/schema/src/index.ts` — корневой экспорт, отсюда читают все.
-2. `packages/schema/src/` — поимённый доступ `@opencode/schema/<имя>` для
-   одного файла без подтягивания остальных.
-3. `packages/schema/src/session-id.ts` — если нужен только формат идентификатора
-   сессии.
+1. `packages/schema/src/index.ts` — the root export, what everyone reads from.
+2. `packages/schema/src/` — named access `@opencode/schema/<name>` for
+   a single file without pulling in the others.
+3. `packages/schema/src/session-id.ts` — when only the session identifier
+   format is needed.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/protocol/PACKAGE.md` — эти типы оборачиваются в HTTP-контракт.
-- `packages/core/PACKAGE.md` — главный потребитель (132 файла), здесь же
-  хранение в `database`.
-- `packages/server/PACKAGE.md` — где типы валидируются на входе и выходе.
-- `packages/util/PACKAGE.md` — нижний слой, на котором типы живут на диске.
+- `packages/protocol/PACKAGE.md` — these types are wrapped into an HTTP contract.
+- `packages/core/PACKAGE.md` — the main consumer (132 files), and where
+  storage in `database` lives too.
+- `packages/server/PACKAGE.md` — where types are validated on input and output.
+- `packages/util/PACKAGE.md` — the lower layer the types rely on to live on disk.
 
-## Ловушки
+## Pitfalls
 
-1. **Версии типов живут рядом.** `filesystem.ts` и `filesystem-v1.ts`,
-   `permission.ts` и `permission-v1.ts`, `question.ts` и `question-v1.ts` —
-   это не дубликаты, а текущая и старая схемы; перенос данных между ними
-   отдельная задача.
-2. **Namespace в `index.ts` не всегда совпадает с файлом:** `WebSearch`
-   экспортируется из `websearch.ts`, а `Worktree` — не в одноимённом файле.
-   Ищи по реэкспорту в `index.ts`, а не по имени файла.
-3. **Изменение схемы требует регенерации клиента** — см.
-   `packages/httpapi-codegen/PACKAGE.md`: контракт попадает в сгенерированные
-   файлы `packages/client`.
-4. **`-v1` суффикс — признак миграции, а не «версии пакета».** Новые поля
-   добавляются в текущий файл, старый трогать нельзя: на нём стоят данные,
-   уже записанные в базе.
+1. **Type versions live side by side.** `filesystem.ts` and `filesystem-v1.ts`,
+   `permission.ts` and `permission-v1.ts`, `question.ts` and `question-v1.ts` —
+   these are not duplicates but the current and the old schema; moving data
+   between them is a separate task.
+2. **A namespace in `index.ts` does not always match its file:** `WebSearch`
+   is exported from `websearch.ts`, while `Worktree` is not in the file of the
+   same name. Search by the re-export in `index.ts`, not by file name.
+3. **A schema change requires regenerating the client** — see
+   `packages/httpapi-codegen/PACKAGE.md`: the contract ends up in the generated
+   `packages/client` files.
+4. **The `-v1` suffix is a sign of migration, not of a "package version".** New fields
+   are added to the current file, the old one must not be touched: it carries data
+   already written to the database.

@@ -1,114 +1,115 @@
-# core/filesystem — наблюдение за файлами, поиск по дереву, защита от лишнего обхода
+# core/filesystem — file watching, tree search, protection against extra walking
 
-## Что в папке
+## What's In This Folder
 
-Одиннадцать файлов: обёртка над `fs.watch` и Parcel-воркером (`watcher.ts`),
-политика игнорирования для локации, наблюдение за служебным файлом VCS
-(`location-watcher.ts`), поиск файлов по имени двумя движками — ripgrep и fff,
-списки игнорируемых папок, защищённые каталоги дома и адаптеры fff под три
-рантайма. Смысл: всё, что ядро знает о файловой системе проекта, собрано здесь.
+Eleven files: a wrapper over `fs.watch` and a Parcel worker (`watcher.ts`),
+the ignore policy for a location, watching of the VCS control file
+(`location-watcher.ts`), file search by name with two engines — ripgrep and fff,
+lists of ignored folders, protected home directories and fff adapters for three
+runtimes. The idea: everything the core knows about the project filesystem is
+collected here.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/filesystem/watcher.ts` — сервисы `@opencode/Watcher`,
-  `@opencode/Watcher/Native` и `@opencode/Watcher/Test`; слои `layer`,
+- `packages/core/src/filesystem/watcher.ts` — the services `@opencode/Watcher`,
+  `@opencode/Watcher/Native` and `@opencode/Watcher/Test`; the layers `layer`,
   `nativeLayer`, `testLayer`; `hasNativeBinding`, `subscribeDirectory`, `Event`.
-- `packages/core/src/filesystem/location-watcher.ts` — сервис
-  `@opencode/LocationWatcher`: следит за файлом ветки VCS и публикует события
-  в шину.
-- `packages/core/src/filesystem/location-watcher-policy.ts` — сервис
-  `@opencode/LocationWatcherPolicy`: наблюдаемый список игнорируемых путей.
-- `packages/core/src/filesystem/search.ts` — сервис
-  `@opencode/FileSystem/Search`: слои `ripgrepLayer`, `fffLayer`, `layer`,
-  `configured`, узел `node`.
-- `packages/core/src/filesystem/ignore.ts` — списки папок и файлов, которые не
-  обходятся, и агрегированный `PATTERNS`.
+- `packages/core/src/filesystem/location-watcher.ts` — the service
+  `@opencode/LocationWatcher`: watches the VCS branch file and publishes events
+  into the bus.
+- `packages/core/src/filesystem/location-watcher-policy.ts` — the service
+  `@opencode/LocationWatcherPolicy`: the observable list of ignored paths.
+- `packages/core/src/filesystem/search.ts` — the service
+  `@opencode/FileSystem/Search`: the layers `ripgrepLayer`, `fffLayer`, `layer`,
+  `configured`, the node `node`.
+- `packages/core/src/filesystem/ignore.ts` — lists of folders and files that are not
+  walked, and the aggregated `PATTERNS`.
 - `packages/core/src/filesystem/protected.ts` — `isHome`, `names`, `paths`:
-  домашние каталоги, которые нельзя сканировать.
-- `packages/core/src/filesystem/watcher-binding.ts` — ленивая загрузка
-  нативного модуля `@parcel/watcher`.
+  home directories that must not be scanned.
+- `packages/core/src/filesystem/watcher-binding.ts` — lazy loading
+  of the native module `@parcel/watcher`.
 - `packages/core/src/filesystem/fff.ts`, `fff.bun.ts`, `fff.node.ts`,
-  `fff.workerd.ts` — типы и привязки поискового движка fff.
+  `fff.workerd.ts` — types and bindings of the fff search engine.
 
-## Важные детали
+## Important Details
 
-- Два разных наблюдателя подключаются к разным целям. Файл и набор имён
-  наблюдаются через `fs.watch` без рекурсии (мгновенная реакция), а
-  рекурсивные каталоги — через Parcel с бэкендом платформы: `windows`,
+- Two different watchers are attached to different targets. A file and a set of names
+  are watched through `fs.watch` without recursion (instant reaction), while
+  recursive directories go through Parcel with the platform backend: `windows`,
   `fs-events`, `inotify`.
-- Одинаковые наблюдения делятся: ключи в `RcMap` сравниваются структурно, так
-  что эквивалентные подписки используют одну нативную подписку. Списки путей
-  игнора и имён дедуплицируются и сортируются перед использованием как ключ.
-- При `enabled: false` сервис отдаёт пустой поток — не ошибку.
-- Если нативная подписка не удалась (нет биндинга, неизвестная платформа,
-  таймаут), поток подписчика просто завершается, а не висит: пабсаб выключается
-  и `subscribe` возвращает пустой поток.
-- Ожидание готовности передаётся отдельным `onReady` и выполняется после
-  регистрации слушателя, когда поток уже потребляется.
-- Подписка на нативную сторону может висеть до `SUBSCRIBE_TIMEOUT_MS`
-  (10 секунд). Она помечена прерываемой, а прерывание само по себе закрывает
-  поздно разрешившуюся подписку.
-- Массив игнора копируется перед передачей нативному коду: он делит ключ
-  `RcMap`, у которого кешируется структурный хеш.
-- Событие VCS-локации: цель выбирается один раз и кешируется — `HEAD` для git
-  (с путём `.git` и разрешённым `gitDirectory` в списке псевдонимов), `branch`
-  для hg. Каталог `.git` или `.hg` в списке игнора выключает наблюдение.
-- Смена политики игнора пересогласовывает наблюдение: активная подписка
-  закрывается, при смене цели создаётся новая. Переходы сериализованы
-  семафором на одну операцию, флажок `stopped` гасит работу после финализации.
-- Наблюдение стартует после активации плагинов, а его провал логируется и не
-  роняет слой; прерывания считаются штатными.
-- Поиск по имени перестраивает индекс при каждом скане, но переиспользует
-  подготовленные строки `fuzzysort` для путей, которые остались. Первый скан
-  ждут все, последующие — не более `REFRESH_INTERVAL` (10 секунд); обновление
-  всегда идёт в фоне, а до первого завершения вызов ждёт его завершения.
-- Пока не завершён первый скан, поиск отдаёт пустой индекс, а не ошибку: это
-  заметно по «миганию» результатов при старте.
-- Домашний каталог при первом скане ограничен 100 000 записей и исключает
-  защищённые подкаталоги; обычная локация под VCS обходится без ограничения.
-- Выбор движка поиска: удалённая локация (`workspaceID`) всегда идёт через
-  ripgrep, потому что fff индексировал бы локальный каталог и отдавал бы
-  неверные результаты. Кроме того, fff выключается на Windows, когда флаг не
-  задан явно, и недоступен без нативного модуля.
-- `ignore.ts` — список для обходов, а не правила git: среди папок `node_modules`,
-  `.git`, `dist`, `target`, `desktop`, кеши и IDE-каталоги; `PATTERNS` собирает
-  их в один набор с glob-формой `**/{...}/**`.
-- `protected.ts` различает базовые имена (`names`) и абсолютные пути (`paths`):
-  на macOS это `Music`, `Pictures`, `Library` и подкаталоги `Library`, а также
-  `.Spotlight-V100`, `.Trashes`, `.fseventsd` и подобное в корне; на Windows —
-  `AppData`, `Downloads`, `OneDrive` и другие; на Linux оба списка пусты.
+- Identical watches are shared: keys in `RcMap` are compared structurally, so
+  equivalent subscriptions use one native subscription. Ignore path lists and
+  name lists are deduplicated and sorted before being used as a key.
+- At `enabled: false` the service returns an empty stream — not an error.
+- If the native subscription failed (no binding, unknown platform,
+  timeout), the subscriber's stream simply ends instead of hanging: the pubsub is switched off
+  and `subscribe` returns an empty stream.
+- The readiness wait is passed as a separate `onReady` and is performed after
+  the listener is registered, when the stream is already being consumed.
+- A subscription to the native side can hang up to `SUBSCRIBE_TIMEOUT_MS`
+  (10 seconds). It is marked interruptible, and the interruption itself closes
+  a subscription that resolved too late.
+- The ignore array is copied before being passed to native code: it shares the key
+  `RcMap`, which caches a structural hash.
+- VCS location event: the target is chosen once and cached — `HEAD` for git
+  (with the `.git` path and the resolved `gitDirectory` in the alias list), `branch`
+  for hg. A `.git` or `.hg` directory in the ignore list switches the watching off.
+- A change of the ignore policy renegotiates the watch: the active subscription
+  is closed, on a target change a new one is created. The transitions are serialized
+  by a semaphore for one operation, the `stopped` flag kills the work after finalization.
+- Watching starts after the activation of plugins, and its failure is logged and does not
+  bring the layer down; interruptions are considered normal.
+- The name search rebuilds the index on every scan, but reuses the prepared
+  `fuzzysort` strings for the paths that remained. The first scan is waited for
+  by everyone, subsequent ones for at most `REFRESH_INTERVAL` (10 seconds); the update
+  always goes in the background, and until the first completion the call waits for its completion.
+- Until the first scan is complete, the search returns an empty index, not an error: this
+  is noticeable as "flashing" of results at startup.
+- The home directory on the first scan is limited to 100 000 entries and excludes
+  protected subdirectories; a regular location under VCS is walked without a limit.
+- Choice of the search engine: a remote location (`workspaceID`) always goes
+  through ripgrep, because fff would index the local directory and give
+  wrong results. Besides that, fff is switched off on Windows when the flag is not
+  explicitly set, and is unavailable without a native module.
+- `ignore.ts` — a list for walks, not git rules: among the folders `node_modules`,
+  `.git`, `dist`, `target`, `desktop`, caches and IDE directories; `PATTERNS` collects
+  them into one set with the glob form `**/{...}/**`.
+- `protected.ts` distinguishes base names (`names`) and absolute paths (`paths`):
+  on macOS these are `Music`, `Pictures`, `Library` and `Library` subdirectories, as well
+  as `.Spotlight-V100`, `.Trashes`, `.fseventsd` and the like in the root; on Windows —
+  `AppData`, `Downloads`, `OneDrive` and others; on Linux both lists are empty.
 
-## Связи
+## Connections
 
-- Поиск по содержимому идёт не отсюда, а через `../ripgrep.js`; подготовленный
-  бинарник лежит в `packages/core/src/ripgrep/binary.ts`.
-- Типы событий файлов берутся из `@opencode/schema/filesystem`
-  (`FileSystem.Event.Changed`, `FileSystem.Entry`, `FileSystem.FindInput`), а
-  пути — `RelativePath` из `../schema.js`.
-- `location-watcher.ts` публикует через шину `../bus.js` и ждёт активации
-  плагинов через `../plugin.js`; репозиторий и каталог `.git` — через
-  `../git.js` и `FSUtil`.
-- Адаптер fff под Bun грузит нативный пакет `@ff-labs/fff-bun`; под Node — с
-  динамическим импортом и перехватом ошибки; под workerd бэкенда нет вовсе.
-- Нативный модуль Parcel выбирается по платформе и libc (переменные
-  `OPENCODE_LIBC` и `OPENCODE_PARCEL_WATCHER_PATH`), сам модуль грузится
-  лениво.
+- Content search does not go from here, but through `../ripgrep.js`; the prepared
+  binary lies in `packages/core/src/ripgrep/binary.ts`.
+- File event types are taken from `@opencode/schema/filesystem`
+  (`FileSystem.Event.Changed`, `FileSystem.Entry`, `FileSystem.FindInput`), and
+  the paths — `RelativePath` from `../schema.js`.
+- `location-watcher.ts` publishes through the bus `../bus.js` and waits for the activation
+  of plugins through `../plugin.js`; the repository and the `.git` directory — through
+  `../git.js` and `FSUtil`.
+- The fff adapter under Bun loads the native package `@ff-labs/fff-bun`; under Node — with
+  a dynamic import and error interception; under workerd there is no backend at all.
+- The Parcel native module is chosen by platform and libc (the variables
+  `OPENCODE_LIBC` and `OPENCODE_PARCEL_WATCHER_PATH`), the module itself is loaded
+  lazily.
 
-## Ловушки
+## Pitfalls
 
-- Событие `Event.Updated` — это тот же `FileSystem.Event.Changed`: отдельного
-  события «обновлено» в схеме нет.
-- Публикация события VCS идёт как `add`/`change`/`unlink` по типу изменения, но
-  источник событий — файл `HEAD` или `branch`, поэтому изменение ветки выглядит
-  как изменение этого файла.
-- Добавление `.git` или `.hg` в игнор политики не просто исключает путь, а
-  полностью выключает наблюдение локации.
-- Подписка на нативную сторону умеет зависнуть, и это обработано отменой и
-  поздним закрытием — но в лог попадает не ошибка, а пустой поток у клиента.
-- Индекс поиска принадлежит локации: переезд локации требует новый слой, иначе
-  в выдаче останутся пути прошлого каталога.
-- `fff` в режиме `aiMode` с отключённым индексированием содержимого: выдача
-  fff — это совпадение по имени, а не полнотекстовый поиск.
-- В списке игнора есть папка `desktop` — это каталог сборки Electron-приложения,
-  а не пользовательский рабочий стол; на macOS рабочий стол защищён отдельно,
-  в `protected.ts`.
+- The event `Event.Updated` is the same `FileSystem.Event.Changed`: there is no separate
+  "updated" event in the schema.
+- Publication of a VCS event goes as `add`/`change`/`unlink` by the type of change, but
+  the source of events is the file `HEAD` or `branch`, so a branch change looks
+  like a change of this file.
+- Adding `.git` or `.hg` to the ignore policy not only excludes the path, but
+  switches the location's watching off completely.
+- A subscription to the native side can hang, and this is handled by cancellation and
+  late closing — but what lands in the log is not an error, but an empty stream at the client.
+- The search index belongs to the location: moving the location requires a new layer, otherwise
+  the paths of the old directory will stay in the results.
+- `fff` in `aiMode` with content indexing switched off: the output of
+  fff is a name match, not a full-text search.
+- The ignore list contains the folder `desktop` — that is the build directory of the Electron app,
+  not the user's desktop; on macOS the desktop is protected separately,
+  in `protected.ts`.

@@ -1,112 +1,111 @@
-# @opencode/ai — клиенты моделей и провайдеры
+# @opencode/ai — model clients and providers
 
-## Что это
+## What This Is
 
-Слой связи с LLM и мультимедийными сервисами: 201 файл, ~29 тыс. строк в
-`src/` — второй по размеру пакет. Здесь описано, как opencode зовёт модели:
-десятки провайдеров (Anthropic, OpenAI, Google, Bedrock, Azure, xAI, DeepSeek,
-Mistral, Cerebras, Groq, OpenRouter, Together, Fireworks, Replicate, Fal,
-ElevenLabs, Deepgram, Cartesia, Stability, Runway, AssemblyAI, …) и десятки
-wire-протоколов (chat, messages, responses, event-stream, transcription,
-speech, images, video).
+The LLM and multimedia services connectivity layer: 201 files, ~29k lines in
+`src/` — the second largest package. This document describes how opencode
+calls models: dozens of providers (Anthropic, OpenAI, Google, Bedrock, Azure,
+xAI, DeepSeek, Mistral, Cerebras, Groq, OpenRouter, Together, Fireworks,
+Replicate, Fal, ElevenLabs, Deepgram, Cartesia, Stability, Runway,
+AssemblyAI, …) and dozens of wire protocols (chat, messages, responses,
+event-stream, transcription, speech, images, video).
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L1**: зависит от `schema`. Опора — `effect`.
+Layer **L1**: depends on `schema`. Foundation — `effect`.
 
-Кто подключает:
+Who depends on it:
 
-- `packages/core` — вызовы моделей из сессий;
-- `packages/app`, `packages/plugin`, `packages/simulation` — чтение типов
-  и клиента;
-- сам `packages/ai` (тесты и внутренние модули).
+- `packages/core` — model calls from sessions;
+- `packages/app`, `packages/plugin`, `packages/simulation` — reading types
+  and the client;
+- `packages/ai` itself (tests and internal modules).
 
-Экспорт — корневой `index.ts`, он же единственная публичная точка.
+The export is the root `index.ts`, which is also the only public entry point.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Публичное лицо** — `packages/ai/src/index.ts`: `AIClient`, `LLMClient`,
+**Public face** — `packages/ai/src/index.ts`: `AIClient`, `LLMClient`,
 `ImageClient`, `VideoClient`, `SpeechClient`, `Auth`, `Provider`,
-`ProviderPackage`, `Image`, `Video`, `Speech`, плюс хелперы
-`isContextOverflow`, `isContextOverflowFailure`, `isRetryable` и реэкспорт
-`schema/index.js`.
+`ProviderPackage`, `Image`, `Video`, `Speech`, plus the helpers
+`isContextOverflow`, `isContextOverflowFailure`, `isRetryable` and the
+re-export of `schema/index.js`.
 
-**Клиенты по типу задачи** — файлы корня `src/`: `ai-client.ts`,
+**Clients by task type** — files in the `src/` root: `ai-client.ts`,
 `llm.ts`, `image-client.ts`, `image.ts`, `video-client.ts`, `video.ts`,
 `speech-client.ts`, `speech.ts`, `transcription-client.ts`,
 `transcription.ts`, `media-client.ts`, `media-model.ts`, `media.ts`,
 `generation.ts`.
 
-**Маршрутизация запроса** — каталог `packages/ai/src/route/`:
+**Request routing** — the `packages/ai/src/route/` directory:
 `client.ts` (→ `LLMClient`), `endpoint.ts`, `executor.ts`,
 `executor-service.ts`, `auth.ts` / `auth-options.ts`, `protocol.ts`,
-`framing.ts`, `media.ts`, `media-protocol.ts`, транспорты
+`framing.ts`, `media.ts`, `media-protocol.ts`, transports
 `transport/http.ts`, `transport/websocket.ts`,
 `transport/websocket-channel.ts`.
 
-**Провайдеры** — каталоги `packages/ai/src/providers/` (один файл на
-провайдера: `anthropic.ts`, `openai.ts`, `google.ts`, `amazon-bedrock.ts`,
+**Providers** — the `packages/ai/src/providers/` directories (one file per
+provider: `anthropic.ts`, `openai.ts`, `google.ts`, `amazon-bedrock.ts`,
 `azure.ts`, `xai.ts`, `deepseek.ts`, `mistral.ts`, `openrouter.ts`,
 `replicate.ts`, `fal.ts`, `elevenlabs.ts`, `deepgram.ts`, `stability.ts`,
-`runway.ts`, … плюс подкаталоги `azure/`, `google-vertex/`, `zai/`,
-`alibaba/`) и сводный `packages/ai/src/providers.ts`.
+`runway.ts`, … plus the subdirectories `azure/`, `google-vertex/`, `zai/`,
+`alibaba/`) and the aggregate `packages/ai/src/providers.ts`.
 
-**Протоколы** — каталог `packages/ai/src/protocols/`: форматы провайдеров —
+**Protocols** — the `packages/ai/src/protocols/` directory: provider formats —
 `anthropic-messages.ts`, `openai-chat.ts`, `openai-responses.ts`,
 `gemini.ts`, `bedrock-converse.ts`, `bedrock-event-stream.ts`,
 `meta-messages.ts`, `mistral-chat.ts`, `alibaba-*.ts`, `xai-*.ts`,
-`zai-*.ts`, медиа-протоколы (`*-images.ts`, `*-video.ts`, `*-speech.ts`,
-`*-transcription.ts`) и сводный `protocols.ts`.
+`zai-*.ts`, media protocols (`*-images.ts`, `*-video.ts`, `*-speech.ts`,
+`*-transcription.ts`) and the aggregate `protocols.ts`.
 
-**Вспомогательное** — `packages/ai/src/protocols/utils/` (кэш, чанки
-`partial-json.ts`, checkpoint'ы `responses-checkpoint.ts`, компакция
-`responses-compaction.ts`, стримы `tool-stream.ts`, `speech-stream.ts`),
+**Helpers** — `packages/ai/src/protocols/utils/` (cache, `partial-json.ts`
+chunks, `responses-checkpoint.ts` checkpoints, `responses-compaction.ts`
+compaction, `tool-stream.ts` / `speech-stream.ts` streams),
 `packages/ai/src/utils/` (`json.ts`, `bytes.ts`, `sanitize.ts`,
 `media-type.ts`, `record.ts`).
 
-**Инструменты и события** — `tool.ts`, `tool-runtime.ts`, `tool-history.ts`,
+**Tools and events** — `tool.ts`, `tool-runtime.ts`, `tool-history.ts`,
 `provider.ts`, `provider-package.ts`, `provider-error.ts`, `cache-policy.ts`,
 `effort-updates.ts`, `promise.ts`, `testing.ts`.
 
-**Схемы и эксперименты** — каталог `packages/ai/src/schema/` (`ids.ts`,
-`messages.ts`, `events.ts`, `errors.ts`, `options.ts`, `index.ts`) и
-`packages/ai/src/experimental/` (`evaluation.ts`,
+**Schemas and experiments** — the `packages/ai/src/schema/` directory
+(`ids.ts`, `messages.ts`, `events.ts`, `errors.ts`, `options.ts`,
+`index.ts`) and `packages/ai/src/experimental/` (`evaluation.ts`,
 `evaluation-client.ts`, `system-one.ts`).
 
-## Точки входа
+## Entry Points
 
-1. `packages/ai/src/index.ts` — весь публичный API.
-2. `packages/ai/src/index.ts` → `LLMClient` (реализация в
-   `packages/ai/src/route/client.ts`) — обычный вызов модели.
-3. `packages/ai/src/index.ts` → `isContextOverflow(...)` — решение, что
-   ошибка модели это переполнение контекста, а не сбой сети.
-4. `packages/ai/src/providers.ts` — список поддерживаемых провайдеров.
+1. `packages/ai/src/index.ts` — the entire public API.
+2. `packages/ai/src/index.ts` → `LLMClient` (implemented in
+   `packages/ai/src/route/client.ts`) — an ordinary model call.
+3. `packages/ai/src/index.ts` → `isContextOverflow(...)` — decides that a
+   model error is a context overflow and not a network failure.
+4. `packages/ai/src/providers.ts` — the list of supported providers.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/core/PACKAGE.md` — потребитель: сессии зовут модели через этот
-  слой.
-- `packages/schema/PACKAGE.md` → `llm.ts`, `provider.ts`, `model.ts` —
-  типы, которыми обмениваются.
-- `packages/http-recorder/PACKAGE.md` — запись трафика провайдеров в тестах.
-- `packages/ai/src/schema/events.ts` — события генерации, которые уходят
-  в интерфейс.
+- `packages/core/PACKAGE.md` — consumer: sessions call models through this
+  layer.
+- `packages/schema/PACKAGE.md` → `llm.ts`, `provider.ts`, `model.ts` — the
+  types exchanged with each other.
+- `packages/http-recorder/PACKAGE.md` — recording provider traffic in tests.
+- `packages/ai/src/schema/events.ts` — generation events that reach the UI.
 
-## Ловушки
+## Pitfalls
 
-1. **Провайдер ≠ протокол.** `providers/anthropic.ts` выбирает, куда
-   стучаться, а `protocols/anthropic-messages.ts` описывает, в каком формате
-   писать тело. Один провайдер может говорить по нескольким протоколам
+1. **Provider ≠ protocol.** `providers/anthropic.ts` chooses where to send
+   the request, while `protocols/anthropic-messages.ts` describes the format
+   in which to write the body. One provider can speak several protocols
    (`chat`, `messages`, `responses`).
-2. **`openai-compatible-*` — не про OpenAI**, а про любые совместимые
-   эндпоинты (self-hosted, OpenRouter и подобные). Путаница здесь даёт
-   неверный URL.
-3. **Ошибки делятся на три вида:** `provider-error.ts` различает
-   переполнение контекста, повторяемые сбои и всё остальное; то, что
-   помечено повторяемым, ретраится, остальное — нет.
-4. **`experimental/` нестабилен:** `system-one.ts` и `evaluation*` могут
-   меняться без предупреждения; на них не стоит строить зависимость
-   внешнего кода.
-5. **Кэш и compaction живут в `protocols/utils/`, а не рядом с провайдером.**
-   Правка `responses-compaction.ts` меняет поведение всех провайдеров на
-   `responses` сразу.
+2. **`openai-compatible-*` is not about OpenAI**, but about any compatible
+   endpoint (self-hosted, OpenRouter and the like). Confusion here yields a
+   wrong URL.
+3. **Errors come in three kinds:** `provider-error.ts` distinguishes context
+   overflow, retryable failures and everything else; whatever is marked
+   retryable is retried, everything else is not.
+4. **`experimental/` is unstable:** `system-one.ts` and `evaluation*` may
+   change without a warning; external code should not build a dependency on
+   them.
+5. **Cache and compaction live in `protocols/utils/`, not next to the
+   provider.** A change to `responses-compaction.ts` changes the behavior of
+   every provider on `responses` at once.

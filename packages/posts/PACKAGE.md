@@ -1,66 +1,66 @@
-# @opencode/posts — блог opencode на Astro
+# @opencode/posts — the opencode blog on Astro
 
-## Что это
+## What This Is
 
-Сайт с записями блога: Astro + MDX, деплой на Cloudflare. Пакет не связан
-с ядром CLI — ни один пакет `@opencode/*` его не импортирует, и он ни кого
-не импортирует. В подсчёт строк `src/` попадает только `content.config.ts`
-(14 строк): `.astro` и `.mdx` в статистику `*.ts` не считаются.
+A site with blog posts: Astro + MDX, deployed to Cloudflare. The package is
+unrelated to the CLI core — no `@opencode/*` package imports it, and it imports
+nothing. Only `content.config.ts` counts toward the `src/` line count
+(14 lines): `.astro` and `.mdx` are not counted in the `*.ts` statistics.
 
-Пакет `private: true`, публикуется только как сайт.
+The package is `private: true`, it is published only as a site.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L0 — лист**: от пакетов `@opencode/*` не зависит. Сторонние
-зависимости: `astro` и `@astrojs/mdx` (сборка), `@fontsource/commit-mono`
-(шрифт), для деплоя — `wrangler` и `@astrojs/cloudflare`.
+Layer **L0 — leaf**: does not depend on `@opencode/*` packages. Third-party
+dependencies: `astro` and `@astrojs/mdx` (build), `@fontsource/commit-mono`
+(font), for deployment — `wrangler` and `@astrojs/cloudflare`.
 
-Потребителей в дереве пакетов нет — это самостоятельный веб-проект внутри
-монорепозитория.
+There are no consumers in the package tree — this is a standalone web project
+inside the monorepo.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Контент** — `packages/posts/src/content/posts/`: три записи MDX
+**Content** — `packages/posts/src/content/posts/`: three MDX posts
 (`hello.mdx`, `inside-the-loop.mdx`, `tools-should-disappear.mdx`).
 
-**Схема контента** — `packages/posts/src/content.config.ts` (14 строк):
-объявляет коллекцию `posts` через `defineCollection`, единственный `.ts`-файл
-пакета.
+**Content schema** — `packages/posts/src/content.config.ts` (14 lines):
+declares the `posts` collection via `defineCollection`, the only `.ts` file
+in the package.
 
-**Страницы** — `packages/posts/src/pages/`:
-- `index.astro` — список записей;
-- `[...slug].astro` — страница одной записи по пути.
+**Pages** — `packages/posts/src/pages/`:
+- `index.astro` — the list of posts;
+- `[...slug].astro` — a single post page by path.
 
-**Каркас** — `packages/posts/src/layouts/Layout.astro` (общий HTML-каркас),
-`packages/posts/src/components/Counter.astro` (пример компонента),
-`packages/posts/src/styles/global.css` (стили).
+**Scaffolding** — `packages/posts/src/layouts/Layout.astro` (the shared
+HTML scaffold), `packages/posts/src/components/Counter.astro` (a component
+example), `packages/posts/src/styles/global.css` (styles).
 
-**Сборка и деплой** — манифест пакета:
-- `bun run dev` — astro dev-сервер;
+**Build and deploy** — the package manifest:
+- `bun run dev` — astro dev server;
 - `bun run build` — `astro build && bun script/prepare-cloudflare.ts`;
 - `bun run deploy` — `wrangler deploy --config dist/server/wrangler.json`.
 
-## Точки входа
+## Entry Points
 
-1. `packages/posts/src/pages/index.astro` — корень сайта.
-2. `packages/posts/src/content.config.ts` — точка, где описывается, какие
-   записи и с какими полями существуют.
-3. Скрипты `dev` / `build` / `deploy` из манифеста пакета.
+1. `packages/posts/src/pages/index.astro` — the site root.
+2. `packages/posts/src/content.config.ts` — the place where it is declared
+   which posts exist and with which fields.
+3. The `dev` / `build` / `deploy` scripts from the package manifest.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/web/PACKAGE.md` — основной сайт opencode, тот же стиль деплоя.
-- `packages/console` — инфраструктура SST/Astro вокруг проекта.
-- `AGENTS.md` в корне репозитория — правила монорепозитория.
+- `packages/web/PACKAGE.md` — the main opencode site, the same deployment style.
+- `packages/console` — SST/Astro infrastructure around the project.
+- `AGENTS.md` in the repository root — the monorepo rules.
 
-## Ловушки
+## Pitfalls
 
-1. **`Counter.astro` — пример компонента из шаблона Astro**, не часть
-   продукта; его правка на контент не влияет.
-2. **Строки `.astro` и `.mdx` не входят в статистику `src/`** — цифры
-   «14 строк» из манифеста не описывают размер контента.
-3. **`bun run build` пишет в `dist/` и готовит Cloudflare-конфиг** — сборка
-   без `script/prepare-cloudflare.ts` даст нерабочий деплой.
-4. **Пакет не тестируется и не typecheck-ится в общем `bun run check`**
-   в том же объёме, что ядро: у него свой скрипт `typecheck`
+1. **`Counter.astro` is a component example from the Astro template**, not
+   part of the product; editing it does not affect the content.
+2. **`.astro` and `.mdx` lines are not included in the `src/` statistics** —
+   the "14 lines" figure from the manifest does not describe the content size.
+3. **`bun run build` writes to `dist/` and prepares the Cloudflare config** — a
+   build without `script/prepare-cloudflare.ts` yields a broken deployment.
+4. **The package is not tested and not typechecked in the global `bun run check`**
+   to the same extent as the core: it has its own `typecheck` script
    (`astro check`).

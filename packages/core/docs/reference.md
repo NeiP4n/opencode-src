@@ -1,68 +1,68 @@
-# core/reference — инструкция для модели о дополнительных каталогах-ссылках проекта
+# core/reference — the instruction for the model about the extra reference directories of the project
 
-## Что в папке
+## What's In This Folder
 
-Один файл `packages/core/src/reference/instructions.ts`: превращает список
-`reference` проекта (каталоги, доступные агенту дополнительно) в инструкцию
-для модели — текстовый блок с тегами `<available_references>`.
+One file `packages/core/src/reference/instructions.ts`: it turns the `reference`
+list of a project (directories additionally available to the agent) into an instruction
+for the model — a text block with the tags `<available_references>`.
 
-Смысл: агент должен знать, какие ещё каталоги проекта можно читать, и знать
-это из инструкции, а не из догадок.
+The idea: the agent must know which other directories of the project can be read, and know
+it from the instruction, and not from guesses.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/reference/instructions.ts` — сервис
-  `ReferenceInstructions` (`@opencode/ReferenceInstructions`) с единственным
-  методом `load()`, плюс `node` для привязки к локации.
-- Внутри файла: схема `Summary` (`name`, `path`, `description` — последнее
-  необязательное), функция `entries()` (строки блока), `render()` (полный
-  список), `update()` (дельты между состояниями).
+- `packages/core/src/reference/instructions.ts` — the service
+  `ReferenceInstructions` (`@opencode/ReferenceInstructions`) with the single
+  method `load()`, plus `node` for binding to a location.
+- Inside the file: the schema `Summary` (`name`, `path`, `description` — the last one
+  optional), the function `entries()` (the lines of the block), `render()` (the full
+  list), `update()` (deltas between states).
 
-## Важные детали
+## Important Details
 
-- В список попадают только ссылки с непустым `description`. Ссылка без
-  описания отфильтровывается, а не печатается в неполном виде.
-- Список отсортирован по `name` через `localeCompare` — порядок
-  стабильный между вызовами, иначе диффы «шумели» бы.
-- Ключ инструкции — `core/reference-guidance`, он же часть
+- Only the references with a non-empty `description` get into the list. A reference without
+  a description is filtered out, and not printed in an incomplete form.
+- The list is sorted by `name` via `localeCompare` — the order is
+  stable between calls, otherwise the diffs would "make noise".
+- The instruction key is `core/reference-guidance`, it is also part of
   `Instructions.List`.
-- `removed` возвращается как особое значение, когда ссылок не осталось.
-  Рендер для этого состояния — отдельная строка «Project reference guidance
+- `removed` is returned as a special value when no references are left.
+  The render for this state is a separate line «Project reference guidance
   is no longer available. Do not use previously listed references.»
-- Дальше файла на диске обновление считается через
-  `Instructions.diffByKey` по полю `name` с предикатом изменения по
-  `path` и `description`.
-- Рендер дельт: добавления печатаются как «New project references are
-  available in addition to those previously listed», удаления — строкой с
-  перечислением имён и запретом использовать.
-- Любое изменение существующей ссылки (не добавление и не удаление)
-  переводит на полный перечень с фразой «This list supersedes the previous
+- Further along the file on disk the update is counted through
+  `Instructions.diffByKey` by the `name` field with a change predicate on
+  `path` and `description`.
+- Rendering of deltas: additions are printed as «New project references are
+  available in addition to those previously listed», removals — by a line with
+  a listing of the names and a prohibition to use them.
+- Any change of an existing reference (neither an addition nor a removal)
+  switches to the full listing with the phrase «This list supersedes the previous
   reference list».
-- Формат вывода — XML-подобные теги с отступом в два пробела на уровень
-  `<reference>` и четыре на уровень полей.
+- The output format is XML-like tags with an indent of two spaces per `<reference>`
+  level and four for the level of the fields.
 
-## Связи
+## Connections
 
-- `packages/core/src/reference.ts` — соседний файл корня `src`: сам
-  сервис `Reference.Service` с методом `list()`. Отсюда берутся имена,
-  пути и описания ссылок.
+- `packages/core/src/reference.ts` — a neighboring file of the root `src`: the
+  `Reference.Service` service itself with the `list()` method. The names,
+  paths and descriptions of the references come from there.
 - `packages/core/src/instructions/index.ts` — `Instructions.make`,
-  `Instructions.Key`, `Instructions.diffByKey`, тип `Instructions.List`:
-  механизм, который хранит состояние и считает изменения между вызовами.
-- `@opencode/util/effect/app-node` — `makeLocationNode`, который связывает
-  сервис с `Reference.node` в граф зависимостей.
+  `Instructions.Key`, `Instructions.diffByKey`, the type `Instructions.List`:
+  the mechanism that stores the state and counts the changes between calls.
+- `@opencode/util/effect/app-node` — `makeLocationNode`, which binds
+  the service to `Reference.node` in the dependency graph.
 
-## Ловушки
+## Pitfalls
 
-- Фильтр по `description` жёсткий: ссылка с пустым описанием исчезает из
-  инструкции целиком, хотя в `Reference.Service` она остаётся.
-- `update` смешивает два случая: изменение любой ссылки печатает весь
-  список заново, а чистые добавления и удаления — дельтой. Логика условия
-  собрана одной строкой, её легко сломать добавлением третьего вида
-  изменения.
-- Пустой список и список, изменившийся в сторону пустоты, дают разный вывод:
-  первый — `removed`, второй — дельту с удалениями и без добавлений.
-- `render` всегда печатает строку-пояснение перед `<available_references>`;
-  при диффе этот преамбул не выводится, только сами блоки.
-- Пути и описания подставляются в текст без экранирования: имя ссылки с
-  угловыми скобками ломает разметку инструкции.
+- The filter by `description` is strict: a reference with an empty description disappears from
+  the instruction entirely, although in `Reference.Service` it stays.
+- `update` mixes two cases: a change of any reference prints the whole
+  list anew, while pure additions and removals — by a delta. The logic of the condition
+  is collected in one line, it is easy to break by adding a third kind
+  of change.
+- An empty list and a list that has changed towards empty give a different output:
+  the first — `removed`, the second — a delta with removals and without additions.
+- `render` always prints an explanatory line before `<available_references>`;
+  in a diff this preamble is not output, only the blocks themselves.
+- The paths and descriptions are substituted into the text without escaping: a reference name with
+  angle brackets breaks the markup of the instruction.

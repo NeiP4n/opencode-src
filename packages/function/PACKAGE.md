@@ -1,74 +1,82 @@
-# @opencode/function — серверная функция share и GitHub App
+# @opencode/function — server function for share and the GitHub App
 
-## Что это
+## What This Is
 
-Облачная функция на Cloudflare Workers: 2 файла, ~400 строк в `src/`. Пакет
-не входит в бинарник CLI и не импортируется ни одним пакетом `@opencode/*` —
-это бэкенд веб-части opencode: публикация сессий (share) и обмен токенами
-GitHub App.
+A cloud function on Cloudflare Workers: 2 files, ~400 lines in `src/`. The
+package is not part of the CLI binary and is imported by no `@opencode/*`
+package — it is the backend of the opencode web part: session publishing
+(share) and GitHub App token exchange.
 
-Пакет `private: true`, в npm не публикуется. Зависимости: `hono` (роутер),
-`jose` (JWT), `@octokit/rest` и `@octokit/auth-app` (GitHub), `sst`
-(переменные окружения инфраструктуры).
+The package is `private: true`, it is not published to npm. Dependencies:
+`hono` (router), `jose` (JWT), `@octokit/rest` and `@octokit/auth-app`
+(GitHub), `sst` (infrastructure environment variables).
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L0 — лист**: от других пакетов `@opencode/*` не зависит. С ядром
-связан только по формату данных: сессии, которые он раздаёт, приходят с
-сервера opencode в том же виде.
+Layer **L0 — leaf**: it does not depend on other `@opencode/*` packages. It
+is tied to the core only by the data format: the sessions it serves arrive
+from the opencode server in the same shape.
 
-Потребителей в `packages/*/src` нет — пакет деплоится отдельно и работает
-с клиентом по HTTP/WebSocket.
+There are no consumers in `packages/*/src` — the package is deployed
+separately and talks to the client over HTTP/WebSocket.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**`packages/function/src/api.ts`** — вся серверная логика, Hono-приложение
-(`export default new Hono<...>()`, строка 117) и Durable Object `SyncServer`:
+**`packages/function/src/api.ts`** — all the server logic, the Hono
+application (`export default new Hono<...>()`, line 117) and the Durable
+Object `SyncServer`:
 
-- `SyncServer` — состояние одной публикуемой сессии. При подключении отдаёт
-  сохранённые ключи `session/*` через WebSocket, метод `publish(key, content)`
-  проверяет, что ключ принадлежит текущей сессии (`session/info/<id>`,
-  `session/message/<id>/`, `session/part/<id>/`), кладёт JSON в R2-бакет
-  (`share/<key>.json`) и в память объекта, затем рассылает всем подписчикам.
-- `share(sessionID)` — выдаёт секрет публикации (первый раз — `randomUUID`,
-  дальше возвращает сохранённый); `assertSecret(secret)` сверяет его.
-- `clear()` — удаляет из бакета все сообщения сессии и память объекта.
-- `static shortName(id)` — короткое имя ссылки.
-- Ручки обмена токенами GitHub: `POST /exchange_github_app_token`
-  (по установке приложения), `POST /exchange_github_app_token_with_pat`
-  (для `opencode github run` локально, дополнительно проверяет права
-  `admin|push|maintain` у репозитория), `GET /get_github_app_installation`
-  (проверка, установлено ли приложение).
+- `SyncServer` — the state of one published session. On connect it serves
+  the stored `session/*` keys over WebSocket; the `publish(key, content)`
+  method checks that the key belongs to the current session
+  (`session/info/<id>`, `session/message/<id>/`, `session/part/<id>/`),
+  puts the JSON into the R2 bucket (`share/<key>.json`) and into the
+  object's memory, then broadcasts to all subscribers.
+- `share(sessionID)` — issues the publishing secret (the first time —
+  `randomUUID`, afterwards it returns the stored one); `assertSecret(secret)`
+  verifies it.
+- `clear()` — deletes all session messages from the bucket and the object's
+  memory.
+- `static shortName(id)` — the short link name.
+- GitHub token exchange handlers: `POST /exchange_github_app_token`
+  (from the app installation), `POST /exchange_github_app_token_with_pat`
+  (for a local `opencode github run`, additionally checks the
+  `admin|push|maintain` permissions of the repository),
+  `GET /get_github_app_installation`
+  (checks whether the app is installed).
 
 **`packages/function/src/github.ts`** — `parseRepositoryClaim(payload)`:
-достаёт и проверяет claim `repository` из JWT (`jose`), без него — ошибка.
+extracts and validates the `repository` claim from the JWT (`jose`); without
+it — an error.
 
-## Точки входа
+## Entry Points
 
-1. `packages/function/src/api.ts` → `export default` — Hono-роутер, который
-   разворачивает Cloudflare Worker.
-2. `packages/function/src/github.ts` → `parseRepositoryClaim` — единственная
-   функция файла, используется внутри `api.ts`.
-3. Внешних импортёров в `packages/*/src` нет: точка входа — сам деплой.
+1. `packages/function/src/api.ts` → `export default` — the Hono router that
+   deploys the Cloudflare Worker.
+2. `packages/function/src/github.ts` → `parseRepositoryClaim` — the only
+   function of the file, used inside `api.ts`.
+3. There are no external importers in `packages/*/src`: the entry point is
+   the deployment itself.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/cli/PACKAGE.md` — команды, которые ходят в этот бэкенд
-  (`opencode github run`, share-ссылки).
-- `packages/core/PACKAGE.md` — сессии и сообщения, формат которых хранится
-  в бакете.
-- `packages/schema/PACKAGE.md` — типы данных, общие для сервера и клиента.
+- `packages/cli/PACKAGE.md` — the commands that call this backend
+  (`opencode github run`, share links).
+- `packages/core/PACKAGE.md` — the sessions and messages whose format is
+  stored in the bucket.
+- `packages/schema/PACKAGE.md` — the data types shared by server and
+  client.
 
-## Ловушки
+## Pitfalls
 
-1. **`Resource.GITHUB_APP_ID` и `Resource.GITHUB_APP_PRIVATE_KEY` берутся из
-   `sst`** — без развёрнутой инфраструктуры функция падает на первом же
-   обращении к GitHub.
-2. **Приватный ключ в ручке `/exchange_github_app_token_with_pat`** передаётся
-   через `Authorization: Bearer <PAT>`; ошибки авторизации отвечают статусом
-   401, ошибки обмена — 502.
-3. **`publish` молча отбрасывает чужие ключи**, возвращая `400` — но только
-   когда проверка ключа не прошла; сама рассылка идёт всем WebSocket-подписчикам
-   объекта без проверки секрета на этом этапе.
-4. **`webSocketMessage` пустой** — клиент ничего не отправляет в объект,
-   канал односторонний; вход только через HTTP-ручки.
+1. **`Resource.GITHUB_APP_ID` and `Resource.GITHUB_APP_PRIVATE_KEY` come
+   from `sst`** — without deployed infrastructure the function fails on the
+   very first call to GitHub.
+2. **The private token in the `/exchange_github_app_token_with_pat`
+   handler** is passed through `Authorization: Bearer <PAT>`; authorization
+   errors answer with status 401, exchange errors with 502.
+3. **`publish` silently drops foreign keys**, returning `400` — but only
+   when the key check failed; the broadcast itself goes to all WebSocket
+   subscribers of the object without a secret check at that stage.
+4. **`webSocketMessage` is empty** — the client sends nothing to the object,
+   the channel is one-way; input comes only through the HTTP handlers.

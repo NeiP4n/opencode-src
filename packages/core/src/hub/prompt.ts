@@ -15,7 +15,7 @@ const MAX_TOOL_CHARS = 400
 const MAX_ENTRIES_PER_TOOL = 3
 
 const HEADER =
-  "Включённые вручную инструменты хаба доступны в этой сессии; подробности и другие рецепты — через инструмент hub. Когда спрашивают, что ты умеешь, назови и их."
+  "Manually enabled hub tools are available in this session; details and other recipes come through the hub tool. When asked what you can do, name them too."
 
 export type Hints = {
   readonly state: State
@@ -38,10 +38,10 @@ export function renderHubHints(hints: Hints): string {
 
   const required = entriesByTool()
   const lines = [HEADER]
-  if (hints.terminals?.length) lines.push(`Терминалы: ${hints.terminals.join(", ")}`)
+  if (hints.terminals?.length) lines.push(`Terminals: ${hints.terminals.join(", ")}`)
   for (const tool of eligible) lines.push(toolLine(tool, required.get(tool) ?? []))
   const dropped = fit(lines, hints.terminals?.length ? 2 : 1)
-  if (dropped > 0) lines.push(`… ещё ${dropped} инструментов — подробности через инструмент hub`)
+  if (dropped > 0) lines.push(`… ${dropped} more tools — details through the hub tool`)
   return lines.join("\n")
 }
 
@@ -67,7 +67,7 @@ function toolLine(tool: string, entries: readonly Entry[]): string {
     .map((template) => `\`${template}\``)
     .join("; ")
   const body = purposes.length > 0 ? `${tool} — ${purposes}` : tool
-  const full = templates.length > 0 ? `${body} | шаблоны: ${templates}` : body
+  const full = templates.length > 0 ? `${body} | templates: ${templates}` : body
   const clipped = full.length > MAX_TOOL_CHARS ? `${full.slice(0, MAX_TOOL_CHARS - 1)}…` : full
   return `- ${clipped}`
 }

@@ -1,37 +1,37 @@
-# core/id — генерация идентификаторов с префиксом сущности и направлением сортировки
+# core/id — identifier generation with an entity prefix and a sort direction
 
-## Что в папке
+## What's In This Folder
 
-- `id.ts` — единственный файл. Содержит карту префиксов сущностей, две обёртки над генератором (`ascending`, `descending`), внутренние `generateID` и `createID`, извлечение времени из ID и самодостаточное переэкспортирование пространства имён.
+- `id.ts` — the only file. It holds the entity prefix map, two wrappers over the generator (`ascending`, `descending`), the internal `generateID` and `createID`, time extraction from an ID, and a self-contained namespace re-export.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/id/id.ts` — весь модуль целиком.
+- `packages/core/src/id/id.ts` — the entire module.
 
-## Важные детали
+## Important Details
 
-- `prefixes` — константная карта вид «сущность → короткий префикс»: `job` → `job`, `event` → `evt`, `session` → `ses`, `message` → `msg`, `permission` → `per`, `question` → `que`, `part` → `prt`, `pty` → `pty`, `tool` → `tool`, `workspace` → `wrk`. Тип параметра `keyof typeof prefixes`, поэтому неизвестная сущность не компилируется.
-- `ascending(prefix, given?)` и `descending(prefix, given?)` — единственная точка входа для остальных пакетов core. Если `given` не передан, генерируется новый ID; если передан, он только проверяется и возвращается как есть.
-- Проверка `given`: строка обязана начинаться ровно с префикса этой сущности, иначе бросается `Error` с текстом о несовпадении. Это защита от подмены ID чужой сущности (например, ID сессии, переданный как ID job).
-- `createID` собирает строку как `prefix + "_" + create(...)` — то есть в ID всегда есть подчёркивание-разделитель.
-- Реальная генерация живёт в `packages/schema/src/identifier.ts` (`create(descending, timestamp?)`): первые 12 hex-символов кодируют `timestamp * 0x1000 + counter` (инвертированное значение при нисходящем направлении), остальные 14 символов — случайные байты из `crypto.getRandomValues`, отображённые в алфавит из 62 символов.
-- Счётчик `counter` в генераторе общий на процесс и сбрасывается при смене миллисекунды, поэтому два ID в одной миллисекунде не совпадают.
-- `timestamp(id)` парсит hex после `prefix_` и делит на `0x1000n`, отбрасывая счётчик. В комментарии к функции прямо сказано, что с нисходящими ID это не работает, потому что значение побитово инвертировано.
-- `createID` переэкспортирован под именем `create` (`export { createID as create }`) — тесты пользуются именно `Identifier.create("tool", "ascending", ts)`, чтобы получить ID с заданным временем.
-- Последняя строка файла — `export * as Identifier from "./id.js"`, самодостаточное пространство имён для импорта вида `import { Identifier } from "./id/id.js"`. Тот же приём применён в остальных модулях репозитория.
+- `prefixes` — a constant map of the form "entity → short prefix": `job` → `job`, `event` → `evt`, `session` → `ses`, `message` → `msg`, `permission` → `per`, `question` → `que`, `part` → `prt`, `pty` → `pty`, `tool` → `tool`, `workspace` → `wrk`. The parameter type is `keyof typeof prefixes`, so an unknown entity does not compile.
+- `ascending(prefix, given?)` and `descending(prefix, given?)` — the only entry point for the other core packages. If `given` is not passed, a new ID is generated; if it is passed, it is only validated and returned as is.
+- Validating `given`: the string must start with exactly this entity's prefix, otherwise an `Error` about the mismatch is thrown. This protects against passing off one entity's ID as another's (for example, a session ID passed as a job ID).
+- `createID` assembles the string as `prefix + "_" + create(...)` — so the ID always contains an underscore separator.
+- The real generation lives in `packages/schema/src/identifier.ts` (`create(descending, timestamp?)`): the first 12 hex characters encode `timestamp * 0x1000 + counter` (the inverted value when descending), the remaining 14 characters are random bytes from `crypto.getRandomValues` mapped onto a 62-character alphabet.
+- The `counter` in the generator is process-wide and resets when the millisecond changes, so two IDs in the same millisecond do not collide.
+- `timestamp(id)` parses the hex after `prefix_` and divides by `0x1000n`, discarding the counter. The function comment says outright that it does not work for descending IDs, because the value is bitwise inverted.
+- `createID` is re-exported as `create` (`export { createID as create }`) — tests use exactly `Identifier.create("tool", "ascending", ts)` to get an ID with a given time.
+- The last line of the file is `export * as Identifier from "./id.js"`, a self-contained namespace for imports like `import { Identifier } from "./id/id.js"`. The same trick is used in the other modules of the repository.
 
-## Связи
+## Connections
 
-- `packages/schema/src/identifier.ts` — источник `create`, который вызывается здесь; в схеме живут и собственные конструкторы ID (например, `packages/schema/src/session-id.ts` собирает `ses_` + нисходящий суффикс).
-- `packages/core/src/job.ts` — `Identifier.ascending("job")` как значение ID по умолчанию при создании job.
-- `packages/core/src/tool-output.ts` — `Identifier.ascending("tool")` для имени файла вывода инструмента.
-- `packages/core/test/tool-output.test.ts` — прямой импорт `Identifier` из `@opencode/core/id/id` и подстановка ID с искусственным временем для проверки уборки старых файлов.
-- `packages/core/package.json` — отображение `./*` на `./src/*.ts`, поэтому внешний импорт `@opencode/core/id/id` работает без отдельной точки входа.
+- `packages/schema/src/identifier.ts` — the source of `create`, called here; the schema also has its own ID constructors (for example, `packages/schema/src/session-id.ts` builds `ses_` plus a descending suffix).
+- `packages/core/src/job.ts` — `Identifier.ascending("job")` as the default ID value when creating a job.
+- `packages/core/src/tool-output.ts` — `Identifier.ascending("tool")` for the tool output file name.
+- `packages/core/test/tool-output.test.ts` — imports `Identifier` directly from `@opencode/core/id/id` and injects IDs with an artificial time to test cleanup of old files.
+- `packages/core/package.json` — maps `./*` to `./src/*.ts`, so the external import `@opencode/core/id/id` works without a separate entry point.
 
-## Ловушки
+## Pitfalls
 
-- `timestamp` на нисходящем ID возвращает бессмысленное число, а исключения не бросает: инверсия значения в генераторе делает исходное время невосстановимым. Проверять направление нужно на вызывающей стороне.
-- Убывающие ID не монотонно упорядочены по времени в ожидаемом смысле: инверсия переворачивает и счётчик внутри одной миллисекунды, так что два ID, созданные в одну миллисекунду, будут упорядочены в обратном порядке счётчика.
-- Переданный `given` не нормализуется и не перегенерируется: это не «создать ID, если такого ещё нет», а «проверить и отдать». Функции с таким аргументом не идемпотентны в смысле выдачи нового значения.
-- Проверка префикса сравнивает только начало строки, поэтому строка вида `job_` с пустым хвостом пройдёт проверку — валидность хвоста этот модуль не контролирует.
-- Счётчик и `lastTimestamp` в генераторе состояние уровня процесса: в двух экземплярах кода, живущих в одном процессе, значения продолжают общую последовательность, а не начинают её заново.
+- `timestamp` on a descending ID returns a meaningless number and throws nothing: the value inversion in the generator makes the original time unrecoverable. The direction has to be checked on the calling side.
+- Descending IDs are not monotonically ordered by time in the usual sense: the inversion flips the counter inside a single millisecond too, so two IDs created in the same millisecond will be ordered by reverse counter.
+- A passed `given` is neither normalized nor regenerated: this is not "create an ID if there is none yet", it is "validate and hand back". Functions with such an argument are not idempotent in the sense of producing a new value.
+- The prefix check compares only the start of the string, so a string like `job_` with an empty tail passes validation — this module does not check the validity of the tail.
+- The counter and `lastTimestamp` in the generator are process-level state: in two instances of the code living in one process the values continue the shared sequence instead of starting it over.

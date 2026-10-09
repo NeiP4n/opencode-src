@@ -1,60 +1,60 @@
-# core/vcs — диффы и патчи: сборка, разбор и разбивка вывода git по файлам
+# core/vcs — diffs and patches: assembling, parsing and splitting the git output by files
 
-## Что в папке
+## What's In This Folder
 
-Один файл `patch.ts`: операции над унифицированным диффом на базе пакета
-`diff`. Он ничего не знает про git-репозитории — только строит патчи для
-создания, удаления и изменения файла, считает строки, достаёт имя файла из
-заголовков и делит вывод `git diff` на куски по файлам.
+One file `patch.ts`: the operations over a unified diff based on the `diff` package.
+It knows nothing about git repositories — it only builds the patches for
+creating, deleting and changing a file, counts the lines, extracts the file name from the
+headers and splits the `git diff` output into chunks by files.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/vcs/patch.ts` — единственный файл папки. Экспортирует
-  `PATCH_CONTEXT_LINES`, `MAX_PATCH_BYTES`, `MAX_TOTAL_PATCH_BYTES`, тип
-  `Patch`, функции `emptyPatch`, `addPatch`, `deletePatch`, `countPatch`,
+- `packages/core/src/vcs/patch.ts` — the only file of the folder. It exports
+  `PATCH_CONTEXT_LINES`, `MAX_PATCH_BYTES`, `MAX_TOTAL_PATCH_BYTES`, the type
+  `Patch`, the functions `emptyPatch`, `addPatch`, `deletePatch`, `countPatch`,
   `fileFromPatchChunk`, `splitGitPatch`, `chunksByFile`.
 
-## Важные детали
+## Important Details
 
-- `PATCH_CONTEXT_LINES` = 2 147 483 647, то есть фактически «весь файл»:
-  адаптеры берут это значение, когда контекст не запрошен.
-- Лимиты размера патча и суммарного размера совпадают и равны 10 000 000 —
-  это предохранители при сборке диффа, а не формат хранения.
-- `emptyPatch`, `addPatch`, `deletePatch` строят дифф через
-  `formatPatch(structuredPatch(...))` с нулевым контекстом: строки контекста не
-  попадают в результат.
-- `countPatch` считает добавления и удаления, пропуская заголовки `+++` и
-  `---`; строки заголовков файлов иначе были бы посчитаны как изменения.
-- Имя файла ищется сначала по строкам `+++` и `---`, а если там ничего нет —
-  по заголовку `diff --git`. Значение `/dev/null` считается отсутствующим
-  файлом, а префиксы `a/` и `b/` срезаются.
-- Пути в заголовках git бывают в кавычках. Для них есть свой разбор с
-  escape-последовательностями `\t`, `\n`, `\r`, `\"`, `\\`; без кавычек путь
-  обрезается по табуляции.
-- `splitGitPatch` режет текст по вхождениям `diff --git`. Если патч помечен
-  как `truncated`, последний кусок отбрасывается: он может быть неполным.
-- `chunksByFile` склеивает несколько кусков одного файла в одну строку, а если
-  имя вывести не удалось — берёт его из переданного `fallback` по индексу.
+- `PATCH_CONTEXT_LINES` = 2 147 483 647, that is in effect "the whole file":
+  the adapters take this value when the context is not requested.
+- The limit of the patch size and of the total size coincide and equal 10 000 000 —
+  these are the fuses at the assembly of the diff, and not a storage format.
+- `emptyPatch`, `addPatch`, `deletePatch` build the diff via
+  `formatPatch(structuredPatch(...))` with a zero context: the context lines do not
+  get into the result.
+- `countPatch` counts the additions and the deletions, skipping the headers `+++` and
+  `---`; the header lines of the files would otherwise be counted as changes.
+- The file name is looked for first by the lines `+++` and `---`, and if there is nothing there —
+  by the header `diff --git`. The value `/dev/null` is considered an absent
+  file, and the prefixes `a/` and `b/` are cut off.
+- The paths in the git headers are sometimes in quotes. For them there is a separate parsing with
+  the escape sequences `\t`, `\n`, `\r`, `\"`, `\\`; without quotes the path is
+  cut at the tab.
+- `splitGitPatch` cuts the text by the occurrences of `diff --git`. If the patch is marked
+  as `truncated`, the last chunk is discarded: it may be incomplete.
+- `chunksByFile` glues several chunks of one file into one line, and if
+  the name could not be produced — takes it from the passed `fallback` by the index.
 
-## Связи
+## Connections
 
-- `chunksByFile` — мост к git: результат `git diff` без заголовков `diff --git`
-  разбирается через `fileFromGitChunk` и группируется этой функцией.
-- `Patch` с полем `truncated` требует, чтобы вызывающая сторона сама следила за
-  лимитом размера: при обрезке вывода последний файл молча теряется, если
-  про `truncated` не знать.
+- `chunksByFile` is a bridge to git: the result of `git diff` without the headers `diff --git`
+  is parsed via `fileFromGitChunk` and is grouped by this function.
+- `Patch` with the field `truncated` requires that the calling side itself watch the
+  size limit: on the cutting of the output the last file is silently lost if you do not
+  know about `truncated`.
 
-## Ловушки
+## Pitfalls
 
-- Диффы собираются с нулевым контекстом, поэтому в `countPatch` каждая строка
-  `+`/`-` — это реальное изменение, но привычный подсчёт «строк контекста» к
-  такому патчу неприменим.
-- `splitGitPatch` при `truncated: true` теряет последний файл без всякого
-  признака в тексте — это осознанное поведение, а не ошибка разбора.
-- Путь из заголовка `diff --git` разбирается эвристикой: нестандартный формат
-  (`---`/`+++` без кавычек и без ` b/`) имя файла не даст, и тогда важен
-  `fallback` в `chunksByFile`.
-- Кавычки в именах файлов с пробелами и нелатинскими символами разбираются
-  вручную; любая незнакомая escape-последовательность возвращается как есть.
-- Размер диффа упирается в 10 МБ: файлы крупнее требуют внешнего ограничения
-  размера, иначе патч будет помечен обрезанным, а последний файл потерян.
+- The diffs are assembled with a zero context, therefore in `countPatch` every line
+  `+`/`-` is a real change, but the usual counting of "context lines" is not
+  applicable to such a patch.
+- `splitGitPatch` at `truncated: true` loses the last file without any
+  sign in the text — this is conscious behavior, and not a parsing error.
+- The path from the header `diff --git` is parsed by a heuristic: a non-standard format
+  (`---`/`+++` without quotes and without ` b/`) will not give a file name, and then the
+  `fallback` in `chunksByFile` matters.
+- The quotes in the file names with spaces and non-Latin characters are parsed
+  by hand; any unknown escape sequence is returned as is.
+- The size of the diff hits 10 MB: the larger files require an external limit of the
+  size, otherwise the patch will be marked as cut off, and the last file will be lost.

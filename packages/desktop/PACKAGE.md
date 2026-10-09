@@ -1,73 +1,76 @@
-# @opencode/desktop — десктопное приложение (Electron)
+# @opencode/desktop — desktop application (Electron)
 
-## Что это
+## What This Is
 
-Обёртка Electron: 142 файла, ~9.6 тыс. строк в `src/`. Три части
-классического Electron — главный процесс (`main/`), прелоад
-(`preload/`), рендер (`renderer/`) — плюс общий код (`shared/`).
+An Electron wrapper: 142 files, ~9.6k lines in `src/`. The three parts of
+classic Electron — the main process (`main/`), the preload (`preload/`),
+the renderer (`renderer/`) — plus shared code (`shared/`).
 
-Собирается `electron-vite`, упаковывается `electron-builder`
-(конфиги в корне пакета), обновляется через `electron-updater`.
+Built by `electron-vite`, packaged by `electron-builder` (configs in the
+package root), updated through `electron-updater`.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L6 — поверхность**: в манифесте зависимостей от `@opencode/*` нет
-(пакет использует workspace-пакеты через devDependencies и сборку), но по
-коду связан с `app`, `cli`, `client`, `gui-extensions`.
+Layer **L6 — surface**: the manifest lists no dependency on `@opencode/*`
+(the package uses workspace packages through devDependencies and the
+build), but by code it is tied to `app`, `cli`, `client`,
+`gui-extensions`.
 
-Потребителей в `packages/*/src` нет — пакет запускается сам.
+There are no consumers in `packages/*/src` — the package runs on its own.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-Каталоги `packages/desktop/src/`:
+Directories in `packages/desktop/src/`:
 
-- `main/` — главный процесс Electron: окна, системный трей, IPC;
-- `preload/` — мост между рендером и главным процессом;
-- `renderer/` — окно приложения (сюда встраивается `@opencode/app`);
-- `shared/` — общие типы и утилиты для обеих половин.
+- `main/` — the Electron main process: windows, system tray, IPC;
+- `preload/` — the bridge between the renderer and the main process;
+- `renderer/` — the application window (`@opencode/app` is embedded
+  here);
+- `shared/` — types and utilities shared by both halves.
 
-Конфигурация в корне пакета:
+Configuration in the package root:
 
-- `electron.vite.config.ts` (+тест `electron.vite.config.test.ts`) —
-  сборка;
-- `electron-builder.config.ts` (+тест) — упаковка дистрибутивов;
-- `drizzle.config.ts` — миграции локальной базы;
-- `icons/` — иконки.
+- `electron.vite.config.ts` (+test `electron.vite.config.test.ts`) —
+  the build;
+- `electron-builder.config.ts` (+test) — packaging of distributables;
+- `drizzle.config.ts` — migrations of the local database;
+- `icons/` — icons.
 
-Скрипты (`packages/desktop/package.json`): `dev`, `build`
+Scripts (`packages/desktop/package.json`): `dev`, `build`
 (`electron-vite build`), `package:mac` / `package:win` /
 `package:linux`, `bench:startup`, `migration`.
 
-Зависимости: `electron-updater` (обновления), `electron-log`,
+Dependencies: `electron-updater` (updates), `electron-log`,
 `electron-context-menu`, `@zip.js/zip.js`, `lighthouse`.
 
-## Точки входа
+## Entry Points
 
 1. `packages/desktop/package.json` → `"main": "./out/main/index.js"` —
-   точка входа Electron после сборки.
-2. `packages/desktop/src/main/` — главный процесс, с него начинается
-   разработка.
-3. `packages/desktop/src/renderer/` — окно, куда встраивается приложение.
-4. `electron.vite.config.ts` — как собираются три части.
+   the Electron entry point after the build.
+2. `packages/desktop/src/main/` — the main process, where development
+   starts.
+3. `packages/desktop/src/renderer/` — the window the application is
+   embedded into.
+4. `electron.vite.config.ts` — how the three parts are built.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/app/PACKAGE.md` — приложение внутри рендерера.
-- `packages/gui-extensions/PACKAGE.md` — расширения, которые desktop
-  подключает.
-- `packages/cli/PACKAGE.md` — CLI, запускаемый из десктопа.
-- `packages/desktop/README.md` — заметки самого пакета.
+- `packages/app/PACKAGE.md` — the application inside the renderer.
+- `packages/gui-extensions/PACKAGE.md` — the extensions desktop connects.
+- `packages/cli/PACKAGE.md` — the CLI launched from the desktop app.
+- `packages/desktop/README.md` — the package's own notes.
 
-## Ловушки
+## Pitfalls
 
-1. **`src/` не равно коду главного процесса после сборки:** результат
-   лежит в `out/` (`out/main/index.js`); правки в `src/` требуют
-   пересборки.
-2. **Конфиги тоже тестируются** (`electron-builder.config.test.ts`,
-   `electron.vite.config.test.ts`) — их правка ломает тесты, а не только
-   сборку.
-3. **`drizzle.config.ts` — про базу данных десктопа**, не про базу
-   ядра opencode (`packages/core/src/database`); два разных файла.
-4. **`main`, `preload`, `renderer` — разные контексты.** Общее — только
-   `shared/`; попытка использовать DOM в `main/` или Node-API в
-   `renderer/` без прелоада упадёт.
+1. **`src/` is not the main-process code after the build:** the result
+   lives in `out/` (`out/main/index.js`); edits in `src/` require a
+   rebuild.
+2. **Configs are tested too** (`electron-builder.config.test.ts`,
+   `electron.vite.config.test.ts`) — editing them breaks the tests, not
+   just the build.
+3. **`drizzle.config.ts` is about the desktop database**, not the
+   opencode core database (`packages/core/src/database`); two different
+   files.
+4. **`main`, `preload`, `renderer` are different contexts.** The only
+   shared part is `shared/`; using the DOM in `main/` or the Node API in
+   `renderer/` without the preload will crash.

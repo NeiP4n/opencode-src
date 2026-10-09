@@ -1,23 +1,24 @@
-# @opencode/app — браузерное приложение
+# @opencode/app — browser application
 
-## Что это
+## What This Is
 
-Самый большой пакет: 515 файлов, ~121 тыс. строк в `src/`. Веб-приложение
-opencode: домашний экран, создание сессии, рабочие пространства, настройки,
-композер, панели серверов и оболочка (shell).
+The largest package: 515 files, ~121k lines in `src/`. The opencode web
+application: home screen, session creation, workspaces, settings, composer,
+server panels and the shell.
 
-Собирается Vite (см. `index.html`, `manifest.json` в корне пакета) и
-встраивается в desktop-приложение.
+Built with Vite (see `index.html`, `manifest.json` in the package root) and
+embedded into the desktop application.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L6 — поверхность**: зависит от `client`, `gui-extensions`,
-`schema`, `session-ui`, `ui`, `util`.
+Layer **L6 — surface**: depends on `client`, `gui-extensions`, `schema`,
+`session-ui`, `ui`, `util`.
 
-Кто подключает: `packages/desktop`, `packages/session-ui` — оба берут
-части приложения. Корневой `src` — точка входа самого приложения.
+Who depends on it: `packages/desktop`, `packages/session-ui` — both take
+parts of the application. The root `src` is the entry point of the
+application itself.
 
-Экспорт (`packages/app/package.json`):
+Export map (`packages/app/package.json`):
 
 ```json
 ".": "./src/index.ts",
@@ -27,51 +28,51 @@ opencode: домашний экран, создание сессии, рабоч
 "./index.css": "./src/index.css"
 ```
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-Каталоги `packages/app/src/`:
+Directories in `packages/app/src/`:
 
-- `home/` — домашний экран со списком сессий;
-- `new-session/` — создание сессии;
-- `session/` — рабочая область сессии;
-- `composer/` — ввод сообщения (композер);
-- `workspaces/` — рабочие пространства;
-- `servers/` — панель серверов (подключение к чужим инстансам);
-- `settings/` — настройки;
-- `shell/` — оболочка и команды, включая `commands/desktop-menu.ts`;
-- `providers/` — Solid-провайдеры состояния;
-- `runtime/` — рантайм-обвязка (включая `i18n/desktop-native.ts`);
+- `home/` — home screen with the session list;
+- `new-session/` — session creation;
+- `session/` — session workspace;
+- `composer/` — message input (composer);
+- `workspaces/` — workspaces;
+- `servers/` — server panel (connecting to other instances);
+- `settings/` — settings;
+- `shell/` — shell and commands, including `commands/desktop-menu.ts`;
+- `providers/` — Solid state providers;
+- `runtime/` — runtime plumbing (including `i18n/desktop-native.ts`);
 - `app.tsx`, `entry.tsx`, `index.ts`, `index.css`, `desktop.ts`.
 
-**Тесты** — `packages/app/component-tests/` и `packages/app/e2e/`
-(E2E-прогоны), `theme-preload.test.ts` в `src/`.
+**Tests** — `packages/app/component-tests/` and `packages/app/e2e/`
+(E2E runs), `theme-preload.test.ts` in `src/`.
 
-## Точки входа
+## Entry Points
 
-1. `packages/app/src/index.ts` (экспорт `"."`) — корень приложения.
-2. `packages/app/src/entry.tsx` — точка входа рендера.
-3. `packages/app/src/desktop.ts` (экспорт `./desktop`) — вариация для
-   desktop-сборки.
-4. `packages/app/src/index.css` (экспорт `./index.css`) — стили, если
-   приложение встраивается без своего HTML.
+1. `packages/app/src/index.ts` (export `"."`) — the application root.
+2. `packages/app/src/entry.tsx` — the render entry point.
+3. `packages/app/src/desktop.ts` (export `./desktop`) — the variant for the
+   desktop build.
+4. `packages/app/src/index.css` (export `./index.css`) — styles for when the
+   application is embedded without its own HTML.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/session-ui/PACKAGE.md` — компоненты ленты сессии, из которых
-  собран `session/session`.
-- `packages/gui-extensions/PACKAGE.md` — расширения, подключаемые в
-  приложении.
-- `packages/ui/PACKAGE.md` — базовые компоненты.
-- `packages/desktop/PACKAGE.md` — обёртка Electron.
+- `packages/session-ui/PACKAGE.md` — the session feed components that
+  `session/session` is assembled from.
+- `packages/gui-extensions/PACKAGE.md` — extensions pluggable into the
+  application.
+- `packages/ui/PACKAGE.md` — base components.
+- `packages/desktop/PACKAGE.md` — the Electron wrapper.
 
-## Ловушки
+## Pitfalls
 
-1. **`"./vite"` указывает на `vite.js` в корне пакета**, а не в `src/` —
-   это хост-плагин сборки.
-2. **Две точки входа (`index.ts` и `entry.tsx`)** — модуль и рендер;
-   путаница между ними даёт «приложение не стартует».
-3. **`desktop.ts` — не копия, а ветка поведения** для Electron: часть
-   браузерного API там отключена или заменена
+1. **`"./vite"` points to `vite.js` in the package root**, not in `src/` —
+   it is the build host plugin.
+2. **Two entry points (`index.ts` and `entry.tsx`)** — module and render;
+   confusing them produces "the application does not start".
+3. **`desktop.ts` is not a copy but a behavior branch** for Electron: part of
+   the browser API is disabled or replaced there
    (`runtime/i18n/desktop-native.ts`).
-4. **E2E и component-tests лежат вне `src/`** и не входят в подсчёт строк
-   пакета — но ломаются первыми при правке UI.
+4. **E2E and component-tests live outside `src/`** and are not included in the
+   package line count — but they break first when the UI is changed.

@@ -1,82 +1,84 @@
-# @opencode/server — HTTP-сервер opencode
+# @opencode/server — opencode HTTP server
 
-## Что это
+## What This Is
 
-Транспортный слой: 52 файла, ~3.9 тыс. строк в `src/`. Пакет монтирует
-контракт `protocol` на Effect `HttpApiBuilder`, реализует эндпоинты хендлерами
-из `core` и отдаёт поток событий по SSE. Здесь нет бизнес-логики — она
-в ядре; здесь — маршруты, авторизация, опции сервера и интеграция слоёв.
+The transport layer: 52 files, ~3.9 thousand lines in `src/`. The package mounts
+the `protocol` contract onto Effect `HttpApiBuilder`, implements the endpoints
+with handlers from `core`, and serves the event stream over SSE. There is no
+business logic here — that lives in the core; here you find routes,
+authorization, server options, and layer integration.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L5 — транспорт**: зависит от `core`, `protocol`, `schema`,
+Layer **L5 — transport**: depends on `core`, `protocol`, `schema`,
 `simulation`, `util`.
 
-Кто подключает: `cli` (запуск сервера), `sdk`, `session-ui` (прямые
-вызовы), сам `server`.
+Who depends on it: `cli` (server startup), `sdk`, `session-ui` (direct
+calls), `server` itself.
 
-Экспорт только поимённый: `"./*": "./src/*.ts"` — корня нет.
+Exports are named-only: `"./*": "./src/*.ts"` — there is no root.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Сборка API** — `packages/server/src/routes.ts`, строка 176:
-`HttpApiBuilder.layer(Api, ...)` монтирует контракт; ниже идёт
-`Layer.provide` с авторизацией, обработкой ошибок и ~35 слоями ядра.
-Это центральный файл пакета.
+**API assembly** — `packages/server/src/routes.ts`, line 176:
+`HttpApiBuilder.layer(Api, ...)` mounts the contract; below it come
+`Layer.provide` with authorization, error handling, and ~35 core layers.
+This is the central file of the package.
 
-**Хендлеры** — `packages/server/src/handlers/`, 32 файла, почти 1:1 с
-группами `protocol`: `session.ts`, `message.ts`, `generate.ts`, `model.ts`,
+**Handlers** — `packages/server/src/handlers/`, 32 files, almost 1:1 with the
+`protocol` groups: `session.ts`, `message.ts`, `generate.ts`, `model.ts`,
 `provider.ts`, `event.ts`, `permission.ts`, `form.ts`, `fs.ts`,
 `command.ts`, `skill.ts`, `rpc.ts`, `agent.ts`, `plugin.ts`, `server.ts`,
 `debug.ts`, `pty.ts`, `pty-socket.ts`, `persistent-pty.ts`, `shell.ts`,
 `reference.ts`, `location.ts`, `integration.ts`, `websearch.ts`, `mcp.ts`,
 `credential.ts`, `config.ts`, `vcs.ts`, `worktree.ts`, `project.ts`,
-`migration.ts`, `session-error.ts`. Сводный файл —
+`migration.ts`, `session-error.ts`. The aggregate file is
 `packages/server/src/handlers.ts`.
 
-**Авторизация** — `packages/server/src/auth.ts`: авторизация, пары
-(pairing), привязка портов и адреса сервера.
+**Authorization** — `packages/server/src/auth.ts`: authorization, pairing,
+port binding, and the server address.
 
-**События** — `packages/server/src/event-feed.ts` — SSE-поток, через
-который интерфейс получает обновления.
+**Events** — `packages/server/src/event-feed.ts` — the SSE stream through
+which the UI receives updates.
 
-**Middleware** — каталог `packages/server/src/middleware/`:
+**Middleware** — the `packages/server/src/middleware/` directory:
 `authorization.ts`, `schema-error.ts`, `session-location.ts`,
 `form-location.ts`.
 
-**Опции и окружение** — `options.ts`, `cors.ts`, `fetch.ts`,
+**Options and environment** — `options.ts`, `cors.ts`, `fetch.ts`,
 `request-tracing.ts`, `process.ts`, `pty-environment.ts`,
 `server-info.ts`, `service-status.ts`, `location.ts`, `api.ts`.
 
-**Альтернативный рантайм** — `packages/server/src/workerd.ts` (сборка
-под Cloudflare), скрипт `probe:workerd` проверяет его.
+**Alternative runtime** — `packages/server/src/workerd.ts` (the Cloudflare
+build), the `probe:workerd` script verifies it.
 
-## Точки входа
+## Entry Points
 
-1. `packages/server/src/routes.ts` → слой `Api` — монтаж всего API.
-2. `packages/server/src/auth.ts` — как получить доступ к серверу (токены,
+1. `packages/server/src/routes.ts` → the `Api` layer — mounting the whole API.
+2. `packages/server/src/auth.ts` — how to gain access to the server (tokens,
    pairing).
-3. `packages/server/src/event-feed.ts` — подписка на события (SSE).
-4. `packages/server/src/handlers/` — реализация конкретной группы
-   эндпоинтов.
+3. `packages/server/src/event-feed.ts` — subscribing to events (SSE).
+4. `packages/server/src/handlers/` — the implementation of a specific group
+   of endpoints.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/protocol/PACKAGE.md` — контракт, который здесь реализуется.
-- `packages/core/PACKAGE.md` — слои, подключаемые через `Layer.provide`.
-- `packages/client/PACKAGE.md` — потребитель API на клиенте.
-- `packages/cli/src/services/service-config.ts` — каналы и порты службы.
+- `packages/protocol/PACKAGE.md` — the contract implemented here.
+- `packages/core/PACKAGE.md` — the layers provided through `Layer.provide`.
+- `packages/client/PACKAGE.md` — the client-side consumer of the API.
+- `packages/cli/src/services/service-config.ts` — service channels and ports.
 
-## Ловушки
+## Pitfalls
 
-1. **Корневого экспорта нет.** Импорт вида `@opencode/server` невозможен,
-   только `@opencode/server/routes` и т. п.
-2. **`routes.ts` не читается линейно.** Хендлеры объявлены отдельно
-   (`handlers/`), монтаж — отдельно; «эндпоинта нет» обычно значит, что
-   группа не подключена в `Layer.provide`.
-3. **`simulation` — зависимость не для тестов.** `simulationReplacements`
-   подмешиваются в сборку при включённом режиме симуляции — по этому пути.
-4. **PTY ходит отдельным сокетом** (`handlers/pty-socket.ts`), а не через
-   обычный HTTP; проблемы терминала ищутся там, а не в `pty.ts`.
-5. **`workerd.ts` — не дубликат, а другой рантайм.** Правка `routes.ts`
-   требует проверки и его (`bun run probe:workerd`).
+1. **There is no root export.** An import like `@opencode/server` is
+   impossible, only `@opencode/server/routes` and so on.
+2. **`routes.ts` cannot be read linearly.** The handlers are declared
+   separately (`handlers/`), the mounting is separate too; "there is no
+   endpoint" usually means the group is not wired in `Layer.provide`.
+3. **`simulation` is not a dependency for tests.** `simulationReplacements`
+   are mixed into the assembly when simulation mode is enabled — through
+   that path.
+4. **PTY goes over a separate socket** (`handlers/pty-socket.ts`), not through
+   ordinary HTTP; terminal problems are looked for there, not in `pty.ts`.
+5. **`workerd.ts` is not a duplicate but a different runtime.** A change to
+   `routes.ts` requires checking it too (`bun run probe:workerd`).

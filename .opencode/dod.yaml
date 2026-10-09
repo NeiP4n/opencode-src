@@ -626,7 +626,15 @@ stages:
       показал → возврат к чату) и отчёт владельцу с числами; DoD зелёный.
     done_when: 'sh -c "cd /home/isako/opencode-src && ~/.config/opencode/bin/dod-check ." → ИТОГ: OK; раздел «Задача TASK-NOTES-CANVAS» в .opencode/plan.md содержит итог'
     depends_on: ["Этап 14 — приёмка: проверка целиком"]
+  - name: L-704 — Перевести весь пользовательский и агентский текст форка на а
+    goal: Перевести весь пользовательский и агентский текст форка на английский (TUI/UI уже чист; остались доки форка и подсказки хаба модели)
+    done_when: every step is checked and the result was run
+    added_by: agent
 
+  - name: 'L-705 — Пункт 2 плана: когда человек выбрал Notes, ИИ работает тольк'
+    goal: 'Пункт 2 плана: когда человек выбрал Notes, ИИ работает только в Notes'
+    done_when: cd /home/isako/opencode-src/packages/core && bun test test/note-instructions.test.ts test/tool-note.test.ts
+    added_by: agent
 leaves:
   - id: L-101
     what: ".opencode/doc_check.py проверяет каждый пакет манифеста: есть непустой PACKAGE.md с обязательными разделами и без заглушек"
@@ -1732,7 +1740,43 @@ leaves:
       - "[ ] дописать в .opencode/plan.md итог с числами прогона, рисками и тем, что не сделано"
       - "[ ] отметить шаги: ~/.config/opencode/bin/oc-dod step /home/isako/opencode-src L-133 N"
     depends_on: [L-131, L-132]
+  - id: L-704
+    group: L-704 — Перевести весь пользовательский и агентский текст форка на а
+    what: Перевести весь пользовательский и агентский текст форка на английский; объект проверки — .opencode/doc_check.py (TUI/UI уже чист; остались доки форка и подсказки хаба модели)
+    added_by: agent
+    target: { path: ".opencode/doc_check.py" }
+    task_state: IN_PROGRESS
+    coverage: IN_SCOPE
+    verification:
+      state: NOT_CHECKED
+      command: not set
+      command_status: UNVERIFIED_CMD
+    next_action: { command: "cd /home/isako/opencode-src && python3 .opencode/doc_check.py" }
+    steps:
+      - '[ ] Зафиксировать в .opencode/plan.md раздел TASK-I18N-EN с разбором: где русский законен (i18n/ru.ts, uk, mk, sr, bg, tg, mn, web/content/docs/ru, astro.config.mjs label, console/app language.ts, schema/note.ts таблица транслитерации, gui-extensions terminal/title.ts, hub/actions.ts регэкспы ошибок), где переводим'
+      - '[x] Перевести 30 packages/*/PACKAGE.md (1701 строка кириллицы) на английский, сохранив структуру и все идентификаторы, команды и числа'
+      - '[x] Перевести 44 файла packages/core/docs/*.md (2811 строк) и ARCHITECTURE.md (106 строк) на английский'
+      - '[ ] Перевести .opencode/plan.md, doc_check.py, doc_check.sh, check_core_docs.py, check_version.sh, check_free_models.sh — тексты ошибок и подсказок валидатора'
+      - '[x] Перевести packages/core/src/hub/prompt.ts и instructions.ts (6 строк) — тексты, которые видит модель; actions.ts регэкспы не трогать, они разбирают вывод чужих утилит'
+      - "[ ] Прогнать rg -c '[\\p{Cyrillic}]' по затронутым путям → ноль; bun run check из корня; dod-check ."
 
+  - id: L-705
+    group: 'L-705 — Пункт 2 плана: когда человек выбрал Notes, ИИ работает тольк'
+    what: 'Пункт 2 плана: когда человек выбрал Notes, ИИ работает только в Notes'
+    added_by: agent
+    target: 'Пункт 2 плана: когда человек выбрал Notes, ИИ работает только в Notes'
+    task_state: IN_PROGRESS
+    verification:
+      command: cd /home/isako/opencode-src/packages/core && bun test test/note-instructions.test.ts test/tool-note.test.ts
+      status: UNVERIFIED_CMD
+    next_action: step 1
+    steps:
+      - "[x] Ядро: переписать render в note-instructions.ts — убрать оговорку 'unless the user clearly asks', добавить жёсткий запрет уходить из заметки"
+      - '[x] Ядро: запретить create и list внутри заметки (вариант б — отказом ToolFailure в Plugin.execute), обычные чаты не затронуты'
+      - "[x] Сервер и TUI: привязать сессию заметки к metadata.note.name и ставить ей права {action:'*',deny}+{action:'note',allow} через session.setPermissions, снимать при возврате в обычный чат"
+      - '[x] TUI: строка-предупреждение в панели Notes и правка подсказки в пустой заметке'
+      - '[x] Тесты: переписать устаревшие ожидания в note-instructions.test.ts, добавить проверку отказа create в заметке'
+      - "[ ] Прогнать bun test в packages/core, bun typecheck в core и tui, rg по 'unless the user clearly asks' → 0"
 dead_ends: []
 
 handover:

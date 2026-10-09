@@ -1,84 +1,84 @@
-# @opencode/protocol — контракт HTTP-API
+# @opencode/protocol — the HTTP API contract
 
-## Что это
+## What This Is
 
-Контракт API opencode: 36 файлов, ~4.2 тыс. строк в `src/`. Пакет описывает
-все эндпоинты сервера (методы, параметры, типы ответов и ошибок) на
-Effect `HttpApi`. Здесь нет ни реализации хендлеров, ни логики ядра —
-только объявление того, что сервер обязан уметь.
+The opencode API contract: 36 files, ~4.2k lines in `src/`. The package
+describes all server endpoints (methods, parameters, response and error
+types) on Effect `HttpApi`. There is neither handler implementation nor core
+logic here — only the declaration of what the server must be able to do.
 
-`packages/protocol/src/api.ts` собирает один `Api` из групп в
-`packages/protocol/src/groups/` — по одной группе на область REST.
+`packages/protocol/src/api.ts` assembles a single `Api` from the groups in
+`packages/protocol/src/groups/` — one group per REST area.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L1**: зависит от `schema` (типы данных). Других пакетов
-`@opencode/*` в зависимостях нет.
+Layer **L1**: depends on `schema` (data types). No other `@opencode/*`
+packages in its dependencies.
 
-Кто подключает:
+Who depends on it:
 
-- `packages/server` — монтирует `Api` в хендлеры;
-- `packages/client` — генерирует клиент по тому же контракту;
-- `packages/plugin` — читает типы контракта;
-- `packages/simulation` — использует контракт в симуляции.
+- `packages/server` — mounts the `Api` into handlers;
+- `packages/client` — generates a client from the same contract;
+- `packages/plugin` — reads the contract types;
+- `packages/simulation` — uses the contract in simulation.
 
-Экспорт поимённый: `"./*": "./src/*.ts"` плюс отдельный
+Named export: `"./*": "./src/*.ts"` plus a separate
 `"./simulation": "./src/simulation.ts"`.
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Сборка контракта** — `packages/protocol/src/api.ts`: импортирует все
-группы (`GenerateGroup`, `MessageGroup`, `ModelGroup`, `ProviderGroup`,
+**Contract assembly** — `packages/protocol/src/api.ts`: imports all
+groups (`GenerateGroup`, `MessageGroup`, `ModelGroup`, `ProviderGroup`,
 `makeSessionGroup`, `makePermissionGroup`, `FileSystemGroup`, `makeFormGroup`,
 `CommandGroup`, `SkillGroup`, `RpcGroup`, `EventGroup`, `AgentGroup`,
 `PluginGroup`, `ServerGroup`, `DebugGroup`, `PtyGroup`,
 `PersistentPtyGroup`, `ShellGroup`, `ReferenceGroup`, `makeLocationGroup`,
-`IntegrationGroup`, `WebSearchGroup`, `McpGroup`, `CredentialGroup`, …) и
-склеивает их в единый `HttpApi`.
+`IntegrationGroup`, `WebSearchGroup`, `McpGroup`, `CredentialGroup`, …) and
+glues them into a single `HttpApi`.
 
-**Группы эндпоинтов** — каталог `packages/protocol/src/groups/`, 30 файлов:
+**Endpoint groups** — directory `packages/protocol/src/groups/`, 30 files:
 `session.ts`, `message.ts`, `generate.ts`, `model.ts`, `provider.ts`,
 `event.ts`, `permission.ts`, `form.ts`, `fs.ts`, `command.ts`, `skill.ts`,
 `rpc.ts`, `agent.ts`, `plugin.ts`, `server.ts`, `debug.ts`, `pty.ts`,
 `persistent-pty.ts`, `shell.ts`, `reference.ts`, `location.ts`,
 `integration.ts`, `websearch.ts`, `mcp.ts`, `credential.ts`, `config.ts`,
-`project.ts`, `vcs.ts`, `worktree.ts`, `migration.ts` — 30 файлов.
+`project.ts`, `vcs.ts`, `worktree.ts`, `migration.ts` — 30 files.
 
-**Авторизация и ошибки** — каталог
-`packages/protocol/src/middleware/`: `authorization.ts` (проверка доступа),
-`schema-error.ts` (приведение ошибок валидации к формату API).
+**Authorization and errors** — directory
+`packages/protocol/src/middleware/`: `authorization.ts` (access check),
+`schema-error.ts` (mapping validation errors to the API format).
 
-**Остальное** — `packages/protocol/src/client.ts` (тип клиентской стороны),
-`packages/protocol/src/errors.ts` (ошибки контракта),
-`packages/protocol/src/simulation.ts` (контракт симуляции, экспорт
+**The rest** — `packages/protocol/src/client.ts` (the client-side type),
+`packages/protocol/src/errors.ts` (contract errors),
+`packages/protocol/src/simulation.ts` (the simulation contract, export
 `./simulation`).
 
-## Точки входа
+## Entry Points
 
-1. `packages/protocol/src/api.ts` → `Api` — единый контракт, с него
-   начинается и сервер, и генерация клиента.
-2. `packages/protocol/src/groups/` — конкретная группа эндпоинтов, если
-   нужен раздел API целиком.
-3. `packages/protocol/src/middleware/authorization.ts` — как проверяется
-   доступ к запросу.
+1. `packages/protocol/src/api.ts` → `Api` — the single contract where both
+   the server and the client generation start.
+2. `packages/protocol/src/groups/` — a specific endpoint group, when a whole
+   API section is needed.
+3. `packages/protocol/src/middleware/authorization.ts` — how access to a
+   request is checked.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/server/PACKAGE.md` — реализация контракта (`HttpApiBuilder`).
-- `packages/client/PACKAGE.md` — сгенерированный клиент по этому контракту.
-- `packages/httpapi-codegen/PACKAGE.md` — генератор, который превращает
-  `Api` в файлы клиента.
-- `packages/schema/PACKAGE.md` — типы, из которых контракт собран.
+- `packages/server/PACKAGE.md` — the contract implementation (`HttpApiBuilder`).
+- `packages/client/PACKAGE.md` — the client generated from this contract.
+- `packages/httpapi-codegen/PACKAGE.md` — the generator that turns
+  `Api` into client files.
+- `packages/schema/PACKAGE.md` — the types the contract is built from.
 
-## Ловушки
+## Pitfalls
 
-1. **`protocol` не содержит логики.** Если эндпоинт «не работает», смотреть
-   нужно в `server`, здесь только объявление.
-2. **Правка `Api` требует регенерации клиента** — `bun run generate` из
-   `packages/client`; иначе типы клиента расходятся с сервером.
-3. **Группы бывают двух стилей:** готовые (`MessageGroup`) и фабрики
-   (`makeSessionGroup(...)`), потому что часть эндпоинтов зависит от
-   переданных опций. Не удивляйся вызову-функции в `api.ts`.
-4. **Поимённый экспорт вместо корня:** `exports` не содержит `"."`,
-   подключаются только пути `@opencode/protocol/<файл>` и
-   `@opencode/protocol/simulation`.
+1. **`protocol` contains no logic.** If an endpoint "does not work", look in
+   `server` — here there is only the declaration.
+2. **Editing `Api` requires regenerating the client** — `bun run generate` from
+   `packages/client`; otherwise the client types diverge from the server.
+3. **Groups come in two styles:** ready-made (`MessageGroup`) and factories
+   (`makeSessionGroup(...)`), because some endpoints depend on passed-in
+   options. Do not be surprised by a function call in `api.ts`.
+4. **Named export instead of a root:** `exports` does not contain `"."`,
+   only the `@opencode/protocol/<file>` paths and
+   `@opencode/protocol/simulation` are importable.

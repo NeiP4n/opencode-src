@@ -1,14 +1,14 @@
-# core — документация по папкам
+# core — folder documentation
 
-Каждый файл этой папки раскрывает одну папку `packages/core/src/<folder>`
-(или тему корневых файлов `src/*.ts`): назначение, ключевые файлы,
-важные детали, связи и ловушки. Факты собраны сплошным чтением исходников.
+Every file in this folder covers one folder of `packages/core/src/<folder>`
+(or a topic of the root files `src/*.ts`): purpose, key files,
+important details, connections and pitfalls. The facts were gathered by reading the sources end to end.
 
-Обзор всего пакета целиком — в `packages/core/PACKAGE.md`.
+An overview of the whole package is in `packages/core/PACKAGE.md`.
 
-## Папки
+## Folders
 
-| Папка | Документ |
+| Folder | Document |
 | --- | --- |
 | account | [account.md](account.md) |
 | codemode | [codemode.md](codemode.md) |
@@ -49,15 +49,15 @@
 | workspace | [workspace.md](workspace.md) |
 | worktree | [worktree.md](worktree.md) |
 
-## Корень `src/` (корневые файлы вне папок)
+## The `src/` Root (root files outside folders)
 
-Разбиты на четыре тематических документа:
+Split into four topical documents:
 
-- [root-models.md](root-models.md) — модели, провайдеры, агенты
-  (`aisdk.ts`, `provider.ts`, `model-resolver.ts` и др.);
-- [root-runtime.md](root-runtime.md) — шина, RPC, состояние, джобы
-  (`bus.ts`, `rpc.ts`, `state.ts`, `job.ts` и др.);
-- [root-fs-git.md](root-fs-git.md) — git, файловая система, location,
-  shell/pty (`git.ts`, `filesystem.ts`, `location*.ts` и др.);
-- [root-config.md](root-config.md) — конфиг, доступы, проекты
-  (`config.ts`, `credential.ts`, `permission.ts` и др.).
+- [root-models.md](root-models.md) — models, providers, agents
+  (`aisdk.ts`, `provider.ts`, `model-resolver.ts` and others);
+- [root-runtime.md](root-runtime.md) — bus, RPC, state, jobs
+  (`bus.ts`, `rpc.ts`, `state.ts`, `job.ts` and others);
+- [root-fs-git.md](root-fs-git.md) — git, filesystem, location,
+  shell/pty (`git.ts`, `filesystem.ts`, `location*.ts` and others);
+- [root-config.md](root-config.md) — config, access rights, projects
+  (`config.ts`, `credential.ts`, `permission.ts` and others).

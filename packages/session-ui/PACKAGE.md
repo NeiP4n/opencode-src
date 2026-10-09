@@ -1,25 +1,25 @@
-# @opencode/session-ui — компоненты страницы сессии
+# @opencode/session-ui — session page components
 
-## Что это
+## What This Is
 
-Веб-часть интерфейса сессии: 113 файлов, ~24 тыс. строк в `src/`. Solid-ком
-поненты для отображения хода работы: лента сообщений, отрисовка инструментов,
-diff'ы, Markdown, таймлайн, обсуждения по строкам кода.
+The web part of the session UI: 113 files, ~24 thousand lines in `src/`. Solid
+components for rendering a run: the message feed, tool rendering,
+diffs, Markdown, the timeline, line-level discussions.
 
-Пакет не запускается сам — его собирают в себя `app`, `gui-extensions`
-и `enterprise`.
+The package does not run on its own — `app`, `gui-extensions`, and
+`enterprise` bundle it into themselves.
 
-## Слои и зависимости
+## Layers and Dependencies
 
-Слой **L5**: зависит от `client`, `ui`, `util`.
+Layer **L5**: depends on `client`, `ui`, `util`.
 
-Кто подключает:
+Who depends on it:
 
-- `packages/app` — основное приложение;
-- `packages/gui-extensions` — расширения интерфейса;
-- `packages/enterprise` — корпоративная поверхность.
+- `packages/app` — the main application;
+- `packages/gui-extensions` — UI extensions;
+- `packages/enterprise` — the corporate surface.
 
-Карта экспорта (`packages/session-ui/package.json`) — отдельные части:
+Export map (`packages/session-ui/package.json`) — separate parts:
 
 ```json
 "./actions": "./src/actions.ts",
@@ -30,72 +30,72 @@ diff'ы, Markdown, таймлайн, обсуждения по строкам к
 "./basic-tool": "./src/components/basic-tool.tsx"
 ```
 
-## Подсистемы и файлы
+## Subsystems and Files
 
-**Лента сессии** — каталог `packages/session-ui/src/timeline/`:
-`session-timeline.tsx` (лента), `session-timeline-row.tsx` (строка),
-`projection.ts` (проекция событий в строки), `detail.ts`,
-`timeline-row.ts`, плюс `*.stories.tsx` и `projection.test.ts`.
+**Session feed** — the `packages/session-ui/src/timeline/` directory:
+`session-timeline.tsx` (the feed), `session-timeline-row.tsx` (a row),
+`projection.ts` (projection of events into rows), `detail.ts`,
+`timeline-row.ts`, plus `*.stories.tsx` and `projection.test.ts`.
 
-**Сообщения** — каталог `packages/session-ui/src/message/`:
-`current-message.tsx` (текущее сообщение), `message-content.tsx`,
+**Messages** — the `packages/session-ui/src/message/` directory:
+`current-message.tsx` (the current message), `message-content.tsx`,
 `attachment-card.tsx`, `comment-card.tsx`,
-`current-tool-state.ts` (+тест).
+`current-tool-state.ts` (plus a test).
 
-**Инструменты** — каталог `packages/session-ui/src/tools/`:
-`tool-renderer.tsx` (отрисовка вызова инструмента), `shell-output.ts`
-(вывод команды) и `*.stories.tsx`.
+**Tools** — the `packages/session-ui/src/tools/` directory:
+`tool-renderer.tsx` (rendering a tool call), `shell-output.ts`
+(command output), and `*.stories.tsx`.
 
-**Компоненты** — каталог `packages/session-ui/src/components/`:
+**Components** — the `packages/session-ui/src/components/` directory:
 `file.tsx`, `file-search.tsx`, `file-media.tsx`, `image-preview.tsx`,
-`line-comment.tsx` (+ `line-comment-annotations.tsx`,
+`line-comment.tsx` (plus `line-comment-annotations.tsx`,
 `line-comment-styles.ts`), `markdown-cache.tsx`,
 `markdown-code-state.ts`, `markdown-image.ts`, `apply-patch-file.ts`,
 `dock-prompt.tsx`, `basic-tool.tsx`, `file-ssr.tsx`.
 
-**Diff'ы** — каталог `packages/session-ui/src/pierre/` (интеграция с
+**Diffs** — the `packages/session-ui/src/pierre/` directory (integration with
 `@pierre/diffs`): `commented-lines.ts`, `comment-hover.ts`,
 `diff-selection.ts`, `file-find.ts`, `file-runtime.ts`,
 `file-selection.ts`, `media.ts`, `selection-bridge.ts`, `virtualizer.ts`,
 `worker.ts`, `index.ts`.
 
-**Контекст** — каталог `packages/session-ui/src/context/` (включая
+**Context** — the `packages/session-ui/src/context/` directory (including
 `data.tsx`, `markdown.tsx`, `index.ts`).
 
-**Прочее** — `actions.ts`, `document.ts`, `file-presentation.ts` и
-каталог `packages/session-ui/src/v2/` (новая версия панелей ревью:
+**Misc** — `actions.ts`, `document.ts`, `file-presentation.ts` and the
+`packages/session-ui/src/v2/` directory (the new version of the review panels:
 `session-review-v2.tsx`, `session-file-panel-v2.tsx`,
-`session-progress-indicator-v2.tsx`), `storybook/` (фикстуры сценариев).
+`session-progress-indicator-v2.tsx`), `storybook/` (scenario fixtures).
 
-## Точки входа
+## Entry Points
 
-1. `packages/session-ui/src/timeline/session-timeline.tsx` (экспорт
-   `./timeline`) — лента, с которой начинается страница сессии.
-2. `packages/session-ui/src/message/current-message.tsx` (экспорт
-   `./message`) — отрисовка одного сообщения.
-3. `packages/session-ui/src/actions.ts` (экспорт `./actions`) — действия
-   пользователя из интерфейса.
-4. `packages/session-ui/src/timeline/projection.ts` (экспорт
-   `./timeline/projection`) — превращение событий в строки ленты.
+1. `packages/session-ui/src/timeline/session-timeline.tsx` (the `./timeline`
+   export) — the feed the session page starts with.
+2. `packages/session-ui/src/message/current-message.tsx` (the `./message`
+   export) — rendering of a single message.
+3. `packages/session-ui/src/actions.ts` (the `./actions` export) — user
+   actions from the UI.
+4. `packages/session-ui/src/timeline/projection.ts` (the `./timeline/projection`
+   export) — turning events into feed rows.
 
-## На что смотреть дальше
+## Where to Look Next
 
-- `packages/app/PACKAGE.md` — приложение, куда компоненты собираются.
-- `packages/ui/PACKAGE.md` — базовые компоненты (кнопки, диалоги),
-  из которых собран `session-ui`.
-- `packages/client/PACKAGE.md` — `./solid`-вариант, откуда приходят данные.
-- `packages/gui-extensions/PACKAGE.md` — вторая поверхность сборки.
+- `packages/app/PACKAGE.md` — the application the components are bundled into.
+- `packages/ui/PACKAGE.md` — the base components (buttons, dialogs)
+  that `session-ui` is built from.
+- `packages/client/PACKAGE.md` — the `./solid` variant the data comes from.
+- `packages/gui-extensions/PACKAGE.md` — the second build surface.
 
-## Ловушки
+## Pitfalls
 
-1. **Нет корневого экспорта.** Только отдельные пути (`./timeline`,
-   `./message`, `./actions`); импорт `@opencode/session-ui` не работает.
-2. **`v2/` — не мусор и не единственный вариант.** Старые и новые панели
-   ревью сосуществуют; при правке проверяй обе ветки.
-3. **`pierre/` — обвязка вокруг чужой библиотеки `@pierre/diffs`** из
-   `packages/ui`-зависимостей: её worker и virtualizer живут здесь, а
-   рендер диффа — там.
-4. **Истории и тесты лежат в `src/`** (`*.stories.tsx`, `*.test.ts`),
-   поэтому строк пакета больше, чем «видимого» кода.
-5. **`file-ssr.tsx` — вариант для серверного рендера**, не путать с
-   `file.tsx`: у них разные предпосылки (DOM есть/нет).
+1. **There is no root export.** Only separate paths (`./timeline`,
+   `./message`, `./actions`); importing `@opencode/session-ui` does not work.
+2. **`v2/` is neither junk nor the only option.** The old and new review panels
+   coexist; when making a change, check both branches.
+3. **`pierre/` is a wrapper around the third-party library `@pierre/diffs`**
+   from the `packages/ui` dependencies: its worker and virtualizer live here,
+   while the diff rendering lives there.
+4. **Stories and tests live in `src/`** (`*.stories.tsx`, `*.test.ts`),
+   so the package has more lines than "visible" code.
+5. **`file-ssr.tsx` is the server-rendering variant**, do not confuse it with
+   `file.tsx`: they have different premises (DOM present/absent).

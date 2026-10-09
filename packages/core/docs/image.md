@@ -1,86 +1,86 @@
-# core/image — сжатие картинок перед отправкой в модель через photon (WASM)
+# core/image — compression of pictures before sending them to the model via photon (WASM)
 
-## Что в папке
+## What's In This Folder
 
-Четыре файла: `packages/core/src/image/photon.ts` — сама логика уменьшения
-изображений, и три варианта импорта WASM-артефакта photon для разных
-рантаймов (`photon-wasm.bun.ts`, `photon-wasm.node.ts`,
+Four files: `packages/core/src/image/photon.ts` — the logic of reducing
+images itself, and three variants of importing the photon WASM artifact for different
+runtimes (`photon-wasm.bun.ts`, `photon-wasm.node.ts`,
 `photon-wasm.workerd.ts`).
 
-Смысл подсистемы: картинка из вложения декодируется, и если она больше
-лимитов, уменьшается и перекодируется — сначала в PNG, затем в JPEG с
-убывающим качеством — пока результат не влезет в лимит по размеру.
+The meaning of the subsystem: a picture from an attachment is decoded, and if it is bigger
+than the limits, it is reduced and re-encoded — first into PNG, then into JPEG with
+decreasing quality — until the result fits the size limit.
 
-## Ключевые файлы
+## Key Files
 
-- `packages/core/src/image/photon.ts` — `make()` возвращает функцию
-  `Image.Photon.normalize(resource, content, limits)`. Она принимает
-  base64-содержимое и `Limits`, а возвращает либо исходный `content`, либо
-  тот же объект с новым `content`, `mime` и `encoding: "base64"`.
-- `packages/core/src/image/photon-wasm.bun.ts` — статический импорт
-  `photon_rs_bg.wasm` с атрибутом `{ type: "file" }`; Bun встраивает файл
-  при компиляции CLI.
-- `packages/core/src/image/photon-wasm.node.ts` — путь к WASM берётся из
-  переменной окружения `OPENCODE_PHOTON_WASM_PATH`, иначе через
+- `packages/core/src/image/photon.ts` — `make()` returns the function
+  `Image.Photon.normalize(resource, content, limits)`. It takes
+  base64 content and `Limits`, and returns either the original `content`, or
+  the same object with a new `content`, `mime` and `encoding: "base64"`.
+- `packages/core/src/image/photon-wasm.bun.ts` — a static import
+  of `photon_rs_bg.wasm` with the attribute `{ type: "file" }`; Bun embeds the file
+  when compiling the CLI.
+- `packages/core/src/image/photon-wasm.node.ts` — the path to the WASM is taken from
+  the environment variable `OPENCODE_PHOTON_WASM_PATH`, otherwise through
   `createRequire(import.meta.url).resolve(...)`.
-- `packages/core/src/image/photon-wasm.workerd.ts` — экспортирует пустую
-  строку: у workerd нет пути в файловой системе, ресайзер считается
-  недоступным по объявлению.
+- `packages/core/src/image/photon-wasm.workerd.ts` — exports an empty
+  string: workerd has no path in the filesystem, the resizer is considered
+  unavailable by declaration.
 
-## Важные детали
+## Important Details
 
-- Импорт `#photon-wasm` резолвится в один из трёх файлов по рантайму.
-  Значение `""` (workerd) — это сигнал «ресайзера нет».
-- Загрузка photon обёрнута в `Effect.cached`, поэтому WASM грузится один раз
-  на процесс, а не на каждое изображение. Ошибка загрузки превращается в
+- The import `#photon-wasm` is resolved into one of the three files per runtime.
+  The value `""` (workerd) is the signal "there is no resizer".
+- Loading of photon is wrapped in `Effect.cached`, so the WASM is loaded once
+  per process, not per image. A load error turns into
   `ResizerUnavailableError`.
-- Порядок проб уменьшения: сначала PNG (`get_bytes()`), затем JPEG с
-  качествами из константы `JPEG_QUALITIES` = 80, 85, 70, 55, 40. Первый
-  вариант, чей base64 укладывается в лимит, и есть ответ.
-- Размер в base64 считается как `Math.ceil(bytes / 3) * 4` — с учётом
-  набивки, а не как `bytes * 4 / 3`.
-- Уменьшение идёт по геометрии, а не по качеству: масштаб
-  `Math.min(1, maxWidth / width, maxHeight / height)`; дальше — до 32
-  ступеней, каждая — множитель 0.75 по каждой стороне, но не ниже 1.
-  Дубликаты размеров отбрасываются.
-- Если `limits.autoResize` выключен, первое же превышение лимита даёт
-  `SizeError` с фактическими и предельными значениями (`width`, `height`,
+- The order of the reduction attempts: first PNG (`get_bytes()`), then JPEG with
+  the qualities from the constant `JPEG_QUALITIES` = 80, 85, 70, 55, 40. The first
+  variant whose base64 fits the limit is the answer.
+- The size in base64 is counted as `Math.ceil(bytes / 3) * 4` — taking the
+  padding into account, not as `bytes * 4 / 3`.
+- The reduction goes by geometry, not by quality: the scale
+  `Math.min(1, maxWidth / width, maxHeight / height)`; then — up to 32
+  steps, each one a factor of 0.75 per side, but not below 1.
+  Duplicate sizes are discarded.
+- If `limits.autoResize` is off, the first excess over a limit gives
+  a `SizeError` with the actual and the limit values (`width`, `height`,
   `bytes`, `maxWidth`, `maxHeight`, `maxBytes`).
-- Если даже самая маленькая ступень не влезла, тоже `SizeError`.
-- Если изображение в лимитах, возвращается исходный объект без
-  перекодирования — качество не трогается зря.
-- Ошибка декодирования байтов — `DecodeError` с полем `resource`.
-- Ручное освобождение памяти WASM: `decoded.free()` и `resized.free()` в
-  блоках `finally`, чтобы падение не оставляло объект photon в памяти.
-- Фильтр интерполяции при ресайзе — `photon.SamplingFilter.Lanczos3`.
+- If even the smallest step did not fit, it is also `SizeError`.
+- If the image is within the limits, the original object is returned without
+  re-encoding — the quality is not touched for nothing.
+- An error of decoding the bytes is `DecodeError` with a `resource` field.
+- Manual release of the WASM memory: `decoded.free()` and `resized.free()` in
+  `finally` blocks, so a failure does not leave a photon object in memory.
+- The interpolation filter on resize is `photon.SamplingFilter.Lanczos3`.
 
-## Связи
+## Connections
 
-- `packages/core/src/image.ts` — типы и ошибки: `Limits`, `DecodeError`,
-  `ResizerUnavailableError`, `SizeError`. Это соседний файл в корне `src`,
-  не файл из папки `image`.
-- `packages/core/src/filesystem.ts` — тип `FileSystem.Content`, часть
-  которого (`encoding: "base64"`) передаётся на вход.
-- `#photon-wasm` — внутренний спецификатор импорта, связывающий папку с
-  тремя рантайм-вариантами.
-- `@silvia-odwyer/photon-node` — сам ресайзер; грузится динамическим
-  `import` только после того, как путь к артефакту признан пригодным.
+- `packages/core/src/image.ts` — types and errors: `Limits`, `DecodeError`,
+  `ResizerUnavailableError`, `SizeError`. This is a neighboring file in the root `src`,
+  not a file from the `image` folder.
+- `packages/core/src/filesystem.ts` — the type `FileSystem.Content`, part
+  of which (`encoding: "base64"`) is passed as input.
+- `#photon-wasm` — an internal import specifier binding the folder with
+  the three runtime variants.
+- `@silvia-odwyer/photon-node` — the resizer itself; loaded by a dynamic
+  `import` only after the path to the artifact has been judged usable.
 
-## Ловушки
+## Pitfalls
 
-- Путь к WASM кладётся в `globalThis.__OPENCODE_PHOTON_WASM_PATH` как
-  побочный эффект — это глобальное мутабельное состояние, а не аргумент.
-- `photon-wasm.node.ts` возвращает значение переменной окружения как есть.
-  Непустая строка с опечаткой даст ошибку загрузки, а пустая — тот же
-  отказ, что и workerd, но с другим текстом причины.
-- Константа качеств JPEG не отсортирована по убыванию (80, 85, 70, 55, 40):
-  на втором месте стоит 85, то есть качество слегка растёт прежде чем падать.
-  Порядок в коде менять нельзя — от него зависит выбор результата.
-- `photon-wasm.bun.ts` содержит `@ts-ignore`: тип у статического импорта
-  WASM-файла не выводится, и это подавление проверки нельзя снимать без
-  другой схемы импорта.
-- Расчёт лимита по размеру идёт от размера перекодированного файла, а
-  сравнение в начале — от размера исходного base64. Это два разных
-  основания для одного и того же лимита.
-- `Effect.cached` означает, что первая неудачная загрузка не кэшируется как
-  успех: при `ResizerUnavailableError` следующий вызов попробует снова.
+- The path to the WASM is put into `globalThis.__OPENCODE_PHOTON_WASM_PATH` as
+  a side effect — that is global mutable state, not an argument.
+- `photon-wasm.node.ts` returns the environment variable value as is.
+  A non-empty string with a typo will give a load error, and an empty one — the same
+  refusal as workerd, but with a different reason text.
+- The constant of JPEG qualities is not sorted in descending order (80, 85, 70, 55, 40):
+  85 is in second place, that is, the quality grows slightly before falling.
+  The order in the code must not be changed — the choice of the result depends on it.
+- `photon-wasm.bun.ts` contains `@ts-ignore`: the type of the static WASM file
+  import is not inferred, and this check suppression cannot be lifted without
+  another import scheme.
+- The size limit calculation goes from the size of the re-encoded file, and
+  the comparison at the beginning — from the size of the original base64. These are two different
+  bases for one and the same limit.
+- `Effect.cached` means that the first failed load is not cached as a
+  success: at `ResizerUnavailableError` the next call will try again.
