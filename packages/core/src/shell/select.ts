@@ -10,12 +10,14 @@ import { Global } from "@opencode/util/global"
 import { State } from "../state.js"
 import { which } from "../util/which.js"
 
-const META: Record<string, { deny?: boolean; login?: boolean; ps?: boolean }> = {
+// `explicit`: never picked up from $SHELL, only when the user configures it, because
+// models write POSIX commands unless told the shell is something else.
+const META: Record<string, { deny?: boolean; explicit?: boolean; login?: boolean; ps?: boolean }> = {
   bash: { login: true },
   dash: { login: true },
   fish: { deny: true, login: true },
   ksh: { login: true },
-  nu: { deny: true },
+  nu: { explicit: true },
   powershell: { ps: true },
   pwsh: { ps: true },
   sh: { login: true },
@@ -75,8 +77,8 @@ function meta(file: string) {
   return META[name(file)]
 }
 
-function compatible(file: string) {
-  return meta(file)?.deny !== true
+function compatible(file: string, explicit?: boolean) {
+  return meta(file)?.deny !== true && (explicit === true || meta(file)?.explicit !== true)
 }
 
 function rooted(file: string) {
@@ -113,8 +115,13 @@ async function unix() {
   return ["/bin/bash", "/bin/zsh", "/bin/sh"]
 }
 
-function select(file: string | undefined, options?: Options, opts?: { compatible?: boolean }, bin?: string) {
-  if (file && (!opts?.compatible || compatible(file))) {
+function select(
+  file: string | undefined,
+  options?: Options,
+  opts?: { compatible?: boolean; explicit?: boolean },
+  bin?: string,
+) {
+  if (file && (!opts?.compatible || compatible(file, opts.explicit))) {
     const shell = executable(file, options, bin)
     if (shell) return shell
   }
@@ -145,6 +152,11 @@ export function name(file: string) {
 
 export function login(file: string) {
   return meta(file)?.login === true
+}
+
+// Nushell has no grammar the permission scanner understands, so its commands are approved whole.
+export function opaque(file: string) {
+  return name(file) === "nu"
 }
 
 export function ps(file: string) {
@@ -178,7 +190,7 @@ let defaultCompatible: { bin?: string; value: string } | undefined
 
 export function resolve(input: ResolveInput, configShell?: string, options?: Options, bin?: string) {
   const filter = input.priority === "compat" ? { compatible: true } : undefined
-  if (configShell) return select(configShell, options, filter, bin)
+  if (configShell) return select(configShell, options, filter && { ...filter, explicit: true }, bin)
   if (options?.gitbash) return select(process.env.SHELL, options, filter, bin)
   const cached = input.priority === "compat" ? defaultCompatible : defaultConfigured
   if (cached && cached.bin === bin) return cached.value

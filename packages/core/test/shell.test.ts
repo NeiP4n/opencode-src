@@ -45,7 +45,15 @@ describe("shell", () => {
 
   test("falls back for terminal-only shells when compatibility is required", () => {
     expect(ShellSelect.name(ShellSelect.resolve({ priority: "compat" }, "fish"))).not.toBe("fish")
-    expect(ShellSelect.name(ShellSelect.resolve({ priority: "compat" }, "nu"))).not.toBe("nu")
+  })
+
+  test("uses nu only when the user configures it", async () => {
+    const nu = Bun.which("nu")
+    if (!nu) return
+    expect(ShellSelect.name(ShellSelect.resolve({ priority: "compat" }, "nu"))).toBe("nu")
+    await withShell(nu, async () => {
+      expect(ShellSelect.name(ShellSelect.environment(undefined, { compatible: true }))).not.toBe("nu")
+    })
   })
 
   test("builds command args per shell family", () => {

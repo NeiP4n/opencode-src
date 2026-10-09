@@ -5,6 +5,14 @@ import path from "path"
 import { ShellParse } from "@opencode/core/shell/parse"
 
 describe("ShellParse", () => {
+  test("approves a Nushell command whole, since no grammar splits it", async () => {
+    const result = await Effect.runPromise(ShellParse.scan(" ls | where size > 1kb ", "/usr/bin/nu", "/workspace"))
+    expect(result).toEqual({
+      commands: [{ resource: "ls | where size > 1kb", save: "ls | where size > 1kb" }],
+      directories: [],
+    })
+  })
+
   test("splits bash commands and derives reusable prefixes", async () => {
     const result = await Effect.runPromise(
       ShellParse.scan("git status && npm run test -- --watch", "/bin/bash", "/workspace"),

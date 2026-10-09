@@ -167,6 +167,7 @@ export const scan = Effect.fnUntraced(function* (
   cwd: string,
   options?: { portable?: boolean },
 ) {
+  if (ShellSelect.opaque(shell)) return { commands: [{ resource: command.trim(), save: command.trim() }], directories: [] }
   if (options?.portable) return yield* scanPortable(command, shell, cwd)
   return yield* scanLegacy(command, shell, cwd)
 })

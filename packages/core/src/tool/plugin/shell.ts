@@ -38,6 +38,11 @@ const description = (shell?: string) =>
   [
     "Execute a shell command and return its output.",
     ...(shell ? [`Commands run on ${OS} using ${shell}.`] : []),
+    ...(shell === "nu"
+      ? [
+          "Write Nushell syntax, not POSIX: `;` or `and` instead of `&&`, `$env.NAME` instead of `$NAME`, `| save file` instead of `> file`, `^cmd` to force an external program.",
+        ]
+      : []),
     "Quote file paths containing spaces or special characters.",
     "Prefer dedicated tools over shell commands when possible.",
     "When output is large, the full result is saved to a file and a truncated preview is returned.",
