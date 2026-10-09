@@ -185,15 +185,6 @@ describe("Agent", () => {
         "notes",
         "orchestrator",
         "summary",
-        "team-architect",
-        "team-debugger",
-        "team-designer",
-        "team-developer",
-        "team-devops",
-        "team-researcher",
-        "team-reviewer",
-        "team-tester",
-        "team-writer",
         "title",
       ])
       expect((yield* agent.get(Agent.defaultID))?.system).toBeUndefined()

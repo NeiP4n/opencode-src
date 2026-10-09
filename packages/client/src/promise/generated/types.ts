@@ -499,6 +499,8 @@ export type OrchestraProject = {
 
 export type OrchestraMember = { agent: string; title: string; category: string }
 
+export type OrchestraOrigin = "builtin" | "edited" | "custom"
+
 export type OrchestraAccess = "hidden" | "read" | "write" | "full"
 
 export type SessionMessageLocationSwitched = {
@@ -1769,7 +1771,25 @@ export type NoteFrontmatter = {
 
 export type RoomJoined = { token: string; guest: RoomGuest; room: RoomInfo }
 
-export type OrchestraTemplate = { id: string; name: string; description: string; members: Array<OrchestraMember> }
+export type OrchestraTemplate = {
+  name: string
+  description: string
+  members: Array<OrchestraMember>
+  id: string
+  origin: OrchestraOrigin
+}
+
+export type OrchestraRole = {
+  name: string
+  description: string
+  rules: string
+  category: string
+  readOnly: boolean
+  model?: string | undefined
+  id: string
+  agent: string
+  origin: OrchestraOrigin
+}
 
 export type SessionInboxMove = {
   id: string
@@ -7160,6 +7180,164 @@ export type RoomGuestPermissionReplyOutput = void
 export type OrchestraProjectListOutput = Array<OrchestraProject>
 
 export type OrchestraTemplateListOutput = Array<OrchestraTemplate>
+
+export type OrchestraTemplateCreateInput = {
+  readonly name: {
+    readonly name: string
+    readonly description: string
+    readonly members: ReadonlyArray<{ readonly agent: string; readonly title: string; readonly category: string }>
+  }["name"]
+  readonly description: {
+    readonly name: string
+    readonly description: string
+    readonly members: ReadonlyArray<{ readonly agent: string; readonly title: string; readonly category: string }>
+  }["description"]
+  readonly members: {
+    readonly name: string
+    readonly description: string
+    readonly members: ReadonlyArray<{ readonly agent: string; readonly title: string; readonly category: string }>
+  }["members"]
+}
+
+export type OrchestraTemplateCreateOutput = OrchestraTemplate
+
+export type OrchestraTemplateUpdateInput = {
+  readonly templateID: { readonly templateID: string }["templateID"]
+  readonly name: {
+    readonly name: string
+    readonly description: string
+    readonly members: ReadonlyArray<{ readonly agent: string; readonly title: string; readonly category: string }>
+  }["name"]
+  readonly description: {
+    readonly name: string
+    readonly description: string
+    readonly members: ReadonlyArray<{ readonly agent: string; readonly title: string; readonly category: string }>
+  }["description"]
+  readonly members: {
+    readonly name: string
+    readonly description: string
+    readonly members: ReadonlyArray<{ readonly agent: string; readonly title: string; readonly category: string }>
+  }["members"]
+}
+
+export type OrchestraTemplateUpdateOutput = OrchestraTemplate
+
+export type OrchestraTemplateRemoveInput = { readonly templateID: { readonly templateID: string }["templateID"] }
+
+export type OrchestraTemplateRemoveOutput = void
+
+export type OrchestraRoleListOutput = Array<OrchestraRole>
+
+export type OrchestraRoleCreateInput = {
+  readonly name: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["name"]
+  readonly description: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["description"]
+  readonly rules: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["rules"]
+  readonly category: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["category"]
+  readonly readOnly: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["readOnly"]
+  readonly model?: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["model"]
+}
+
+export type OrchestraRoleCreateOutput = OrchestraRole
+
+export type OrchestraRoleUpdateInput = {
+  readonly roleID: { readonly roleID: string }["roleID"]
+  readonly name: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["name"]
+  readonly description: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["description"]
+  readonly rules: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["rules"]
+  readonly category: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["category"]
+  readonly readOnly: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["readOnly"]
+  readonly model?: {
+    readonly name: string
+    readonly description: string
+    readonly rules: string
+    readonly category: string
+    readonly readOnly: boolean
+    readonly model?: string | undefined
+  }["model"]
+}
+
+export type OrchestraRoleUpdateOutput = OrchestraRole
+
+export type OrchestraRoleRemoveInput = { readonly roleID: { readonly roleID: string }["roleID"] }
+
+export type OrchestraRoleRemoveOutput = void
 
 export type OrchestraProjectCreateInput = {
   readonly name: { readonly name: string; readonly directory: string; readonly template?: string | undefined }["name"]

@@ -70,6 +70,7 @@ import { DialogAgent } from "./component/dialog-agent"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogOpen, DialogOpenKey, moveOpenSession } from "./component/dialog-open"
 import { ProjectTree } from "./component/project-tree"
+import { openTeamEditor } from "./component/dialog-teams"
 import { ProjectsProvider, useProjects } from "./context/projects"
 import { NotesProvider } from "./context/notes"
 import { NotesCommands } from "./component/notes-commands"
@@ -767,6 +768,13 @@ function App() {
           if (model) local.model.set(model)
           dialog.clear()
         },
+      },
+      {
+        name: "team.editor",
+        title: "Edit teams and roles",
+        category: "Session",
+        slash: { name: "teams", aliases: ["team", "roles"] },
+        run: () => openTeamEditor(dialog),
       },
       {
         name: "open.menu",

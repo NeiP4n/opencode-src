@@ -22,6 +22,11 @@ import { tmpdir } from "./fixture/tmpdir"
 import { tempGlobalLayer } from "./fixture/global"
 import { offlineModels } from "./fixture/models"
 import { testEffect } from "./lib/effect"
+import { Location } from "@opencode/core/location"
+import { AbsolutePath } from "@opencode/core/schema"
+import { location } from "./fixture/location"
+import { TeamPlugin } from "@opencode/core/plugin/team"
+import { agentHost, host } from "./plugin/host"
 
 const model = Model.Ref.make({ id: Model.ID.make("member"), providerID: Provider.ID.make("test") })
 const tokens = { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }
@@ -92,8 +97,14 @@ const it = testEffect(
       SessionExecution.node,
       LocationServiceMap.node,
       Orchestra.node,
+      Agent.node,
     ]),
-    [SessionExecution.node.replace(executionNode), Global.node.replace(tempGlobalLayer), offlineModels],
+    [
+      SessionExecution.node.replace(executionNode),
+      Global.node.replace(tempGlobalLayer),
+      Location.node.replace(Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make("/project") })))),
+      offlineModels,
+    ],
   ),
 )
 
@@ -171,6 +182,96 @@ describe("Orchestra team", () => {
       expect(found[0]).toContain("Run failed: Disconnected")
       // the shutdown left its task open for the run that resumes after restart
       expect(yield* orchestra.pending(paused.id)).toBeNumber()
+    }).pipe(Effect.scoped),
+  )
+
+  it.live("operators add their own roles and teams and edit the built-in ones", () =>
+    Effect.gen(function* () {
+      const tmp = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir("opencode-orchestra-team-")))
+      const orchestra = yield* Orchestra.Service
+      const auditor = yield* orchestra.saveRole(undefined, {
+        name: " Code Auditor ",
+        description: "Audits",
+        rules: "Check licenses.",
+        category: "",
+        readOnly: true,
+        model: "test/member",
+      })
+      expect(auditor).toMatchObject({ id: "code-auditor", name: "Code Auditor", category: "Team", origin: "custom" })
+      expect(auditor.agent).toBe(Orchestra.role("code-auditor"))
+      // a second role of the same name gets its own id
+      const second = yield* orchestra.saveRole(undefined, { ...auditor, model: undefined })
+      expect(second.id).toBe("code-auditor-2")
+
+      const edited = yield* orchestra.saveRole("tester", { ...auditor, name: "QA", model: undefined })
+      expect(edited.origin).toBe("edited")
+      const roles = yield* orchestra.roles()
+      expect(roles.find((role) => role.id === "tester")).toMatchObject({ name: "QA", origin: "edited" })
+      expect(roles.slice(-2).map((role) => role.id)).toEqual(["code-auditor", "code-auditor-2"])
+
+      const template = yield* orchestra.saveTemplate(undefined, {
+        name: "Audit",
+        description: "",
+        members: [{ agent: auditor.agent, title: "", category: "" }],
+      })
+      expect(template).toMatchObject({ id: "audit", origin: "custom" })
+      expect(template.members).toEqual([{ agent: auditor.agent, title: "Code Auditor", category: "Team" }])
+
+      const project = yield* orchestra.create({ name: "Audit", directory: tmp.path, template: "audit" })
+      expect((yield* orchestra.sessions(project.id)).map((session) => session.agent)).toEqual([auditor.agent])
+
+      // a custom role a team uses cannot be removed; removing an edited built-in restores it
+      const blocked = yield* orchestra.removeRole("code-auditor").pipe(Effect.flip)
+      expect(blocked.message).toContain("Audit")
+      yield* orchestra.removeRole("tester")
+      expect((yield* orchestra.roles()).find((role) => role.id === "tester")).toMatchObject({
+        name: "Tester",
+        origin: "builtin",
+      })
+      yield* orchestra.removeTemplate("audit")
+      yield* orchestra.removeRole("code-auditor")
+      expect((yield* orchestra.templates()).some((item) => item.id === "audit")).toBe(false)
+      expect((yield* orchestra.roles()).some((role) => role.id === "code-auditor")).toBe(false)
+
+      const invalid = yield* orchestra.saveRole(undefined, { ...auditor, model: "no-slash" }).pipe(Effect.flip)
+      expect(invalid.field).toBe("model")
+      const unknown = yield* orchestra
+        .saveTemplate(undefined, { name: "X", description: "", members: [{ agent: Orchestra.role("nobody"), title: "", category: "" }] })
+        .pipe(Effect.flip)
+      expect(unknown.field).toBe("members")
+    }).pipe(Effect.scoped),
+  )
+
+  it.live("team roles are agents that follow the operator's edits", () =>
+    Effect.gen(function* () {
+      const orchestra = yield* Orchestra.Service
+      const agents = yield* Agent.Service
+      yield* TeamPlugin.Plugin.effect(host({ agent: agentHost(agents) }))
+      expect(String((yield* agents.get(Orchestra.role("developer")))?.name)).toBe("Developer")
+
+      const role = yield* orchestra.saveRole(undefined, {
+        name: "Translator",
+        description: "Translates",
+        rules: "Translate to Russian.",
+        category: "Build",
+        readOnly: true,
+        model: "test/member",
+      })
+      const agent = yield* agents.get(role.agent).pipe(
+        Effect.filterOrFail((item) => item !== undefined),
+        Effect.retry(Schedule.spaced("10 millis")),
+        Effect.timeout("2 seconds"),
+      )
+      expect(agent.system).toEndWith("Translate to Russian.")
+      expect(agent.model).toEqual(model)
+      expect(agent.permissions).toContainEqual({ action: "edit", resource: "*", effect: "deny" })
+
+      yield* orchestra.removeRole(role.id)
+      yield* agents.get(role.agent).pipe(
+        Effect.filterOrFail((item) => item === undefined),
+        Effect.retry(Schedule.spaced("10 millis")),
+        Effect.timeout("2 seconds"),
+      )
     }).pipe(Effect.scoped),
   )
 })

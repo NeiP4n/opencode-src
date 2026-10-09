@@ -313,6 +313,19 @@ import type {
   RoomGuestPermissionReplyOutput,
   OrchestraProjectListOutput,
   OrchestraTemplateListOutput,
+  OrchestraTemplateCreateInput,
+  OrchestraTemplateCreateOutput,
+  OrchestraTemplateUpdateInput,
+  OrchestraTemplateUpdateOutput,
+  OrchestraTemplateRemoveInput,
+  OrchestraTemplateRemoveOutput,
+  OrchestraRoleListOutput,
+  OrchestraRoleCreateInput,
+  OrchestraRoleCreateOutput,
+  OrchestraRoleUpdateInput,
+  OrchestraRoleUpdateOutput,
+  OrchestraRoleRemoveInput,
+  OrchestraRoleRemoveOutput,
   OrchestraProjectCreateInput,
   OrchestraProjectCreateOutput,
   OrchestraProjectUpdateInput,
@@ -1875,6 +1888,65 @@ const EndpointOrchestraTemplateList = (raw: RawClient["server.orchestra"]) => ()
     raw["orchestra.template.list"]({}).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointOrchestraTemplateCreate = (raw: RawClient["server.orchestra"]) => (input: OrchestraTemplateCreateInput) =>
+  preserveEffect<OrchestraTemplateCreateOutput>()(
+    raw["orchestra.template.create"]({
+      payload: { name: input["name"], description: input["description"], members: input["members"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointOrchestraTemplateUpdate = (raw: RawClient["server.orchestra"]) => (input: OrchestraTemplateUpdateInput) =>
+  preserveEffect<OrchestraTemplateUpdateOutput>()(
+    raw["orchestra.template.update"]({
+      params: { templateID: input["templateID"] },
+      payload: { name: input["name"], description: input["description"], members: input["members"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointOrchestraTemplateRemove = (raw: RawClient["server.orchestra"]) => (input: OrchestraTemplateRemoveInput) =>
+  preserveEffect<OrchestraTemplateRemoveOutput>()(
+    raw["orchestra.template.remove"]({ params: { templateID: input["templateID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointOrchestraRoleList = (raw: RawClient["server.orchestra"]) => () =>
+  preserveEffect<OrchestraRoleListOutput>()(raw["orchestra.role.list"]({}).pipe(Effect.mapError(mapClientError)))
+
+const EndpointOrchestraRoleCreate = (raw: RawClient["server.orchestra"]) => (input: OrchestraRoleCreateInput) =>
+  preserveEffect<OrchestraRoleCreateOutput>()(
+    raw["orchestra.role.create"]({
+      payload: {
+        name: input["name"],
+        description: input["description"],
+        rules: input["rules"],
+        category: input["category"],
+        readOnly: input["readOnly"],
+        model: input["model"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointOrchestraRoleUpdate = (raw: RawClient["server.orchestra"]) => (input: OrchestraRoleUpdateInput) =>
+  preserveEffect<OrchestraRoleUpdateOutput>()(
+    raw["orchestra.role.update"]({
+      params: { roleID: input["roleID"] },
+      payload: {
+        name: input["name"],
+        description: input["description"],
+        rules: input["rules"],
+        category: input["category"],
+        readOnly: input["readOnly"],
+        model: input["model"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointOrchestraRoleRemove = (raw: RawClient["server.orchestra"]) => (input: OrchestraRoleRemoveInput) =>
+  preserveEffect<OrchestraRoleRemoveOutput>()(
+    raw["orchestra.role.remove"]({ params: { roleID: input["roleID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointOrchestraProjectCreate = (raw: RawClient["server.orchestra"]) => (input: OrchestraProjectCreateInput) =>
   preserveEffect<OrchestraProjectCreateOutput>()(
     raw["orchestra.project.create"]({
@@ -1934,7 +2006,18 @@ const adaptGroupOrchestra = (raw: RawClient["server.orchestra"]) => ({
     main: EndpointOrchestraProjectMain(raw),
     sessions: EndpointOrchestraProjectSessions(raw),
   },
-  template: { list: EndpointOrchestraTemplateList(raw) },
+  template: {
+    list: EndpointOrchestraTemplateList(raw),
+    create: EndpointOrchestraTemplateCreate(raw),
+    update: EndpointOrchestraTemplateUpdate(raw),
+    remove: EndpointOrchestraTemplateRemove(raw),
+  },
+  role: {
+    list: EndpointOrchestraRoleList(raw),
+    create: EndpointOrchestraRoleCreate(raw),
+    update: EndpointOrchestraRoleUpdate(raw),
+    remove: EndpointOrchestraRoleRemove(raw),
+  },
   access: EndpointOrchestraAccess(raw),
   category: EndpointOrchestraCategory(raw),
 })

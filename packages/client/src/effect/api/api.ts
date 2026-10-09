@@ -3552,6 +3552,69 @@ export type OrchestraProjectListOperation<E = never> = () => Effect.Effect<Orche
 export type OrchestraTemplateListOutput = ReadonlyArray<Orchestra.Template>
 export type OrchestraTemplateListOperation<E = never> = () => Effect.Effect<OrchestraTemplateListOutput, E>
 
+export type OrchestraTemplateCreateInput = {
+  readonly name: string
+  readonly description: string
+  readonly members: ReadonlyArray<Orchestra.Member>
+}
+export type OrchestraTemplateCreateOutput = Orchestra.Template
+export type OrchestraTemplateCreateOperation<E = never> = (
+  input: OrchestraTemplateCreateInput,
+) => Effect.Effect<OrchestraTemplateCreateOutput, E>
+
+export type OrchestraTemplateUpdateInput = {
+  readonly templateID: string
+  readonly name: string
+  readonly description: string
+  readonly members: ReadonlyArray<Orchestra.Member>
+}
+export type OrchestraTemplateUpdateOutput = Orchestra.Template
+export type OrchestraTemplateUpdateOperation<E = never> = (
+  input: OrchestraTemplateUpdateInput,
+) => Effect.Effect<OrchestraTemplateUpdateOutput, E>
+
+export type OrchestraTemplateRemoveInput = { readonly templateID: string }
+export type OrchestraTemplateRemoveOutput = void
+export type OrchestraTemplateRemoveOperation<E = never> = (
+  input: OrchestraTemplateRemoveInput,
+) => Effect.Effect<OrchestraTemplateRemoveOutput, E>
+
+export type OrchestraRoleListOutput = ReadonlyArray<Orchestra.Role>
+export type OrchestraRoleListOperation<E = never> = () => Effect.Effect<OrchestraRoleListOutput, E>
+
+export type OrchestraRoleCreateInput = {
+  readonly name: string
+  readonly description: string
+  readonly rules: string
+  readonly category: string
+  readonly readOnly: boolean
+  readonly model?: string | undefined
+}
+export type OrchestraRoleCreateOutput = Orchestra.Role
+export type OrchestraRoleCreateOperation<E = never> = (
+  input: OrchestraRoleCreateInput,
+) => Effect.Effect<OrchestraRoleCreateOutput, E>
+
+export type OrchestraRoleUpdateInput = {
+  readonly roleID: string
+  readonly name: string
+  readonly description: string
+  readonly rules: string
+  readonly category: string
+  readonly readOnly: boolean
+  readonly model?: string | undefined
+}
+export type OrchestraRoleUpdateOutput = Orchestra.Role
+export type OrchestraRoleUpdateOperation<E = never> = (
+  input: OrchestraRoleUpdateInput,
+) => Effect.Effect<OrchestraRoleUpdateOutput, E>
+
+export type OrchestraRoleRemoveInput = { readonly roleID: string }
+export type OrchestraRoleRemoveOutput = void
+export type OrchestraRoleRemoveOperation<E = never> = (
+  input: OrchestraRoleRemoveInput,
+) => Effect.Effect<OrchestraRoleRemoveOutput, E>
+
 export type OrchestraProjectCreateInput = {
   readonly name: string
   readonly directory: string
@@ -3615,7 +3678,18 @@ export interface OrchestraApi<E = never> {
     readonly main: OrchestraProjectMainOperation<E>
     readonly sessions: OrchestraProjectSessionsOperation<E>
   }
-  readonly template: { readonly list: OrchestraTemplateListOperation<E> }
+  readonly template: {
+    readonly list: OrchestraTemplateListOperation<E>
+    readonly create: OrchestraTemplateCreateOperation<E>
+    readonly update: OrchestraTemplateUpdateOperation<E>
+    readonly remove: OrchestraTemplateRemoveOperation<E>
+  }
+  readonly role: {
+    readonly list: OrchestraRoleListOperation<E>
+    readonly create: OrchestraRoleCreateOperation<E>
+    readonly update: OrchestraRoleUpdateOperation<E>
+    readonly remove: OrchestraRoleRemoveOperation<E>
+  }
   readonly access: OrchestraAccessOperation<E>
   readonly category: OrchestraCategoryOperation<E>
 }

@@ -30,6 +30,98 @@ export const OrchestraGroup = HttpApiGroup.make("server.orchestra")
     ),
   )
   .add(
+    HttpApiEndpoint.post("orchestra.template.create", "/api/orchestra/template", {
+      payload: Orchestra.TemplateSpec,
+      success: Orchestra.Template,
+      error: InvalidRequestError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.template.create",
+        summary: "Create team template",
+        description: "Add the operator's own team: a name and the role sessions it opens.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.put("orchestra.template.update", "/api/orchestra/template/:templateID", {
+      params: { templateID: Schema.String },
+      payload: Orchestra.TemplateSpec,
+      success: Orchestra.Template,
+      error: InvalidRequestError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.template.update",
+        summary: "Update team template",
+        description: "Replace a team template, built-in or the operator's own.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.delete("orchestra.template.remove", "/api/orchestra/template/:templateID", {
+      params: { templateID: Schema.String },
+      success: HttpApiSchema.NoContent,
+      error: InvalidRequestError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.template.remove",
+        summary: "Remove team template",
+        description: "Delete the operator's own team template, or restore a built-in one to its default.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("orchestra.role.list", "/api/orchestra/role", {
+      success: Schema.Array(Orchestra.Role),
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.role.list",
+        summary: "List team roles",
+        description: "The roles team sessions run: built-in ones with the operator's edits, then the operator's own.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("orchestra.role.create", "/api/orchestra/role", {
+      payload: Orchestra.RoleSpec,
+      success: Orchestra.Role,
+      error: InvalidRequestError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.role.create",
+        summary: "Create team role",
+        description: "Add the operator's own role; its sessions run the team-<id> agent with the role's rules.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.put("orchestra.role.update", "/api/orchestra/role/:roleID", {
+      params: { roleID: Schema.String },
+      payload: Orchestra.RoleSpec,
+      success: Orchestra.Role,
+      error: InvalidRequestError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.role.update",
+        summary: "Update team role",
+        description: "Replace a role, built-in or the operator's own.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.delete("orchestra.role.remove", "/api/orchestra/role/:roleID", {
+      params: { roleID: Schema.String },
+      success: HttpApiSchema.NoContent,
+      error: InvalidRequestError,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.role.remove",
+        summary: "Remove team role",
+        description:
+          "Delete the operator's own role, unless a team template still uses it, or restore a built-in one to its default.",
+      }),
+    ),
+  )
+  .add(
     HttpApiEndpoint.post("orchestra.project.create", root, {
       payload: Schema.Struct({
         name: Schema.String,

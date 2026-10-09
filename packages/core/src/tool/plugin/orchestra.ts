@@ -12,8 +12,6 @@ import type { SessionMessage } from "../../session/message.js"
 
 export const name = "sessions"
 
-const ROLES = ["architect", "developer", "tester", "reviewer", "debugger", "researcher", "designer", "writer", "devops"]
-
 const description = [
   "Run this project's AI team: the other sessions of the project, each a separate chat with its own role.",
   "Only the project's main session (the orchestrator) has this tool.",
@@ -30,7 +28,9 @@ export const Input = Schema.Struct({
     description: "Message for send, or the first task for create",
   }),
   title: Schema.optionalKey(Schema.String).annotate({ description: "Title of the session to create" }),
-  role: Schema.optionalKey(Schema.Literals(ROLES)).annotate({ description: "Role of the session to create" }),
+  role: Schema.optionalKey(Schema.String).annotate({
+    description: "Role id of the session to create, e.g. architect, developer, tester, reviewer",
+  }),
   category: Schema.optionalKey(Schema.String).annotate({
     description: "Category of the session to create, e.g. Planning, Build or Quality",
   }),
@@ -152,6 +152,11 @@ export const Plugin = {
                   }
                 }
                 case "create": {
+                  const roles = yield* orchestra.roles()
+                  if (input.role && !roles.some((role) => role.id === input.role))
+                    return yield* new ToolFailure({
+                      message: `Unknown role ${input.role}. Roles: ${roles.map((role) => role.id).join(", ")}`,
+                    })
                   const created = yield* sessions
                     .create({
                       location: { directory: AbsolutePath.make(project.directory) },

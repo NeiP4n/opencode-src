@@ -19,6 +19,7 @@ import { PanelBox, PanelTitle, Row } from "./devtools-panel"
 import { RegistryPanel } from "./devtools-registry"
 import { DialogConnect, DialogHost } from "./dialog-rooms"
 import { openProjectDialog } from "./dialog-project"
+import { openTeamEditor } from "./dialog-teams"
 import { useProjects } from "../context/projects"
 import { DialogExperiments } from "./dialog-experiments"
 import { usePlugin } from "../plugin/context"
@@ -468,6 +469,15 @@ export function DevToolsBar() {
         }}
       >
         <text fg={theme.text.muted}>{t("Connect")}</text>
+      </BarItem>
+      <BarItem
+        active={false}
+        onClick={() => {
+          close()
+          openTeamEditor(dialog)
+        }}
+      >
+        <text fg={theme.text.muted}>{t("Teams")}</text>
       </BarItem>
       <Show when={projects.loaded() && projects.list().length === 0}>
         <BarItem

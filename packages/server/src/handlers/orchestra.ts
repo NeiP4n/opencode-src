@@ -24,6 +24,10 @@ function badDirectory(error: Orchestra.DirectoryError) {
   )
 }
 
+function badTeam(error: Orchestra.TeamError) {
+  return Effect.fail(new InvalidRequestError({ message: error.message, field: error.field }))
+}
+
 export const OrchestraHandler = HttpApiBuilder.group(Api, "server.orchestra", (handlers) =>
   Effect.gen(function* () {
     const orchestra = yield* Orchestra.Service
@@ -31,7 +35,36 @@ export const OrchestraHandler = HttpApiBuilder.group(Api, "server.orchestra", (h
 
     return handlers
       .handle("orchestra.project.list", () => orchestra.projects())
-      .handle("orchestra.template.list", () => Effect.succeed(Orchestra.templates))
+      .handle("orchestra.template.list", () => orchestra.templates())
+      .handle("orchestra.template.create", (ctx) =>
+        orchestra.saveTemplate(undefined, ctx.payload).pipe(Effect.catchTag("Orchestra.TeamError", badTeam)),
+      )
+      .handle("orchestra.template.update", (ctx) =>
+        orchestra
+          .saveTemplate(ctx.params.templateID, ctx.payload)
+          .pipe(Effect.catchTag("Orchestra.TeamError", badTeam)),
+      )
+      .handle(
+        "orchestra.template.remove",
+        Effect.fn(function* (ctx) {
+          yield* orchestra.removeTemplate(ctx.params.templateID).pipe(Effect.catchTag("Orchestra.TeamError", badTeam))
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle("orchestra.role.list", () => orchestra.roles())
+      .handle("orchestra.role.create", (ctx) =>
+        orchestra.saveRole(undefined, ctx.payload).pipe(Effect.catchTag("Orchestra.TeamError", badTeam)),
+      )
+      .handle("orchestra.role.update", (ctx) =>
+        orchestra.saveRole(ctx.params.roleID, ctx.payload).pipe(Effect.catchTag("Orchestra.TeamError", badTeam)),
+      )
+      .handle(
+        "orchestra.role.remove",
+        Effect.fn(function* (ctx) {
+          yield* orchestra.removeRole(ctx.params.roleID).pipe(Effect.catchTag("Orchestra.TeamError", badTeam))
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
       .handle("orchestra.project.create", (ctx) =>
         orchestra
           .create(ctx.payload)

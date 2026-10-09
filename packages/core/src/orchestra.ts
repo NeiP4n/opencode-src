@@ -1,10 +1,11 @@
 export * as Orchestra from "./orchestra.js"
 
-import { Context, Effect, Layer, Option, Schema, Stream } from "effect"
+import { Context, Effect, Layer, Option, PubSub, Schema, Stream } from "effect"
 import path from "node:path"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Orchestra } from "@opencode/schema/orchestra"
+import { Model } from "@opencode/schema/model"
 import { SessionID } from "@opencode/schema/session-id"
 import type { Session as SessionSchema } from "@opencode/schema/session"
 import { AbsolutePath } from "./schema.js"
@@ -26,7 +27,12 @@ export const ProjectID = Orchestra.ProjectID
 export type ProjectID = Orchestra.ProjectID
 export const Template = Orchestra.Template
 export type Template = Orchestra.Template
-export const templates = Orchestra.templates
+export const TemplateSpec = Orchestra.TemplateSpec
+export type TemplateSpec = Orchestra.TemplateSpec
+export const Role = Orchestra.Role
+export type Role = Orchestra.Role
+export const RoleSpec = Orchestra.RoleSpec
+export type RoleSpec = Orchestra.RoleSpec
 
 export class ProjectNotFoundError extends Schema.TaggedError<ProjectNotFoundError>()("Orchestra.ProjectNotFoundError", {
   projectID: Schema.String,
@@ -36,6 +42,13 @@ export class TemplateNotFoundError extends Schema.TaggedError<TemplateNotFoundEr
   "Orchestra.TemplateNotFoundError",
   { template: Schema.String },
 ) {}
+
+// A role or team the operator saved or removed that cannot be: an empty name,
+// an unknown role, a role a team still uses, a malformed model.
+export class TeamError extends Schema.TaggedError<TeamError>()("Orchestra.TeamError", {
+  message: Schema.String,
+  field: Schema.String.pipe(Schema.optional),
+}) {}
 
 export class DispatchError extends Schema.TaggedError<DispatchError>()("Orchestra.DispatchError", {
   message: Schema.String,
@@ -81,6 +94,18 @@ export interface Interface {
   }) => Effect.Effect<void, DispatchError>
   // When a dispatched task was sent, while its report is still outstanding.
   readonly pending: (sessionID: SessionID) => Effect.Effect<number | undefined>
+  // Team roles and templates: the built-in ones, with the operator's edits
+  // applied, followed by the operator's own in the order they were created.
+  readonly roles: () => Effect.Effect<ReadonlyArray<Role>>
+  // Without an id creates a custom role; with one replaces that role.
+  readonly saveRole: (id: string | undefined, spec: RoleSpec) => Effect.Effect<Role, TeamError>
+  // Deletes a custom role, or restores a built-in one to its default.
+  readonly removeRole: (id: string) => Effect.Effect<void, TeamError>
+  readonly templates: () => Effect.Effect<ReadonlyArray<Template>>
+  readonly saveTemplate: (id: string | undefined, spec: TemplateSpec) => Effect.Effect<Template, TeamError>
+  readonly removeTemplate: (id: string) => Effect.Effect<void, TeamError>
+  // Emits after every saved or removed role or template, so agents can be rebuilt.
+  readonly changes: Stream.Stream<void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Orchestra") {}
@@ -91,6 +116,8 @@ const PROJECT = "orchestra/project/"
 const ACCESS = "orchestra/access/"
 const CATEGORY = "orchestra/category/"
 const TASK = "orchestra/task/"
+const ROLE = "orchestra/role/"
+const TEMPLATE = "orchestra/template/"
 // Reports longer than this are cut; the orchestrator reads the rest with the sessions tool.
 const REPORT_LIMIT = 6000
 // How many recent top-level sessions are scanned when listing a project.
@@ -100,6 +127,12 @@ const decodeAccess = Schema.decodeUnknownOption(Access)
 // A task that is waiting for its report: which main session to deliver it to and when it was sent.
 const Task = Schema.Struct({ main: SessionID, sent: Schema.Number })
 const decodeTask = Schema.decodeUnknownOption(Task)
+// Saved roles and templates keep when they were first created, so custom ones list in creation order.
+const StoredRole = Schema.Struct({ ...Orchestra.RoleSpec.fields, created: Schema.Number })
+const StoredTemplate = Schema.Struct({ ...Orchestra.TemplateSpec.fields, created: Schema.Number })
+const decodeRole = Schema.decodeUnknownOption(StoredRole)
+const decodeTemplate = Schema.decodeUnknownOption(StoredTemplate)
+const decodeCreated = Schema.decodeUnknownOption(Schema.Struct({ created: Schema.Number }))
 
 // Annotated: the layer calls Session operations whose types reach back through the
 // instance graph that includes this node, so an inferred type would be circular.
@@ -191,6 +224,46 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
         Effect.forkScoped({ startImmediately: true }),
       )
 
+    const changed = yield* PubSub.sliding<void>(16)
+
+    const stored = Effect.fnUntraced(function* <A extends { created: number }>(
+      prefix: string,
+      decode: (value: unknown) => Option.Option<A>,
+    ) {
+      const result = yield* kv.scan({ prefix, limit: 1000 })
+      return result.entries.flatMap((entry) =>
+        Option.toArray(decode(entry.value)).map((value) => ({ ...value, id: entry.key.slice(prefix.length) })),
+      )
+    })
+
+    const roles = Effect.fn("Orchestra.roles")(function* () {
+      const saved = yield* stored(ROLE, decodeRole)
+      return merge(Orchestra.roles, saved).map(({ created: _, ...item }) => ({
+        ...item,
+        agent: Orchestra.role(item.id),
+      }))
+    })
+
+    const templates = Effect.fn("Orchestra.templates")(function* () {
+      return merge(Orchestra.templates, yield* stored(TEMPLATE, decodeTemplate)).map(({ created: _, ...item }) => item)
+    })
+
+    // The key to save under — the given id, or a new one made from the name — and when it was first saved.
+    const slot = Effect.fnUntraced(function* (
+      prefix: string,
+      id: string | undefined,
+      taken: ReadonlyArray<{ id: string }>,
+      name: string,
+    ) {
+      if (id && !taken.some((item) => item.id === id)) return yield* new TeamError({ message: `Unknown id: ${id}` })
+      const key = id ?? freeID(name, taken)
+      const created = Option.match(decodeCreated(yield* kv.get(prefix + key)), {
+        onNone: () => Date.now(),
+        onSome: (value) => value.created,
+      })
+      return { key, created }
+    })
+
     const access = Effect.fn("Orchestra.access")(function* (sessionID: SessionID) {
       return Option.getOrElse(decodeAccess(yield* kv.get(ACCESS + sessionID)), () => Orchestra.defaultAccess)
     })
@@ -198,7 +271,9 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
     return Service.of({
       projects,
       create: Effect.fn("Orchestra.create")(function* (input) {
-        const template = input.template ? templates.find((item) => item.id === input.template) : undefined
+        const template = input.template
+          ? (yield* templates()).find((item) => item.id === input.template)
+          : undefined
         if (input.template && !template) return yield* new TemplateNotFoundError({ template: input.template })
         const resolved = yield* directory(input.directory)
         const project = yield* save({
@@ -299,9 +374,123 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
       pending: Effect.fn("Orchestra.pending")(function* (sessionID) {
         return Option.getOrUndefined(Option.map(decodeTask(yield* kv.get(TASK + sessionID)), (task) => task.sent))
       }),
+      roles,
+      saveRole: Effect.fn("Orchestra.saveRole")(function* (id, input) {
+        const spec = yield* requireRole(input)
+        const target = yield* slot(ROLE, id, yield* roles(), spec.name)
+        yield* kv.set(ROLE + target.key, Schema.encodeSync(StoredRole)({ ...spec, created: target.created }))
+        yield* PubSub.publish(changed, undefined)
+        return { ...spec, id: target.key, agent: Orchestra.role(target.key), origin: originOf(Orchestra.roles, target.key) }
+      }),
+      removeRole: Effect.fn("Orchestra.removeRole")(function* (id) {
+        const role = (yield* roles()).find((item) => item.id === id)
+        if (!role) return yield* new TeamError({ message: `Unknown role: ${id}` })
+        // A built-in role is only reset, so it stays available to every team.
+        if (role.origin === "custom") {
+          const users = (yield* templates()).filter((template) =>
+            template.members.some((member) => member.agent === role.agent),
+          )
+          if (users.length > 0)
+            return yield* new TeamError({
+              message: `${role.name} is in ${users.map((template) => template.name).join(", ")}; remove it there first`,
+            })
+        }
+        yield* kv.remove(ROLE + id)
+        yield* PubSub.publish(changed, undefined)
+      }),
+      templates,
+      saveTemplate: Effect.fn("Orchestra.saveTemplate")(function* (id, input) {
+        const spec = yield* requireTemplate(input, yield* roles())
+        const target = yield* slot(TEMPLATE, id, yield* templates(), spec.name)
+        yield* kv.set(TEMPLATE + target.key, Schema.encodeSync(StoredTemplate)({ ...spec, created: target.created }))
+        yield* PubSub.publish(changed, undefined)
+        return { ...spec, id: target.key, origin: originOf(Orchestra.templates, target.key) }
+      }),
+      removeTemplate: Effect.fn("Orchestra.removeTemplate")(function* (id) {
+        if (!(yield* templates()).some((item) => item.id === id))
+          return yield* new TeamError({ message: `Unknown team: ${id}` })
+        yield* kv.remove(TEMPLATE + id)
+        yield* PubSub.publish(changed, undefined)
+      }),
+      changes: Stream.fromPubSub(changed),
     })
   }),
 )
+
+// Built-ins in their own order with saved edits applied, then the saved custom items oldest first.
+function merge<A extends { id: string }, B extends { id: string; created: number }>(
+  builtin: readonly A[],
+  saved: readonly B[],
+) {
+  const edits = new Map(saved.map((item) => [item.id, item]))
+  return [
+    ...builtin.map((item) => {
+      const edit = edits.get(item.id)
+      return edit ? { ...edit, origin: "edited" as const } : { ...item, created: 0, origin: "builtin" as const }
+    }),
+    ...saved
+      .filter((item) => !builtin.some((base) => base.id === item.id))
+      .toSorted((a, b) => a.created - b.created)
+      .map((item) => ({ ...item, origin: "custom" as const })),
+  ]
+}
+
+function originOf(builtin: readonly { id: string }[], id: string): Orchestra.Origin {
+  return builtin.some((item) => item.id === id) ? "edited" : "custom"
+}
+
+// Ids are lowercase words joined by "-", so role agents read as team-code-auditor.
+function freeID(name: string, taken: ReadonlyArray<{ id: string }>) {
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "") || "custom"
+  const used = new Set(taken.map((item) => item.id))
+  const free = (n: number): string => (used.has(`${base}-${n}`) ? free(n + 1) : `${base}-${n}`)
+  return used.has(base) ? free(2) : base
+}
+
+const requireRole = Effect.fnUntraced(function* (input: RoleSpec) {
+  const name = input.name.trim()
+  if (!name) return yield* new TeamError({ message: "Enter the role's name", field: "name" })
+  const model = input.model?.trim()
+  // Parsed the way the agent plugin parses it, so a saved model never breaks agent loading.
+  if (model)
+    yield* Effect.try({
+      try: () => Model.Ref.parse(model),
+      catch: () => new TeamError({ message: "Model must look like provider/model", field: "model" }),
+    })
+  return {
+    name,
+    description: input.description.trim(),
+    rules: input.rules.trim(),
+    category: input.category.trim() || "Team",
+    readOnly: input.readOnly,
+    ...(model ? { model } : {}),
+  }
+})
+
+function requireTemplate(input: TemplateSpec, roles: ReadonlyArray<Role>) {
+  const name = input.name.trim()
+  if (!name) return Effect.fail(new TeamError({ message: "Enter the team's name", field: "name" }))
+  if (input.members.length === 0)
+    return Effect.fail(new TeamError({ message: "Add at least one member", field: "members" }))
+  const unknown = input.members.find((member) => !roles.some((role) => role.agent === member.agent))
+  if (unknown) return Effect.fail(new TeamError({ message: `Unknown role: ${unknown.agent}`, field: "members" }))
+  return Effect.succeed({
+    name,
+    description: input.description.trim(),
+    members: input.members.map((member) => {
+      const role = roles.find((item) => item.agent === member.agent)
+      return {
+        agent: member.agent,
+        title: member.title.trim() || role?.name || member.agent,
+        category: member.category.trim() || role?.category || "Team",
+      }
+    }),
+  })
+}
 
 // The last assistant answer with text, newest first.
 function finalText(message: SessionMessage.Info) {

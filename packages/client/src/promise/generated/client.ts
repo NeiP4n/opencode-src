@@ -311,6 +311,19 @@ import type {
   RoomGuestPermissionReplyOutput,
   OrchestraProjectListOutput,
   OrchestraTemplateListOutput,
+  OrchestraTemplateCreateInput,
+  OrchestraTemplateCreateOutput,
+  OrchestraTemplateUpdateInput,
+  OrchestraTemplateUpdateOutput,
+  OrchestraTemplateRemoveInput,
+  OrchestraTemplateRemoveOutput,
+  OrchestraRoleListOutput,
+  OrchestraRoleCreateInput,
+  OrchestraRoleCreateOutput,
+  OrchestraRoleUpdateInput,
+  OrchestraRoleUpdateOutput,
+  OrchestraRoleRemoveInput,
+  OrchestraRoleRemoveOutput,
   OrchestraProjectCreateInput,
   OrchestraProjectCreateOutput,
   OrchestraProjectUpdateInput,
@@ -2657,6 +2670,103 @@ export function make(options: ClientOptions) {
               successStatus: 200,
               declaredStatuses: [400, 401],
               empty: false,
+            },
+            requestOptions,
+          ),
+        create: (input: OrchestraTemplateCreateInput, requestOptions?: RequestOptions) =>
+          request<OrchestraTemplateCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/orchestra/template`,
+              body: { name: input["name"], description: input["description"], members: input["members"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        update: (input: OrchestraTemplateUpdateInput, requestOptions?: RequestOptions) =>
+          request<OrchestraTemplateUpdateOutput>(
+            {
+              method: "PUT",
+              path: `/api/orchestra/template/${encodeURIComponent(input.templateID)}`,
+              body: { name: input["name"], description: input["description"], members: input["members"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        remove: (input: OrchestraTemplateRemoveInput, requestOptions?: RequestOptions) =>
+          request<OrchestraTemplateRemoveOutput>(
+            {
+              method: "DELETE",
+              path: `/api/orchestra/template/${encodeURIComponent(input.templateID)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
+      role: {
+        list: (requestOptions?: RequestOptions) =>
+          request<OrchestraRoleListOutput>(
+            {
+              method: "GET",
+              path: `/api/orchestra/role`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        create: (input: OrchestraRoleCreateInput, requestOptions?: RequestOptions) =>
+          request<OrchestraRoleCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/orchestra/role`,
+              body: {
+                name: input["name"],
+                description: input["description"],
+                rules: input["rules"],
+                category: input["category"],
+                readOnly: input["readOnly"],
+                model: input["model"],
+              },
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        update: (input: OrchestraRoleUpdateInput, requestOptions?: RequestOptions) =>
+          request<OrchestraRoleUpdateOutput>(
+            {
+              method: "PUT",
+              path: `/api/orchestra/role/${encodeURIComponent(input.roleID)}`,
+              body: {
+                name: input["name"],
+                description: input["description"],
+                rules: input["rules"],
+                category: input["category"],
+                readOnly: input["readOnly"],
+                model: input["model"],
+              },
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        remove: (input: OrchestraRoleRemoveInput, requestOptions?: RequestOptions) =>
+          request<OrchestraRoleRemoveOutput>(
+            {
+              method: "DELETE",
+              path: `/api/orchestra/role/${encodeURIComponent(input.roleID)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401],
+              empty: true,
             },
             requestOptions,
           ),
