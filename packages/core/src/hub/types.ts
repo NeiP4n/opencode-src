@@ -14,6 +14,7 @@ export type Category =
   | "json"
   | "data"
   | "git"
+  | "github"
   | "docker"
   | "systemd"
   | "process"

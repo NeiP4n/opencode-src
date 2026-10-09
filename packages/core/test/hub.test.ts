@@ -36,7 +36,7 @@ describe("Tool Hub", () => {
 
   test("categories cover the required backends", () => {
     const cats = Hub.categories()
-    for (const expected of ["search", "files", "text", "json", "data", "git", "docker", "systemd", "process", "network", "system", "windows"]) {
+    for (const expected of ["search", "files", "text", "json", "data", "git", "github", "docker", "systemd", "process", "network", "system", "windows"]) {
       expect(cats).toContain(expected)
     }
   })
@@ -254,4 +254,12 @@ describe("host", () => {
     const bash = Hub.HubHost.shellFor("bash")
     if (bash) expect(bash.toLowerCase()).not.toContain("system32")
   })
+})
+
+test("gh entries render the same command in bash and PowerShell and list gh as a registry tool", () => {
+  const entry = Hub.get("github.pr-view")
+  expect(entry?.requires).toEqual(["gh"])
+  expect(entry?.templates.bash).toBe(entry?.templates.pwsh)
+  expect(Hub.get("github.setup-git")?.danger).toBe(true)
+  expect(Hub.get("github.pr-create")?.danger).toBe(true)
 })

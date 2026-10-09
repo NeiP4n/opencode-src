@@ -7,6 +7,7 @@ import { entries as text } from "./text.js"
 import { entries as json } from "./json.js"
 import { entries as data } from "./data.js"
 import { entries as git } from "./git.js"
+import { entries as github } from "./github.js"
 import { entries as docker } from "./docker.js"
 import { entries as systemd } from "./systemd.js"
 import { entries as process } from "./process.js"
@@ -24,6 +25,7 @@ export const all: readonly Entry[] = [
   ...json,
   ...data,
   ...git,
+  ...github,
   ...docker,
   ...systemd,
   ...process,

@@ -75,6 +75,7 @@ const PACKAGE: Record<string, Partial<Record<Manager, string>>> = {
     choco: "sqlite",
   },
   git: { winget: "Git.Git" },
+  gh: { pacman: "github-cli", apk: "github-cli", winget: "GitHub.cli" },
   curl: { winget: "cURL.cURL" },
   tree: { winget: "GnuWin32.Tree" },
   "diff-so-fancy": { brew: "diff-so-fancy" },
