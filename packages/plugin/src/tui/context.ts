@@ -142,6 +142,8 @@ export interface Data {
 export type Route =
   | { readonly type: "home" }
   | { readonly type: "session"; readonly sessionID: string }
+  // A room joined on another host, identified by that host's address and the room ID.
+  | { readonly type: "room"; readonly url: string; readonly roomID: string }
   | {
       readonly type: "plugin"
       readonly id: string

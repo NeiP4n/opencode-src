@@ -10,7 +10,8 @@ import { useTheme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
-import { roomListRevision } from "../util/room"
+import { roomListRevision, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
+import { DialogConnect } from "./dialog-rooms"
 import { openProjectDialog } from "./dialog-project"
 import { useProjects } from "../context/projects"
 import { DialogPrompt } from "../ui/dialog-prompt"
@@ -24,7 +25,9 @@ import { useT } from "../util/i18n"
 // with its main session (the orchestrator) and the sessions opened in that
 // directory under it, grouped by category. "#" sets a session's category; the
 // chip after it is the access the orchestrator has to it, and clicking it steps
-// through the levels. The Notes tab swaps the tree for the notes of one project.
+// through the levels. Below the projects, Multiplayer lists the sessions this
+// computer hosts as rooms and the rooms it joined on other hosts. The Notes tab
+// swaps the tree for the notes of one project.
 
 const ACCESS_ORDER: readonly OrchestraAccess[] = ["hidden", "read", "write", "full"]
 
@@ -40,6 +43,7 @@ export function ProjectTree(props: { width: number }) {
   const projects = projectList.list
   const notes = useNotes()
   const [rooms] = createResource(roomListRevision, () => client.api.room.list().catch(() => []))
+  const [joined, updateJoined] = useJoinedRooms()
   const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
   const [access, setAccess] = createStore<Record<string, OrchestraAccess>>({})
   const [category, setCategory] = createStore<Record<string, string | undefined>>({})
@@ -155,6 +159,25 @@ export function ProjectTree(props: { width: number }) {
       .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
   }
 
+  const roomKey = (room: JoinedRoom) => `room:${room.url}#${room.roomID}`
+  const openRoom = (room: JoinedRoom) => route.navigate({ type: "room", url: room.url, roomID: room.roomID })
+  const viewing = (room: JoinedRoom) => route.data.type === "room" && sameRoom(route.data, room)
+
+  // Leaving only forgets the token here; the host keeps the room and its chat.
+  const leave = (room: JoinedRoom) => {
+    if (armed() !== roomKey(room)) return setArmed(roomKey(room))
+    setArmed()
+    if (viewing(room)) route.navigate({ type: "home" })
+    void updateJoined((draft) => {
+      draft.joined = draft.joined.filter((item) => !sameRoom(item, room))
+    })
+  }
+
+  const connect = () => {
+    dialog.replace(() => <DialogConnect onClose={() => dialog.clear()} />, undefined, { size: "large" })
+    dialog.setCentered(true)
+  }
+
   const sessionsOf = (project: OrchestraProject) =>
     data.session
       .list()
@@ -191,7 +214,9 @@ export function ProjectTree(props: { width: number }) {
           setHover={setHover}
           onClick={() => (notes.tab() === "notes" ? notes.setCreating(true) : edit())}
         >
-          <text fg={hover() === "new" ? theme.text.action.primary.hovered : theme.text.action.primary.base}>{t("+ New")}</text>
+          <text fg={hover() === "new" ? theme.text.action.primary.hovered : theme.text.action.primary.base}>
+            {t("+ New")}
+          </text>
         </Row>
       </box>
       <Show when={notes.tab() === "notes"}>
@@ -317,6 +342,77 @@ export function ProjectTree(props: { width: number }) {
             </box>
           )}
         </For>
+        <box paddingTop={projects().length > 0 ? 1 : 0}>
+          <Row id="multiplayer" hover={hover} setHover={setHover} onClick={connect}>
+            <text fg={theme.text.action.secondary.base} attributes={TextAttributes.BOLD}>
+              {"⇄ "}
+            </text>
+            <box flexGrow={1} minWidth={0}>
+              <text fg={theme.text.base} attributes={TextAttributes.BOLD} wrapMode="none" truncate>
+                {t("Multiplayer")}
+              </text>
+            </box>
+            <text fg={hover() === "multiplayer" ? theme.text.action.primary.hovered : theme.text.action.primary.base}>
+              {t("+ Connect")}
+            </text>
+          </Row>
+          <For each={rooms.latest ?? []}>
+            {(room) => (
+              <Row
+                id={`hosted:${room.id}`}
+                hover={hover}
+                setHover={setHover}
+                selected={room.sessionID === current()?.id}
+                onClick={() => route.navigate({ type: "session", sessionID: room.sessionID })}
+              >
+                <text fg={theme.text.action.secondary.base}>{"  ⇄ "}</text>
+                <box flexGrow={1} minWidth={0}>
+                  <text fg={theme.text.base} wrapMode="none" truncate>
+                    {room.name}
+                  </text>
+                </box>
+                <text fg={theme.text.muted}>{` ${t("hosting")}`}</text>
+              </Row>
+            )}
+          </For>
+          <For each={joined.joined}>
+            {(room) => (
+              <Row
+                id={roomKey(room)}
+                hover={hover}
+                setHover={setHover}
+                selected={viewing(room)}
+                onClick={() => openRoom(room)}
+              >
+                <text fg={theme.text.action.secondary.base}>{"  ⇄ "}</text>
+                <box flexGrow={1} minWidth={0}>
+                  <text fg={theme.text.base} wrapMode="none" truncate>
+                    {room.name}
+                    <span style={{ fg: theme.text.muted }}>{` · ${new URL(room.url).host}`}</span>
+                  </text>
+                </box>
+                <box
+                  onMouseOut={() => setArmed()}
+                  onMouseUp={(event) => {
+                    event.stopPropagation()
+                    leave(room)
+                  }}
+                >
+                  <text fg={armed() === roomKey(room) ? theme.text.feedback.error.base : theme.text.muted}>
+                    {armed() === roomKey(room) ? ` ${t("leave?")}` : " ×"}
+                  </text>
+                </box>
+              </Row>
+            )}
+          </For>
+          <Show when={(rooms.latest ?? []).length === 0 && joined.joined.length === 0}>
+            <box paddingLeft={4} paddingRight={1}>
+              <text fg={theme.text.muted} wrapMode="word">
+                {t("No rooms yet. Host a session or connect to someone else's.")}
+              </text>
+            </box>
+          </Show>
+        </box>
       </scrollbox>
     </box>
   )

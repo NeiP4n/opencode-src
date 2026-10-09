@@ -176,3 +176,45 @@ test("the Language bar item switches the bar and room windows to Russian and bac
   const dialog = await setup.waitForFrame((frame) => frame.includes("Вход по адресу"))
   expect(dialog).toContain("Комнаты в этой сети")
 })
+
+test("a joined room opens in the main area and stays in the left panel under Multiplayer", async () => {
+  await using state = await tmpdir()
+  const remote = { ...room, id: "room_far", sessionID: "ses_far", name: "Far lab", open: true }
+  const host = Bun.serve({
+    port: 0,
+    fetch(request) {
+      const url = new URL(request.url)
+      if (url.pathname === "/api/room/public") return json({ host: "studio", rooms: [remote] })
+      if (url.pathname === "/api/room/join" && request.method === "POST")
+        return json({ token: "token", guest: { id: "guest_1", name: "Bo" }, room: remote })
+      if (url.pathname === `/api/room/${remote.id}/guest/message`)
+        return json({
+          data: [{ id: "msg_1", role: "user", author: "Ann", text: "Hello from far", created: 0 }],
+          running: false,
+        })
+      return new Response(null, { status: 404 })
+    },
+  })
+  try {
+    await using setup = await render(state.path)
+    const bar = await setup.waitForFrame((frame) => frame.includes("Connect"))
+    const entry = cell(bar, "Connect")
+    await setup.mockMouse.click(entry.x, entry.y)
+    const dialog = await setup.waitForFrame((frame) => frame.includes("Join by address"))
+    const address = cell(dialog, "e.g. 192.168.1.5")
+    await setup.mockMouse.click(address.x, address.y)
+    await setup.mockInput.typeText(`127.0.0.1:${host.port}`)
+    setup.mockInput.pressEnter()
+
+    const joined = await setup.waitForFrame(
+      (frame) => frame.includes("Hello from far") && !frame.includes("Join by address"),
+    )
+    expect(joined).toContain("⇄ Multiplayer · Far lab · host studio")
+    // A separate section below the projects: hosted sessions and joined rooms, each marked as multiplayer.
+    expect(joined).toMatch(/⇄ Multiplayer +\+ Connect/)
+    expect(joined).toMatch(/⇄ Lab +hosting/)
+    expect(joined).toContain(`⇄ Far lab · 127.0.0.1:${host.port}`)
+  } finally {
+    await host.stop()
+  }
+})

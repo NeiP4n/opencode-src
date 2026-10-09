@@ -7,17 +7,15 @@ import { useConfig } from "../config"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
 import { useRoute } from "../context/route"
-import { useStorage } from "../context/storage"
 import { useTheme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
 import { useT } from "../util/i18n"
-import { roomListChanged } from "../util/room"
+import { roomListChanged, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
 import { Button } from "./devtools-registry"
-import { DialogRoomChat, roomClient, type JoinedRoom } from "./dialog-room-chat"
+import { roomClient } from "./room-chat"
 import { DISCOVERY_PORTS, listRooms, scanRooms, type FoundRoom } from "@opencode/client/room-discovery"
-
 
 // Host: the rooms this computer shares. A room is one session other devices
 // join with a short code; only this computer's AI answers in it.
@@ -48,9 +46,7 @@ export function DialogHost(props: { onClose?: () => void }) {
   const addresses = () =>
     (server()?.urls ?? [])
       .map((url) => new URL(url).host)
-      .filter(
-        (host) => !/^(localhost|127\.|169\.254\.|\[::1\]|172\.(1[6-9]|2\d|3[01])\.|198\.1[89]\.)/.test(host),
-      )
+      .filter((host) => !/^(localhost|127\.|169\.254\.|\[::1\]|172\.(1[6-9]|2\d|3[01])\.|198\.1[89]\.)/.test(host))
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true)
@@ -109,7 +105,10 @@ export function DialogHost(props: { onClose?: () => void }) {
         </Labeled>
         <FirewallHelp ports={[...new Set(addresses().map((address) => Number(address.split(":").at(-1))))]} />
       </Show>
-      <Show when={sessionID()} fallback={<text fg={theme.text.muted}>{t("Open a session to host it as a room.")}</text>}>
+      <Show
+        when={sessionID()}
+        fallback={<text fg={theme.text.muted}>{t("Open a session to host it as a room.")}</text>}
+      >
         <Show when={!shared()}>
           <box flexDirection="row">
             <Button variant="primary" disabled={busy()} onClick={share}>
@@ -223,11 +222,12 @@ export function DialogHost(props: { onClose?: () => void }) {
 // unless its host lets guests in without one.
 export function DialogConnect(props: { onClose?: () => void }) {
   const dialog = useDialog()
+  const route = useRoute()
   const theme = useTheme().surface("dialog")
   const config = useConfig().data
   const dimensions = useTerminalDimensions()
   const t = useT()
-  const [saved, updateSaved] = useStorage().store<{ joined: JoinedRoom[] }>("rooms", { initial: { joined: [] } })
+  const [saved, updateSaved] = useJoinedRooms()
   const [found, { refetch: rescan, mutate: setFound }] = createResource(() => scanRooms())
   const [armed, setArmed] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
@@ -239,16 +239,16 @@ export function DialogConnect(props: { onClose?: () => void }) {
     setJoinError()
     void roomClient({ url, token: "" })
       .room.join({ ...request, name: fields.name?.value.trim() || hostname() })
-      .then((joined) =>
-        updateSaved((draft) => {
+      .then(async (joined) => {
+        const room = { url, roomID: joined.room.id }
+        await updateSaved((draft) => {
           draft.joined = [
-            ...draft.joined.filter((item) => !(item.url === url && item.roomID === joined.room.id)),
-            { url, roomID: joined.room.id, name: joined.room.name, token: joined.token, guest: joined.guest.name },
+            ...draft.joined.filter((item) => !sameRoom(item, room)),
+            { ...room, name: joined.room.name, token: joined.token, guest: joined.guest.name },
           ]
-        }).then(() => {
-          if (fields.code) fields.code.value = ""
-        }),
-      )
+        })
+        open(room)
+      })
       .catch((error: unknown) => setJoinError(errorMessage(error)))
       .finally(() => setBusy(false))
   }
@@ -269,7 +269,8 @@ export function DialogConnect(props: { onClose?: () => void }) {
         const unlocked = rooms.filter((room) => room.open)
         if (rooms.length === 0) return setJoinError(t("No rooms at this address"))
         if (unlocked.length === 1 && rooms.length === 1) return enter(url, { roomID: unlocked[0].id })
-        if (unlocked.length === 0 && rooms.length === 1) return setJoinError(t("This room needs the join code its host shows"))
+        if (unlocked.length === 0 && rooms.length === 1)
+          return setJoinError(t("This room needs the join code its host shows"))
         setJoinError(t("Pick a room above: this host shares several"))
       })
       .catch((error: unknown) => setJoinError(errorMessage(error)))
@@ -284,9 +285,10 @@ export function DialogConnect(props: { onClose?: () => void }) {
     fields.code?.focus()
   }
 
-  const open = (room: JoinedRoom) => {
-    dialog.replace(() => <DialogRoomChat room={room} onClose={() => dialog.clear()} />, undefined, { size: "xlarge" })
-    dialog.setCentered(true)
+  // A joined room opens where a session would and stays in the left panel under Multiplayer.
+  const open = (room: Pick<JoinedRoom, "url" | "roomID">) => {
+    dialog.clear()
+    route.navigate({ type: "room", url: room.url, roomID: room.roomID })
   }
 
   const leave = (room: JoinedRoom) => {
@@ -294,7 +296,7 @@ export function DialogConnect(props: { onClose?: () => void }) {
     if (armed() !== key) return setArmed(key)
     setArmed()
     void updateSaved((draft) => {
-      draft.joined = draft.joined.filter((item) => !(item.url === room.url && item.roomID === room.roomID))
+      draft.joined = draft.joined.filter((item) => !sameRoom(item, room))
     })
   }
 
@@ -392,7 +394,7 @@ export function DialogConnect(props: { onClose?: () => void }) {
               <text fg={theme.text.muted}>{`${new URL(room.url).host} · ${t("as {name}", { name: room.guest })}`}</text>
               <box flexGrow={1} />
               <Button variant="primary" onClick={() => open(room)}>
-                {t("Open chat")}
+                {t("Open")}
               </Button>
               <Button onLeave={() => setArmed()} onClick={() => leave(room)}>
                 {armed() === `${room.url}#${room.roomID}` ? t("Click again to leave") : t("Leave")}
@@ -461,7 +463,8 @@ async function allowInWindowsFirewall(ports: readonly number[]) {
     ],
     { stdout: "ignore", stderr: "pipe" },
   )
-  if ((await child.exited) !== 0) throw new Error((await new Response(child.stderr).text()).trim() || "PowerShell failed")
+  if ((await child.exited) !== 0)
+    throw new Error((await new Response(child.stderr).text()).trim() || "PowerShell failed")
 }
 
 function Header(props: { title: string; onClose?: () => void }) {

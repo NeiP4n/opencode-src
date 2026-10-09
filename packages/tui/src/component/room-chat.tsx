@@ -4,15 +4,8 @@ import { OpenCode, type NoteInfo, type RoomMessage } from "@opencode/client"
 import { useConfig } from "../config"
 import { useTheme, useThemes } from "../context/theme"
 import { errorMessage } from "../util/error"
-
-// A room this device joined on another host. The token only opens that room.
-export type JoinedRoom = {
-  url: string
-  roomID: string
-  name: string
-  token: string
-  guest: string
-}
+import { useT } from "../util/i18n"
+import type { JoinedRoom } from "../util/room"
 
 const POLL_MS = 1500
 
@@ -20,11 +13,12 @@ export function roomClient(room: Pick<JoinedRoom, "url" | "token">) {
   return OpenCode.make({ baseUrl: room.url, headers: { authorization: `Bearer ${room.token}` } })
 }
 
-// Chat view of a joined room: everyone's messages and the host model's answers.
-// Guests only post; the model runs on the host.
-export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void }) {
-  const theme = useTheme().surface("dialog")
+// A joined room in the main area, where a session would be: everyone's messages
+// and the host model's answers. Guests only post; the model runs on the host.
+export function RoomChat(props: { room: JoinedRoom }) {
+  const theme = useTheme()
   const config = useConfig().data
+  const t = useT()
   const client = roomClient(props.room)
   const [messages, setMessages] = createSignal<readonly RoomMessage[]>([])
   const [running, setRunning] = createSignal(false)
@@ -106,31 +100,27 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
   }
 
   const author = (message: RoomMessage) => {
-    if (message.role === "assistant") return "AI"
-    if (message.author === props.room.guest) return "You"
-    if (!message.author || message.author === "host") return "Host"
+    if (message.role === "assistant") return t("AI")
+    if (message.author === props.room.guest) return t("You")
+    if (!message.author || message.author === "host") return t("Host")
     return message.author
   }
 
   return (
-    <box paddingLeft={2} paddingRight={2} paddingBottom={1} gap={1}>
-      <box flexDirection="row" justifyContent="space-between">
-        <text fg={theme.text.base} wrapMode="none" truncate>
-          <span style={{ bold: true }}>{`⇄ Multiplayer · ${props.room.name}`}</span>
-          <span style={{ fg: theme.text.muted }}>
-            {` · host ${host() ?? new URL(props.room.url).host} · ${people()} ${people() === 1 ? "person" : "people"}`}
-          </span>
-        </text>
-        <text fg={theme.text.muted} onMouseUp={props.onClose}>
-          esc
-        </text>
-      </box>
+    <box flexGrow={1} minHeight={0} paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1} gap={1}>
+      <text fg={theme.text.base} wrapMode="none" truncate>
+        <span style={{ fg: theme.text.action.secondary.base, bold: true }}>{`⇄ ${t("Multiplayer")}`}</span>
+        <span style={{ bold: true }}>{` · ${props.room.name}`}</span>
+        <span style={{ fg: theme.text.muted }}>
+          {` · ${t("host {host}", { host: host() ?? new URL(props.room.url).host })} · ${t("{count} in the room", { count: people() })}`}
+        </span>
+      </text>
       <Show when={note()}>
         {(bound) => (
           <box flexDirection="row" gap={2}>
             <text fg={theme.text.base} wrapMode="none" truncate>
-              {`✎ Note: ${bound().title}`}
-              <span style={{ fg: theme.text.muted }}> · the host's AI writes your requests into it</span>
+              {`✎ ${t("Note: {title}", { title: bound().title })}`}
+              <span style={{ fg: theme.text.muted }}>{` · ${t("the host's AI writes your requests into it")}`}</span>
             </text>
             <box flexGrow={1} />
             <box
@@ -140,26 +130,26 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
               onMouseUp={toggleNote}
             >
               <text fg={hovered() ? theme.text.action.primary.hovered : theme.text.action.primary.base}>
-                {reading() ? "Back to chat" : "Read note"}
+                {reading() ? t("Back to chat") : t("Read note")}
               </text>
             </box>
           </box>
         )}
       </Show>
       <Show when={reading()}>
-        <scrollbox height={18}>
+        <scrollbox flexGrow={1} minHeight={0}>
           <Show
             when={document()}
             fallback={
               <text fg={theme.text.muted}>
-                {document() === null ? "The note is no longer bound." : "Reading the note…"}
+                {document() === null ? t("The note is no longer bound.") : t("Reading the note…")}
               </text>
             }
           >
             {(current) => (
               <Show
                 when={current().body.trim()}
-                fallback={<text fg={theme.text.muted}>The note is empty so far.</text>}
+                fallback={<text fg={theme.text.muted}>{t("The note is empty so far.")}</text>}
               >
                 <markdown
                   syntaxStyle={syntax()}
@@ -177,13 +167,14 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
       </Show>
       <scrollbox
         visible={!reading()}
-        height={reading() ? 0 : 18}
+        flexGrow={reading() ? 0 : 1}
+        minHeight={0}
         ref={(element: ScrollBoxRenderable) => {
           scroll = element
         }}
       >
         <Show when={messages().length === 0}>
-          <text fg={theme.text.muted}>No messages yet. Say hello; the host's AI answers here.</text>
+          <text fg={theme.text.muted}>{t("No messages yet. Say hello; the host's AI answers here.")}</text>
         </Show>
         <For each={messages()}>
           {(message) => (
@@ -199,7 +190,7 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
         </For>
       </scrollbox>
       <Show when={running()}>
-        <text fg={theme.text.muted}>The host's AI is answering… you can keep writing.</text>
+        <text fg={theme.text.muted}>{t("The host's AI is answering… you can keep writing.")}</text>
       </Show>
       <Show when={error()}>
         {(message) => (
@@ -214,11 +205,12 @@ export function DialogRoomChat(props: { room: JoinedRoom; onClose: () => void })
           input = element
         }}
         onSubmit={send}
-        placeholder={sending() > 0 ? "Sending…" : "Message the room, enter to send"}
+        placeholder={sending() > 0 ? t("Sending…") : t("Message the room, enter to send")}
         placeholderColor={theme.text.muted}
         textColor={theme.text.formfield.base}
         focusedTextColor={theme.text.formfield.focused}
         cursorColor={theme.text.formfield.focused}
+        backgroundColor={theme.background.formfield.base}
         focusedBackgroundColor={theme.background.formfield.focused}
       />
     </box>

@@ -4,7 +4,7 @@ import { expect, test } from "bun:test"
 import { ConfigProvider } from "../../src/config"
 import { Keymap } from "../../src/context/keymap"
 import { ThemeProvider } from "../../src/context/theme"
-import { DialogRoomChat } from "../../src/component/dialog-room-chat"
+import { RoomChat } from "../../src/component/room-chat"
 import { emptyThemeSource } from "../fixture/fixture"
 import { json } from "../fixture/tui-client"
 import { TestTuiContexts } from "../fixture/tui-environment"
@@ -40,9 +40,8 @@ test("a guest sees the note the room writes into and reads it without leaving th
         <ConfigProvider config={createTuiResolvedConfig()}>
           <ThemeProvider mode="dark" source={emptyThemeSource}>
             <Keymap.Provider>
-              <DialogRoomChat
+              <RoomChat
                 room={{ url: host.url.toString(), roomID: "room_lab", name: "Lab", token: "token", guest: "Bo" }}
-                onClose={() => {}}
               />
             </Keymap.Provider>
           </ThemeProvider>

@@ -24,7 +24,14 @@ export type PluginRoute = {
   data?: Record<string, unknown>
 }
 
-export type Route = HomeRoute | SessionRoute | PluginRoute
+// A room joined on another host, shown in place of a session.
+export type RoomRoute = {
+  type: "room"
+  url: string
+  roomID: string
+}
+
+export type Route = HomeRoute | SessionRoute | PluginRoute | RoomRoute
 
 export const { use: useRoute, provider: RouteProvider } = createSimpleContext({
   name: "Route",

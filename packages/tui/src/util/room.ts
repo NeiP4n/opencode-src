@@ -1,5 +1,6 @@
 import { Option, Schema } from "effect"
 import { createSignal } from "solid-js"
+import { useStorage } from "../context/storage"
 
 // The host server stamps guest prompts with the author from the room token, so
 // this metadata is the only record of who wrote a message in a hosted session.
@@ -36,4 +37,23 @@ const [revision, setRevision] = createSignal(0)
 export const roomListRevision = revision
 export function roomListChanged() {
   setRevision((value) => value + 1)
+}
+
+// A room this device joined on another host. The token only opens that room.
+export type JoinedRoom = {
+  url: string
+  roomID: string
+  name: string
+  token: string
+  guest: string
+}
+
+// Joined rooms live in client storage under one key, so the Connect window, the
+// left panel and the room view all read and change the same live list.
+export function useJoinedRooms() {
+  return useStorage().store<{ joined: JoinedRoom[] }>("rooms", { initial: { joined: [] } })
+}
+
+export function sameRoom(a: Pick<JoinedRoom, "url" | "roomID">, b: Pick<JoinedRoom, "url" | "roomID">) {
+  return a.url === b.url && a.roomID === b.roomID
 }

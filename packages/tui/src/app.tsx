@@ -70,6 +70,8 @@ import { DialogAgent } from "./component/dialog-agent"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogOpen, DialogOpenKey, moveOpenSession } from "./component/dialog-open"
 import { ProjectTree } from "./component/project-tree"
+import { RoomChat } from "./component/room-chat"
+import { sameRoom, useJoinedRooms } from "./util/room"
 import { openTeamEditor } from "./component/dialog-teams"
 import { ProjectsProvider, useProjects } from "./context/projects"
 import { NotesProvider } from "./context/notes"
@@ -470,6 +472,7 @@ function App() {
   const local = useLocal()
   const sessionTabs = useSessionTabs()
   const projects = useProjects()
+  const [joinedRooms] = useJoinedRooms()
   const panels = usePanel()
   const keymap = Keymap.use()
   const event = useEvent()
@@ -582,7 +585,8 @@ function App() {
   const pasteSummaryEnabled = () => config.data.prompt?.paste !== "full"
   // The project tree replaces the session tabs and always sits on the left when the terminal is wide enough.
   const tabsVertical = () => sessionTabsFitVertically(dimensions().width, tabsResize.size())
-  const tabsAvailable = () => route.data.type !== "plugin" && projects.list().length > 0
+  const tabsAvailable = () =>
+    route.data.type !== "plugin" && (projects.list().length > 0 || joinedRooms.joined.length > 0)
   const fullscreenPanel = () =>
     route.data.type === "session" &&
     panels.current()?.sessionID === route.data.sessionID &&
@@ -627,6 +631,13 @@ function App() {
 
     if (route.data.type === "plugin") {
       renderer.setTerminalTitle(`OC | ${route.data.name}`)
+      return
+    }
+
+    if (route.data.type === "room") {
+      const target = route.data
+      const room = joinedRooms.joined.find((item) => sameRoom(item, target))
+      renderer.setTerminalTitle(room ? `OC | ⇄ ${room.name}` : "Opencode++")
     }
   })
 
@@ -1379,6 +1390,14 @@ function App() {
                       />
                     )}
                   </Show>
+                </Match>
+                <Match when={route.data.type === "room" ? route.data : undefined}>
+                  {(target) => (
+                    // Keyed by the room so switching rooms starts a fresh chat; leaving a room drops it.
+                    <Show when={joinedRooms.joined.find((item) => sameRoom(item, target()))} keyed>
+                      {(room) => <RoomChat room={room} />}
+                    </Show>
+                  )}
                 </Match>
                 <Match when={route.data.type === "plugin"}>
                   <PluginRoute
