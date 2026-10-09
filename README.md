@@ -43,6 +43,35 @@
 
 ---
 
+## Opencode++
+
+This fork adds LAN rooms (multiplayer between Windows and Linux), project AI teams, notes with their own Notes agent, a Hub of CLI tools, Nushell as the AI's shell and an English/Russian interface.
+
+**Install with one command** — git, Bun and everything else is set up for you:
+
+| System | Command |
+| --- | --- |
+| Linux / macOS | `curl -fsSL https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.sh \| sh` |
+| Windows (PowerShell) | `irm https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.ps1 \| iex` |
+
+Then run `opencode`. Running the same command again updates Opencode++.
+
+<details>
+<summary>Русский</summary>
+
+**Установка одной командой** — git, Bun и остальное установщик поставит сам:
+
+- Linux / macOS: `curl -fsSL https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.sh | sh`
+- Windows (PowerShell): `irm https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.ps1 | iex`
+
+Потом запусти `opencode`. Повторный запуск той же команды обновляет Opencode++.
+Мультиплеер между компьютерами: на Windows один раз нажми «Разрешить в брандмауэре Windows» в окне Host или Connect.
+Язык интерфейса переключается справа в нижней строке.
+
+</details>
+
+Upstream OpenCode installation follows below.
+
 ### Installation
 
 ```bash

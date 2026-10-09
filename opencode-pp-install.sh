@@ -1,11 +1,12 @@
 #!/bin/sh
-# Installs Opencode++ for Linux and macOS:
+# Installs Opencode++ for Linux and macOS with one command:
 #
 #   curl -fsSL https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.sh | sh
 #
-# The newest release is checked out into ~/.local/share/opencode-pp and the
-# `opencode` command goes to ~/.local/bin. Updates come later from the update
-# prompt inside Opencode++; running this script again also updates.
+# Missing git, curl or unzip come from the system package manager (it may ask
+# for your sudo password), Bun from bun.sh. The newest release is checked out
+# into ~/.local/share/opencode-pp and the `opencode` command goes to
+# ~/.local/bin, which is added to your shell's PATH. Running this again updates.
 set -eu
 
 REPO="${OPENCODE_PP_REPO:-https://github.com/NeiP4n/opencode-src.git}"
@@ -18,9 +19,45 @@ fail() {
   exit 1
 }
 
-command -v git >/dev/null 2>&1 || fail "git is required. Install it with your package manager, then run this again."
+need() {
+  command -v "$1" >/dev/null 2>&1
+}
 
-if ! command -v bun >/dev/null 2>&1; then
+# The system package manager installs what the installer itself needs. Root needs no sudo.
+packages() {
+  sudo=""
+  if [ "$(id -u)" -ne 0 ]; then
+    need sudo || return 1
+    sudo="sudo"
+  fi
+  if need apt-get; then
+    $sudo apt-get update -qq && $sudo apt-get install -y "$@"
+  elif need dnf; then
+    $sudo dnf install -y "$@"
+  elif need pacman; then
+    $sudo pacman -S --needed --noconfirm "$@"
+  elif need zypper; then
+    $sudo zypper --non-interactive install "$@"
+  elif need apk; then
+    $sudo apk add "$@"
+  elif need brew; then
+    brew install "$@"
+  else
+    return 1
+  fi
+}
+
+missing=""
+for tool in git curl unzip; do
+  need "$tool" || missing="$missing $tool"
+done
+if [ -n "$missing" ]; then
+  echo "Installing$missing…"
+  # shellcheck disable=SC2086 # one word per package
+  packages $missing || fail "could not install$missing. Install them with your package manager, then run this again."
+fi
+
+if ! need bun; then
   echo "Installing Bun…"
   curl -fsSL https://bun.sh/install | bash
   PATH="$HOME/.bun/bin:$PATH"
@@ -61,9 +98,30 @@ exec "$(command -v bun)" --config="$DIR/packages/cli/bunfig.toml" "$DIR/packages
 WRAPPER
 chmod +x "$BIN/opencode"
 
-echo
-echo "Opencode++ $VERSION is installed. Run: opencode"
+# New terminals find `opencode` without the user editing anything: one line per shell
+# config, written once.
+add_path() {
+  file="$1"
+  line="$2"
+  [ -f "$file" ] && grep -qF "$BIN" "$file" && return 0
+  mkdir -p "$(dirname "$file")"
+  printf '\n# Opencode++\n%s\n' "$line" >>"$file"
+}
 case ":$PATH:" in
   *":$BIN:"*) ;;
-  *) echo "Add $BIN to your PATH first, for example: echo 'export PATH=\"$BIN:\$PATH\"' >> ~/.profile" ;;
+  *)
+    add_path "$HOME/.profile" "export PATH=\"$BIN:\$PATH\""
+    [ -f "$HOME/.bashrc" ] && add_path "$HOME/.bashrc" "export PATH=\"$BIN:\$PATH\""
+    [ -f "$HOME/.zshrc" ] && add_path "$HOME/.zshrc" "export PATH=\"$BIN:\$PATH\""
+    need fish && add_path "$HOME/.config/fish/config.fish" "fish_add_path \"$BIN\""
+    ADDED=1
+    ;;
 esac
+
+echo
+echo "Opencode++ $VERSION is installed."
+if [ "${ADDED:-0}" = 1 ]; then
+  echo "Open a new terminal and run: opencode"
+else
+  echo "Run: opencode"
+fi
