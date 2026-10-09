@@ -182,6 +182,7 @@ describe("Agent", () => {
         "compaction",
         "explore",
         "general",
+        "notes",
         "orchestrator",
         "summary",
         "team-architect",

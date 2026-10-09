@@ -1456,6 +1456,7 @@ export function createData(config: CreateDataInput) {
         model?: ModelRef
         location?: LocationRef
         projectID?: string
+        metadata?: SessionInfo["metadata"]
       }) {
         const { projectID, ...payload } = input
         const id = payload.id ?? SessionID.create()
@@ -1474,6 +1475,7 @@ export function createData(config: CreateDataInput) {
             time: { created: now, updated: now },
             title: payload.title,
             location,
+            metadata: payload.metadata,
           })
           // A mounted optimistic session must not fetch its empty collections
           // before creation settles. The session.created echo re-syncs info.

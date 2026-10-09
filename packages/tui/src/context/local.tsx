@@ -8,6 +8,7 @@ import { useTuiPaths } from "./runtime"
 import { useArgs } from "./args"
 import { RGBA } from "@opentui/core"
 import { Orchestra } from "@opencode/schema/orchestra"
+import { Note } from "@opencode/schema/note"
 import { readJson, writeJsonAtomic } from "../util/persistence"
 import {
   createModelPreferenceRepository,
@@ -61,11 +62,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const visibleAgents = createMemo(() =>
         (data.location.agent.list(location.ref) ?? []).filter((agent) => !agent.hidden),
       )
-      // A project's main session always runs the hidden Orchestrator agent; the composer shows it and cannot change it.
-      const fixed = () =>
-        route.data.type === "session" && data.session.get(route.data.sessionID)?.agent === Orchestra.agent
-          ? data.location.agent.list(location.ref)?.find((agent) => agent.id === Orchestra.agent)
-          : undefined
+      // A project's main session always runs the hidden Orchestrator agent and a note's chat the
+      // hidden Notes agent; the composer shows it and cannot change it.
+      const fixed = () => {
+        if (route.data.type !== "session") return
+        const session = data.session.get(route.data.sessionID)
+        const id = session?.agent === Orchestra.agent ? Orchestra.agent : Note.chatOf(session?.metadata) ? Note.agent : undefined
+        return id && data.location.agent.list(location.ref)?.find((agent) => agent.id === id)
+      }
       const [agentStore, setAgentStore] = createStore({
         current: undefined as string | undefined,
         draftBySession: {} as Record<string, { agent?: string } | undefined>,
@@ -104,7 +108,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         },
         set(id: string) {
           if (fixed())
-            return toast.show({ variant: "info", message: "The Orchestrator session's role is fixed", duration: 3000 })
+            return toast.show({ variant: "info", message: "This chat's agent is fixed", duration: 3000 })
           if (!agents().some((agent) => agent.id === id))
             return toast.show({
               variant: "warning",

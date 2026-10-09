@@ -1755,6 +1755,7 @@ const EndpointRoomCreate = (raw: RawClient["server.room"]) => (input: RoomCreate
         name: input["name"],
         ai: input["ai"],
         guestApprovals: input["guestApprovals"],
+        open: input["open"],
       },
     }).pipe(
       Effect.mapError(mapClientError),
@@ -1766,7 +1767,7 @@ const EndpointRoomUpdate = (raw: RawClient["server.room"]) => (input: RoomUpdate
   preserveEffect<RoomUpdateOutput>()(
     raw["room.update"]({
       params: { roomID: input["roomID"] },
-      payload: { name: input["name"], ai: input["ai"], guestApprovals: input["guestApprovals"] },
+      payload: { name: input["name"], ai: input["ai"], guestApprovals: input["guestApprovals"], open: input["open"] },
     }).pipe(
       Effect.mapError(mapClientError),
       Effect.map((value) => value.data),
@@ -1788,7 +1789,9 @@ const EndpointRoomPublic = (raw: RawClient["server.room"]) => () =>
 
 const EndpointRoomJoin = (raw: RawClient["server.room"]) => (input: RoomJoinInput) =>
   preserveEffect<RoomJoinOutput>()(
-    raw["room.join"]({ payload: { code: input["code"], name: input["name"] } }).pipe(Effect.mapError(mapClientError)),
+    raw["room.join"]({ payload: { code: input["code"], roomID: input["roomID"], name: input["name"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
   )
 
 const EndpointRoomGuestGet = (raw: RawClient["server.room"]) => (input: RoomGuestGetInput) =>

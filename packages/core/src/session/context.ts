@@ -141,7 +141,7 @@ const layer = Layer.effect(
           references: referenceInstructions.load(),
           mcp: mcpInstructions.load(permissions),
           entries: entries.load(sessionID),
-          canvas: noteInstructions.load(sessionID),
+          canvas: noteInstructions.load(session),
         },
         { concurrency: "unbounded" },
       )

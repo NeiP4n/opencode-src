@@ -1,4 +1,11 @@
-import { isNoteConflictError, type NoteInfo, type NoteLength, type NoteStatus } from "@opencode/client"
+import {
+  isNoteConflictError,
+  type NoteInfo,
+  type NoteLength,
+  type NoteStatus,
+  type PermissionRuleset,
+} from "@opencode/client"
+import { Note } from "@opencode/schema/note"
 import { createSignal, onCleanup } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { errorMessage } from "../util/error"
@@ -108,6 +115,7 @@ export const { use: useNotes, provider: NotesProvider } = createSimpleContext({
     }
 
     const link = async (directory: string, note: NoteInfo, session: string | undefined) => {
+      const previous = note.frontmatter.session
       const result = await client.api.note.link({
         location: { directory },
         name: note.name,
@@ -115,7 +123,42 @@ export const { use: useNotes, provider: NotesProvider } = createSimpleContext({
         expectedMtime: note.mtime,
       })
       upsert(directory, result.data)
+      // A chat that loses the note becomes an ordinary chat again: the rules that
+      // bound it to the note must not outlive the binding.
+      if (previous && previous !== session) await release(previous)
       return result.data
+    }
+
+    // The chat of a note is its canvas: it names the note in its metadata, and the
+    // rules below deny everything the note tool itself may do. Session rules are
+    // merged after the agent's and the last matching rule wins, so the allow at the
+    // end reopens exactly the note and nothing else.
+    const scoped: PermissionRuleset = [
+      { action: "*", resource: "*", effect: "deny" },
+      { action: "note", resource: "*", effect: "allow" },
+    ]
+
+    const scope = async (sessionID: string, note: NoteInfo) => {
+      const current = data.session.get(sessionID)
+      const bound = Note.chatOf(current?.metadata) === note.name
+      const locked = sameRules(current?.permissions, scoped)
+      if (current?.agent !== Note.agent) await client.api.session.switchAgent({ sessionID, agent: Note.agent })
+      if (bound && locked) return
+      await client.api.session.update({
+        sessionID,
+        metadata: Note.chatMetadata(note.name),
+        permissions: scoped,
+      })
+      const session = await client.api.session.get({ sessionID }).catch(() => undefined)
+      if (session) data.session.remember(session)
+    }
+
+    const release = async (sessionID: string) => {
+      const current = data.session.get(sessionID)
+      if (!current || !sameRules(current.permissions, scoped)) return
+      await client.api.session.update({ sessionID, permissions: [] })
+      const session = await client.api.session.get({ sessionID }).catch(() => undefined)
+      if (session) data.session.remember(session)
     }
 
     const setTab = (tab: NotesTab) => void updatePanel((draft) => void (draft.tab = tab)).catch(() => undefined)
@@ -125,6 +168,7 @@ export const { use: useNotes, provider: NotesProvider } = createSimpleContext({
     // AI of that chat writes into the note from the first prompt.
     const open = async (directory: string, note: NoteInfo) => {
       const sessionID = (await existingSession(note.frontmatter.session)) ?? (await bindNewSession(directory, note))
+      await scope(sessionID, note)
       setChat(sessionID, false)
       setTab("notes")
       route.navigate({ type: "session", sessionID })
@@ -132,10 +176,11 @@ export const { use: useNotes, provider: NotesProvider } = createSimpleContext({
 
     // A new note starts with its own chat, so the first prompt already writes into it.
     const start = async (directory: string, title: string) => {
-      const created = data.session.create({ title, location: { directory } })
+      const created = data.session.create({ title, location: { directory }, agent: Note.agent })
       await created.request
       const result = await client.api.note.create({ location: { directory }, title, session: created.id })
       upsert(directory, result.data)
+      await scope(created.id, result.data)
       setChat(created.id, false)
       setTab("notes")
       route.navigate({ type: "session", sessionID: created.id })
@@ -151,11 +196,26 @@ export const { use: useNotes, provider: NotesProvider } = createSimpleContext({
     }
 
     const bindNewSession = async (directory: string, note: NoteInfo) => {
-      const created = data.session.create({ title: note.frontmatter.title || note.name, location: { directory } })
+      const created = data.session.create({
+        title: note.frontmatter.title || note.name,
+        location: { directory },
+        agent: Note.agent,
+      })
       await created.request
       await link(directory, note, created.id)
       return created.id
     }
+
+    // Rules compare by value, so the check does not depend on the server echoing
+    // them back in the same order.
+    const sameRules = (current: PermissionRuleset | undefined, rules: PermissionRuleset) =>
+      current?.length === rules.length &&
+      current.every(
+        (rule, index) =>
+          rule.action === rules[index]!.action &&
+          rule.resource === rules[index]!.resource &&
+          rule.effect === rules[index]!.effect,
+      )
 
     const tab = () => panel.tab ?? "projects"
 

@@ -64,7 +64,7 @@ const ideas = (): Note => ({
 type Call = { method: string; path: string; body?: unknown }
 
 function render(state: string, input: { notes: Note[]; calls: Call[]; conflict?: () => boolean }) {
-  let created: ReturnType<typeof session> | undefined
+  let created: (ReturnType<typeof session> & { metadata?: unknown; permissions?: unknown[] }) | undefined
   return createAppFixture({
     width: 150,
     height: 40,
@@ -113,12 +113,29 @@ function render(state: string, input: { notes: Note[]; calls: Call[]; conflict?:
         return json({ data: [worker], access: { [worker.id]: "write" } })
       if (url.pathname === `/api/orchestra/project/${other.id}/session`) return json({ data: [], access: {} })
       if (url.pathname === "/api/session" && request.method === "POST") {
-        const payload = (await request.json()) as { id: string; title?: string }
+        const payload = (await request.json()) as { id: string; title?: string; agent?: string }
         input.calls.push({ method: "POST", path: url.pathname, body: payload })
-        created = { ...worker, id: payload.id, title: payload.title ?? "" }
+        created = { ...worker, id: payload.id, title: payload.title ?? "", agent: payload.agent ?? worker.agent }
         return json({ data: created })
       }
-      if (created && url.pathname === `/api/session/${created.id}`) return json({ data: created })
+      if (created && url.pathname === `/api/session/${created.id}/agent` && request.method === "POST") {
+        const payload = (await request.json()) as { agent: string }
+        input.calls.push({ method: "POST", path: url.pathname, body: payload })
+        created = { ...created, agent: payload.agent }
+        return new Response(null, { status: 204 })
+      }
+      if (created && url.pathname === `/api/session/${created.id}`) {
+        // The chat of a note binds itself with metadata and rights on open, so the
+        // fixture has to accept the patch and echo the stored session back.
+        if (request.method === "PATCH") {
+          const payload = (await request.json()) as { metadata?: Record<string, unknown>; permissions?: unknown[] }
+          input.calls.push({ method: "PATCH", path: url.pathname, body: payload })
+          if (payload.metadata !== undefined) created = { ...created, metadata: payload.metadata }
+          if (payload.permissions !== undefined) created = { ...created, permissions: payload.permissions }
+          return new Response(null, { status: 204 })
+        }
+        return json({ data: created })
+      }
       if (url.pathname === "/api/session") return json({ data: [worker], cursor: {} })
       if (url.pathname === `/api/session/${worker.id}`) return json({ data: worker })
       if (/^\/api\/session\/[^/]+\/(message|inbox|permission)$/.test(url.pathname))
@@ -299,8 +316,11 @@ test("a new note starts with its own bound chat, and deleting one takes two clic
   const createdSession = calls.find((call) => call.method === "POST" && call.path === "/api/session")?.body as {
     id: string
     title: string
+    agent: string
   }
   expect(createdSession.title).toBe("New idea")
+  // A note's chat runs the Notes agent from its first prompt.
+  expect(createdSession.agent).toBe("notes")
   expect(calls.find((call) => call.method === "POST" && call.path === "/api/note")?.body).toEqual({
     title: "New idea",
     session: createdSession.id,

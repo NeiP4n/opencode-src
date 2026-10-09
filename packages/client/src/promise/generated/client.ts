@@ -2428,6 +2428,7 @@ export function make(options: ClientOptions) {
               name: input["name"],
               ai: input["ai"],
               guestApprovals: input["guestApprovals"],
+              open: input["open"],
             },
             successStatus: 200,
             declaredStatuses: [400, 401, 404],
@@ -2440,7 +2441,12 @@ export function make(options: ClientOptions) {
           {
             method: "PATCH",
             path: `/api/room/${encodeURIComponent(input.roomID)}`,
-            body: { name: input["name"], ai: input["ai"], guestApprovals: input["guestApprovals"] },
+            body: {
+              name: input["name"],
+              ai: input["ai"],
+              guestApprovals: input["guestApprovals"],
+              open: input["open"],
+            },
             successStatus: 200,
             declaredStatuses: [400, 401, 404],
             empty: false,
@@ -2479,7 +2485,7 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/room/join`,
-            body: { code: input["code"], name: input["name"] },
+            body: { code: input["code"], roomID: input["roomID"], name: input["name"] },
             successStatus: 200,
             declaredStatuses: [400, 401],
             empty: false,

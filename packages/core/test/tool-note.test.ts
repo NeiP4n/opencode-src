@@ -12,6 +12,7 @@ import { Permission } from "@opencode/core/permission"
 import { Session } from "@opencode/core/session"
 import { Tool } from "@opencode/core/tool"
 import { AbsolutePath } from "@opencode/core/schema"
+import { Note } from "@opencode/schema/note"
 import { location } from "./fixture/location"
 import { withTempDir } from "./fixture/tmpdir"
 import { it } from "./lib/effect"
@@ -20,11 +21,33 @@ import { executeTool, registerToolPlugin, toolIdentity } from "./lib/tool"
 
 const sessionID = Session.ID.make("ses_note_tool_test")
 
-const noteToolNode = makeLocationNode({
-  name: "test/note-tool-plugin",
-  layer: Layer.effectDiscard(registerToolPlugin(NoteTool.Plugin)),
-  deps: [Tool.node, NoteStore.node, Permission.node],
-})
+/** The plugin reads only the chat's own metadata, so the fake carries it and the required identity fields. */
+const sessionInfo = (note?: string) =>
+  ({
+    id: sessionID,
+    projectID: "prj_note_tool_test",
+    cost: 0,
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    time: { created: 0, updated: 0 },
+    location: { directory: AbsolutePath.make(process.cwd()) },
+    metadata: note === undefined ? undefined : Note.chatMetadata(Note.Slug.make(note)),
+  }) as unknown as Session.Info
+
+/**
+ * The plugin learns whether a chat is a note's dedicated chat from that chat's own
+ * metadata, so the harness answers `session.get` with the binding under test. `note`
+ * undefined is the ordinary chat, which stays unrestricted.
+ */
+const chatNode = (note?: string) =>
+  makeLocationNode({
+    name: "test/note-tool-plugin",
+    layer: Layer.effectDiscard(
+      registerToolPlugin(NoteTool.Plugin, {
+        session: { get: () => Effect.succeed(sessionInfo(note)) },
+      }),
+    ),
+    deps: [Tool.node, NoteStore.node, Permission.node],
+  })
 
 /** Records what the tool asked permission for, and fails the test if it never asked. */
 const askingPermission = (seen: string[]) =>
@@ -35,8 +58,8 @@ const askingPermission = (seen: string[]) =>
     },
   })
 
-function harness(directory: string, seen: string[] = []) {
-  return AppNodeBuilder.build(LayerNode.group([Tool.node, noteToolNode, NoteStore.node]), [
+function harness(directory: string, seen: string[] = [], note?: string) {
+  return AppNodeBuilder.build(LayerNode.group([Tool.node, chatNode(note), NoteStore.node]), [
     Location.node.replace(
       Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make(directory) }))),
     ),
@@ -52,6 +75,9 @@ const call = (id: string, input: Record<string, unknown>) => ({
 
 const run = (tools: Tool.Interface, id: string, input: Record<string, unknown>) =>
   executeTool(tools, call(id, input)).pipe(Effect.map((result) => result))
+
+/** The model-facing refusal text, unescaped so a test can read it the way the model does. */
+const refusal = (result: { readonly error?: { readonly message?: string } }) => result.error?.message ?? ""
 
 const onDisk = (directory: string, name: string) => path.join(directory, ".opencode", "notes", `${name}.md`)
 const read = (target: string) => Effect.promise(() => fs.readFile(target, "utf8"))
@@ -196,49 +222,16 @@ describe("NoteTool", () => {
     ),
   )
 
-  it.live("binds a note to the calling chat", () =>
-    withTempDir(({ path: directory }) =>
-      Effect.gen(function* () {
-        const tools = yield* Tool.Service
-        const created = yield* run(tools, "call-create", {
-          action: "create",
-          name: "plan",
-          title: "План",
-          body: "тело",
-        })
-
-        yield* run(tools, "call-link", {
-          action: "link",
-          name: "plan",
-          expectedMtime: (created.output as { updated: number }).updated,
-        })
-
-        expect(yield* read(onDisk(directory, "plan"))).toContain(`session: ${sessionID}`)
-      }).pipe(Effect.provide(harness(directory))),
-    ),
-  )
-
-  it.live("derives a name from the title, sets the length and unbinds the note again", () =>
+  it.live("derives a name from the title and sets the length", () =>
     withTempDir(({ path: directory }) =>
       Effect.gen(function* () {
         const tools = yield* Tool.Service
         const created = yield* run(tools, "call-create", { action: "create", title: "План сети", length: "brief" })
-        const linked = yield* run(tools, "call-link", {
-          action: "link",
-          name: "plan-seti",
-          expectedMtime: (created.output as { updated: number }).updated,
-        })
         const updated = yield* run(tools, "call-update", {
           action: "update",
           name: "plan-seti",
           length: "detailed",
-          expectedMtime: (linked.output as { updated: number }).updated,
-        })
-
-        yield* run(tools, "call-unlink", {
-          action: "unlink",
-          name: "plan-seti",
-          expectedMtime: (updated.output as { updated: number }).updated,
+          expectedMtime: (created.output as { updated: number }).updated,
         })
 
         expect((created.output as { name: string }).name).toBe("plan-seti")
@@ -259,6 +252,77 @@ describe("NoteTool", () => {
         const listed = yield* run(tools, "call-list", { action: "list" })
 
         expect(JSON.stringify(listed.output)).toContain("blank-note [inbox] (untitled)")
+      }).pipe(Effect.provide(harness(directory))),
+    ),
+  )
+
+  it.live("refuses to create or list inside a note's own chat and writes nothing", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const tools = yield* Tool.Service
+        const note = yield* NoteStore.Service
+        yield* note.create({ title: "Room plan", name: "room-plan" })
+
+        const created = yield* run(tools, "call-create-inside-note", {
+          action: "create",
+          name: "second-note",
+          title: "Второй",
+          body: "не должно записаться",
+        })
+        const listed = yield* run(tools, "call-list-inside-note", { action: "list" })
+
+        // JSON.stringify escapes the quotes, so the note name is matched unescaped.
+        expect(created).toMatchObject({ status: "error" })
+        expect(refusal(created)).toContain('the note "room-plan"')
+        expect(refusal(created)).toContain("works only on that note")
+        expect(listed).toMatchObject({ status: "error" })
+        expect(refusal(listed)).toContain("works only on that note")
+        // The refusal happens before any write, so only the original note exists.
+        const names = (yield* note.list()).map((entry) => entry.name)
+        expect(names).toEqual(["room-plan"])
+      }).pipe(Effect.provide(harness(directory, [], "room-plan"))),
+    ),
+  )
+
+  it.live("still reads and edits the note inside its own chat", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const tools = yield* Tool.Service
+        const note = yield* NoteStore.Service
+        const created = yield* note.create({ title: "Room plan", name: "room-plan", body: "черновик" })
+        const stamp = created.mtime
+
+        const readBack = yield* run(tools, "call-read-inside-note", { action: "read", name: "room-plan" })
+        const edited = yield* run(tools, "call-edit-inside-note", {
+          action: "edit",
+          name: "room-plan",
+          body: "правка агента",
+          expectedMtime: stamp,
+        })
+
+        // The point of the note's own chat: it must still be able to do its one job.
+        expect(readBack).toMatchObject({ status: "completed" })
+        expect(edited).toMatchObject({ status: "completed" })
+        expect(yield* read(onDisk(directory, "room-plan"))).toContain("правка агента")
+      }).pipe(Effect.provide(harness(directory, [], "room-plan"))),
+    ),
+  )
+
+  it.live("keeps create and list working in an ordinary chat", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const tools = yield* Tool.Service
+
+        const created = yield* run(tools, "call-create-ordinary", {
+          action: "create",
+          name: "ordinary-note",
+          title: "Обычная",
+        })
+        const listed = yield* run(tools, "call-list-ordinary", { action: "list" })
+
+        expect(created).toMatchObject({ status: "completed" })
+        expect(listed).toMatchObject({ status: "completed" })
+        expect(JSON.stringify(listed.output)).toContain("ordinary-note")
       }).pipe(Effect.provide(harness(directory))),
     ),
   )

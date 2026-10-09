@@ -7,7 +7,7 @@ export * as NoteInstructions from "./note-instructions.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Note } from "@opencode/schema/note"
-import { SessionID } from "@opencode/schema/session-id"
+import type { Session } from "@opencode/schema/session"
 import { Context, Effect, Layer, Schema } from "effect"
 import { Instructions } from "./instructions/index.js"
 import { NoteStore } from "./note.js"
@@ -23,7 +23,7 @@ const Canvas = Schema.Struct({
 type Canvas = typeof Canvas.Type
 
 export interface Interface {
-  readonly load: (sessionID: SessionID) => Effect.Effect<Instructions.List>
+  readonly load: (session: Session.Info) => Effect.Effect<Instructions.List>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/NoteInstructions") {}
@@ -34,10 +34,16 @@ const layer = Layer.effect(
     const notes = yield* NoteStore.Service
     const rooms = yield* Room.Service
 
-    const observe = Effect.fn("NoteInstructions.observe")(function* (sessionID: SessionID) {
-      const note = yield* notes.bound(sessionID)
+    // Only a note's dedicated chat writes into it: the chat names its note in its
+    // metadata, so an ordinary chat never becomes a canvas.
+    const observe = Effect.fn("NoteInstructions.observe")(function* (session: Session.Info) {
+      const name = Note.chatOf(session.metadata)
+      if (!name) return Instructions.removed
+      const note = yield* notes
+        .get(name)
+        .pipe(Effect.catchTag("NoteStore.NotFoundError", () => Effect.succeed(undefined)))
       if (!note) return Instructions.removed
-      const shared = (yield* rooms.list()).some((room) => room.sessionID === sessionID)
+      const shared = (yield* rooms.list()).some((room) => room.sessionID === session.id)
       return {
         name: note.name,
         title: note.frontmatter.title || note.name,
@@ -47,14 +53,14 @@ const layer = Layer.effect(
     })
 
     return Service.of({
-      load: (sessionID) =>
+      load: (session) =>
         Effect.succeed(
           Instructions.make({
             key: Instructions.Key.make("core/canvas"),
             codec: Schema.toCodecJson(Canvas),
             // An unreadable notes folder must not block the chat from starting, so it
             // reads as "no note bound" rather than as an unavailable source.
-            read: observe(sessionID).pipe(Effect.orElseSucceed(() => Instructions.removed)),
+            read: observe(session).pipe(Effect.orElseSucceed(() => Instructions.removed)),
             render: {
               initial: render,
               changed: (previous, current) =>
@@ -79,11 +85,14 @@ function render(canvas: Canvas) {
   return [
     "<canvas>",
     `  The user is working on the note "${canvas.title}" (.opencode/notes/${canvas.name}.md) alongside this chat.`,
-    "  Treat requests in this chat as edits to that note unless the user clearly asks for something else: read it with the note tool, then write the result into it with note edit, passing expectedMtime from that read.",
+    "  This is the only thing you can change in this chat: read the note with the note tool, then write the result into it with note edit, passing expectedMtime from that read.",
+    "  If the user asks for anything outside the note, do not do it and do not look for another tool: say in one sentence that this chat works only on this note and nothing else will be changed.",
     "  Reply in chat with a one or two sentence summary of what changed instead of repeating the note.",
     `  Length: ${Policy[canvas.length]}.`,
     ...(canvas.shared
-      ? ["  This chat is shared in a room: several people may be prompting it, and all of them are editing the same note."]
+      ? [
+          "  This chat is shared in a room: several people may be prompting it, and all of them are editing the same note.",
+        ]
       : []),
     "</canvas>",
   ].join("\n")

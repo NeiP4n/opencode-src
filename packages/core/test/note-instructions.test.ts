@@ -9,6 +9,8 @@ import { NoteStore } from "@opencode/core/note"
 import { Permission } from "@opencode/core/permission"
 import { Room } from "@opencode/core/room"
 import { AbsolutePath } from "@opencode/core/schema"
+import { Note } from "@opencode/schema/note"
+import type { Session } from "@opencode/schema/session"
 import { SessionID } from "@opencode/schema/session-id"
 import { location } from "./fixture/location"
 import { withTempDir } from "./fixture/tmpdir"
@@ -16,6 +18,10 @@ import { it } from "./lib/effect"
 import { permissionLayer } from "./lib/permission"
 
 const session = SessionID.make("ses_canvas")
+
+// The source reads only the id and the metadata of the chat it observes.
+const chat = (note?: string) =>
+  ({ id: session, metadata: note ? Note.chatMetadata(Note.Slug.make(note)) : undefined }) as unknown as Session.Info
 
 function provide(directory: string) {
   return Effect.provide(
@@ -29,9 +35,9 @@ function provide(directory: string) {
 }
 
 /** Reads the source once, the way a step boundary observes it. */
-const observe = Effect.fn(function* () {
+const observe = Effect.fn(function* (note?: string) {
   const source = yield* NoteInstructions.Service
-  const list = yield* source.load(session)
+  const list = yield* source.load(chat(note))
   const [entry] = yield* Instructions.read(list)
   return { list, value: entry.value }
 })
@@ -39,11 +45,11 @@ const observe = Effect.fn(function* () {
 const json = (value: unknown) => value as Schema.Json
 
 describe("NoteInstructions", () => {
-  it.live("renders nothing while no note is bound to the chat", () =>
+  it.live("renders nothing for an ordinary chat, even one a note names", () =>
     withTempDir(({ path: directory }) =>
       Effect.gen(function* () {
         const notes = yield* NoteStore.Service
-        yield* notes.create({ title: "Other chat", name: "other-note", session: SessionID.make("ses_other") })
+        yield* notes.create({ title: "Linked", name: "linked-note", session })
 
         const observed = yield* observe()
 
@@ -52,13 +58,13 @@ describe("NoteInstructions", () => {
     ),
   )
 
-  it.live("renders the canvas for the bound note with its length policy", () =>
+  it.live("renders the canvas in the dedicated chat of a note with its length policy", () =>
     withTempDir(({ path: directory }) =>
       Effect.gen(function* () {
         const notes = yield* NoteStore.Service
         yield* notes.create({ title: "Room plan", name: "room-plan", session, length: "brief" })
 
-        const observed = yield* observe()
+        const observed = yield* observe("room-plan")
         const text = Instructions.renderInitial(observed.list, { "core/canvas": json(observed.value) })
 
         expect(text).toContain("<canvas>")
@@ -66,6 +72,27 @@ describe("NoteInstructions", () => {
         expect(text).toContain("note edit")
         expect(text).toContain("Length: brief and useful, only what matters and no filler.")
         expect(text).not.toContain("shared in a room")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("leaves no escape hatch: the note is the only thing this chat may change", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const notes = yield* NoteStore.Service
+        yield* notes.create({ title: "Room plan", name: "room-plan", session })
+
+        const observed = yield* observe("room-plan")
+        const text = Instructions.renderInitial(observed.list, { "core/canvas": json(observed.value) })
+
+        // The old wording let the model leave the note; it must be gone from the source.
+        expect(text).not.toContain("unless the user clearly asks")
+        expect(text).toContain("This is the only thing you can change in this chat")
+        expect(text).toContain("works only on this note and nothing else will be changed")
+        // Naming hidden tools by name would only invite the model to ask for them.
+        expect(text).not.toContain("shell")
+        expect(text).not.toContain("write tool")
+        expect(text).not.toContain("read tool")
       }).pipe(provide(directory)),
     ),
   )
@@ -78,7 +105,7 @@ describe("NoteInstructions", () => {
         yield* notes.create({ title: "Room plan", name: "room-plan", session })
         const room = yield* rooms.create({ sessionID: session })
 
-        const observed = yield* observe()
+        const observed = yield* observe("room-plan")
         const text = Instructions.renderInitial(observed.list, { "core/canvas": json(observed.value) })
         yield* rooms.remove(room.id)
 
@@ -88,33 +115,31 @@ describe("NoteInstructions", () => {
     ),
   )
 
-  it.live("announces a length change, a different note and an unbinding chronologically", () =>
+  it.live("announces a length change, another note and a deleted note chronologically", () =>
     withTempDir(({ path: directory }) =>
       Effect.gen(function* () {
         const notes = yield* NoteStore.Service
         const note = yield* notes.create({ title: "Room plan", name: "room-plan", session })
-        const before = yield* observe()
+        const before = yield* observe("room-plan")
 
-        const updated = yield* notes.update({ name: "room-plan", expectedMtime: note.mtime, length: "detailed" })
-        const lengthChanged = yield* observe()
+        yield* notes.update({ name: "room-plan", expectedMtime: note.mtime, length: "detailed" })
+        const lengthChanged = yield* observe("room-plan")
         const lengthText = Instructions.renderUpdate(
           lengthChanged.list,
           { "core/canvas": json(before.value) },
           { "core/canvas": Option.some(json(lengthChanged.value)) },
         )
 
-        yield* notes.link({ name: "room-plan", expectedMtime: updated.mtime })
-        yield* notes.create({ title: "Spec", name: "spec-note", session })
-        const moved = yield* observe()
+        const spec = yield* notes.create({ title: "Spec", name: "spec-note", session })
+        const moved = yield* observe("spec-note")
         const movedText = Instructions.renderUpdate(
           moved.list,
           { "core/canvas": json(lengthChanged.value) },
           { "core/canvas": Option.some(json(moved.value)) },
         )
 
-        const spec = yield* notes.get("spec-note")
-        yield* notes.link({ name: "spec-note", expectedMtime: spec.mtime })
-        const gone = yield* observe()
+        yield* notes.remove({ name: "spec-note", expectedMtime: spec.mtime })
+        const gone = yield* observe("spec-note")
         const goneText = Instructions.renderUpdate(
           gone.list,
           { "core/canvas": json(moved.value) },

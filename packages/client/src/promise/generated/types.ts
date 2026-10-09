@@ -463,6 +463,7 @@ export type RoomInfo = {
   name: string
   ai: "linked" | "discovered"
   guestApprovals: boolean
+  open?: boolean | undefined
   created: number
 }
 
@@ -476,6 +477,7 @@ export type RoomInfo1 = {
   name: string
   ai: "linked" | "discovered"
   guestApprovals: boolean
+  open?: boolean | null
   created: number | "Infinity" | "-Infinity" | "NaN"
 }
 
@@ -7011,25 +7013,36 @@ export type RoomCreateInput = {
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
+    readonly open?: boolean | undefined
   }["sessionID"]
   readonly name?: {
     readonly sessionID: string
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
+    readonly open?: boolean | undefined
   }["name"]
   readonly ai?: {
     readonly sessionID: string
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
+    readonly open?: boolean | undefined
   }["ai"]
   readonly guestApprovals?: {
     readonly sessionID: string
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
+    readonly open?: boolean | undefined
   }["guestApprovals"]
+  readonly open?: {
+    readonly sessionID: string
+    readonly name?: string | undefined
+    readonly ai?: "linked" | "discovered" | undefined
+    readonly guestApprovals?: boolean | undefined
+    readonly open?: boolean | undefined
+  }["open"]
 }
 
 export type RoomCreateOutput = { data: RoomInfo }["data"]
@@ -7040,17 +7053,26 @@ export type RoomUpdateInput = {
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
+    readonly open?: boolean | undefined
   }["name"]
   readonly ai?: {
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
+    readonly open?: boolean | undefined
   }["ai"]
   readonly guestApprovals?: {
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
+    readonly open?: boolean | undefined
   }["guestApprovals"]
+  readonly open?: {
+    readonly name?: string | undefined
+    readonly ai?: "linked" | "discovered" | undefined
+    readonly guestApprovals?: boolean | undefined
+    readonly open?: boolean | undefined
+  }["open"]
 }
 
 export type RoomUpdateOutput = { data: RoomInfo }["data"]
@@ -7063,11 +7085,24 @@ export type RoomCodeInput = { readonly roomID: { readonly roomID: string }["room
 
 export type RoomCodeOutput = RoomJoinCode
 
-export type RoomPublicOutput = { host: string; rooms: Array<{ id: string; name: string }> }
+export type RoomPublicOutput = { host: string; rooms: Array<{ id: string; name: string; open: boolean }> }
 
 export type RoomJoinInput = {
-  readonly code: { readonly code: string; readonly name: string }["code"]
-  readonly name: { readonly code: string; readonly name: string }["name"]
+  readonly code?: {
+    readonly code?: string | undefined
+    readonly roomID?: string | undefined
+    readonly name: string
+  }["code"]
+  readonly roomID?: {
+    readonly code?: string | undefined
+    readonly roomID?: string | undefined
+    readonly name: string
+  }["roomID"]
+  readonly name: {
+    readonly code?: string | undefined
+    readonly roomID?: string | undefined
+    readonly name: string
+  }["name"]
 }
 
 export type RoomJoinOutput = RoomJoined

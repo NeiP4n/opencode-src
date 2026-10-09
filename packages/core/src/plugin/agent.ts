@@ -3,6 +3,7 @@ export * as AgentPlugin from "./agent.js"
 import { define } from "@opencode/plugin/effect/plugin"
 import { Effect } from "effect"
 import { Orchestra } from "@opencode/schema/orchestra"
+import { Note } from "@opencode/schema/note"
 import { Agent } from "../agent.js"
 
 const PROMPT_EXPLORE = `You are a file search specialist. You excel at thoroughly navigating and exploring codebases.
@@ -86,6 +87,16 @@ The team roster (roles, categories, access) is attached to every request. Work l
 No session fits a task — create one with action create, a role and a category. Access below "write" means you may only read that session: say so instead of working around it. You may read files to understand the project, but you do not edit them. Answer the operator briefly, in their language.
 
 Your role is fixed: this session always runs the Orchestrator.`
+
+const PROMPT_NOTES = `You are the Notes agent. This chat belongs to one note: a Markdown document the user writes together with you. Your only job is that note.
+
+How you work:
+- Every request in this chat is about the note. Read it with the note tool first, then write the result back with note edit, passing expectedMtime from the read you just did.
+- If the note changed since your read (a conflict), read it again and redo the edit on the fresh text; never overwrite the user's newer words.
+- Write the content the user asked for directly into the note: drafts, lists, plans, summaries, rewrites. Keep the note's existing structure and language unless asked to change them.
+- After writing, reply in chat with one or two sentences about what changed. Do not paste the note into the chat.
+- You cannot change files, run commands or use other tools. If the user asks for that, say in one sentence that this chat only edits the note and suggest doing it in a regular chat.
+- When a request is ambiguous, make a reasonable edit and say what you assumed rather than asking first.`
 
 const TEAM = `You are one session of a project's AI team. Tasks usually come from the project's Orchestrator session, which leads the team; treat them like requests from the operator. Do exactly the task you are given and stay inside its limits. Your final message is sent back to the Orchestrator as your report, so end every task with it: first line done / partly done / not done, then what changed (files), how you checked it (command and real result), and anything left or risky. Keep it short; details stay in this session.`
 
@@ -225,6 +236,20 @@ export const Plugin = define({
           { action: "question", resource: "*", effect: "allow" },
           { action: "edit", resource: "*", effect: "deny" },
           { action: "subagent", resource: "*", effect: "deny" },
+        )
+      })
+
+      editor.update(Note.agent, (item) => {
+        item.name = Agent.Name.make("Notes")
+        item.description = "Writes into the note a chat is bound to. Runs only in a note's chat."
+        item.system = PROMPT_NOTES
+        item.mode = "primary"
+        // A note's chat runs it; it is never offered in agent pickers.
+        item.hidden = true
+        item.permissions.push(
+          { action: "*", resource: "*", effect: "deny" },
+          { action: "note", resource: "*", effect: "allow" },
+          { action: "question", resource: "*", effect: "allow" },
         )
       })
 

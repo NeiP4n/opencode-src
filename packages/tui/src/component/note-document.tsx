@@ -253,7 +253,7 @@ export function NoteDocument(props: {
               This note is empty.
             </text>
             <text fg={theme.text.muted} wrapMode="word">
-              Ask the AI in the chat to write it, or press ✎ Edit to start writing yourself.
+              Ask the AI to write it here, or press ✎ Edit to start writing yourself.
             </text>
           </box>
         </Match>

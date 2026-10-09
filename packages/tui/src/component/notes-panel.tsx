@@ -130,6 +130,12 @@ export function NotesPanel(props: {
         </box>
       </Show>
       <box height={1} />
+      {/* The chat of a note is bound to it, so the model writes there and nowhere else. */}
+      <box paddingLeft={2} paddingRight={1}>
+        <text fg={theme.text.muted} wrapMode="word">
+          This chat writes into the selected note only.
+        </text>
+      </box>
       <scrollbox flexGrow={1} minHeight={0} horizontalScrollbarOptions={{ visible: false }}>
         <For each={visible()}>
           {(note) => (

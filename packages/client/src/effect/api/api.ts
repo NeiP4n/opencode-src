@@ -2496,6 +2496,7 @@ export type RoomCreateInput = {
   readonly name?: string | undefined
   readonly ai?: "linked" | "discovered" | undefined
   readonly guestApprovals?: boolean | undefined
+  readonly open?: boolean | undefined
 }
 export type RoomCreateOutput = Room.Info
 export type RoomCreateOperation<E = never> = (input: RoomCreateInput) => Effect.Effect<RoomCreateOutput, E>
@@ -2505,6 +2506,7 @@ export type RoomUpdateInput = {
   readonly name?: string | undefined
   readonly ai?: "linked" | "discovered" | undefined
   readonly guestApprovals?: boolean | undefined
+  readonly open?: boolean | undefined
 }
 export type RoomUpdateOutput = Room.Info
 export type RoomUpdateOperation<E = never> = (input: RoomUpdateInput) => Effect.Effect<RoomUpdateOutput, E>
@@ -2519,11 +2521,15 @@ export type RoomCodeOperation<E = never> = (input: RoomCodeInput) => Effect.Effe
 
 export type RoomPublicOutput = {
   readonly host: string
-  readonly rooms: ReadonlyArray<{ readonly id: Room.ID; readonly name: string }>
+  readonly rooms: ReadonlyArray<{ readonly id: Room.ID; readonly name: string; readonly open: boolean }>
 }
 export type RoomPublicOperation<E = never> = () => Effect.Effect<RoomPublicOutput, E>
 
-export type RoomJoinInput = { readonly code: string; readonly name: string }
+export type RoomJoinInput = {
+  readonly code?: string | undefined
+  readonly roomID?: Room.ID | undefined
+  readonly name: string
+}
 export type RoomJoinOutput = Room.Joined
 export type RoomJoinOperation<E = never> = (input: RoomJoinInput) => Effect.Effect<RoomJoinOutput, E>
 

@@ -3,7 +3,7 @@ export * as NoteTool from "./note.js"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { ToolFailure } from "@opencode/ai"
 import { Note } from "@opencode/schema/note"
-import { SessionID } from "@opencode/schema/session-id"
+import { Session } from "@opencode/schema/session"
 import { optional } from "@opencode/schema/schema"
 import { Effect, Schema } from "effect"
 import { NoteStore } from "../../note.js"
@@ -15,9 +15,8 @@ export const name = "note"
 const FOLDER = ".opencode/notes"
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["list", "read", "create", "edit", "update", "link", "unlink"]).annotate({
-    description:
-      "List notes, read one, create one, rewrite or append its body, change its metadata, bind it to this chat or unbind it",
+  action: Schema.Literals(["list", "read", "create", "edit", "update"]).annotate({
+    description: "List notes, read one, create one, rewrite or append its body, or change its metadata",
   }),
   name: optional(
     Schema.String.annotate({
@@ -33,12 +32,12 @@ export const Input = Schema.Struct({
   tags: optional(Schema.Array(Note.Tag).annotate({ description: "Lowercase latin tags" })),
   length: optional(
     Note.Length.annotate({
-      description: "How much to write into the note while it is bound to a chat: brief, balanced or detailed",
+      description: "How much to write into the note from its own chat: brief, balanced or detailed",
     }),
   ),
   expectedMtime: optional(
     Schema.Number.annotate({
-      description: "File mtime in epoch ms from an earlier read; required by edit, update, link and unlink",
+      description: "File mtime in epoch ms from an earlier read; required by edit and update",
     }),
   ),
 })
@@ -60,10 +59,10 @@ export const description = [
   "  create — a new note from title and body; pass a short latin name, or omit it to derive one from the title.",
   "  edit — rewrite or append the body; pass name, body, optional mode and expectedMtime from a read.",
   "  update — change title, status, tags or length without touching the body; pass name and expectedMtime.",
-  "  link — bind the note to this chat, so the session can open it later.",
-  "  unlink — unbind the note from whatever chat it is bound to.",
   "",
-  "Writing rules: edit, update, link and unlink refuse to write when expectedMtime does not match the file, which is what happens when the user or another agent changed the note. On that refusal read the note again and re-apply the change, never invent a fresh mtime.",
+  "Every note has its own dedicated chat that the user opens from the Notes panel; a note cannot be bound to another chat.",
+  "",
+  "Writing rules: edit and update refuse to write when expectedMtime does not match the file, which is what happens when the user or another agent changed the note. On that refusal read the note again and re-apply the change, never invent a fresh mtime.",
   "",
   "When to write a note: a plan, a decision, a spec or a summary that will still matter after this chat ends. Do not write a note that only restates the chat, and do not create one for a trivial answer.",
 ].join("\n")
@@ -73,6 +72,17 @@ export const Plugin = {
   effect: Effect.fn("NoteTool.Plugin")(function* (ctx: Context) {
     const notes = yield* NoteStore.Service
     const permission = yield* Permission.Service
+
+    /**
+     * A note's dedicated chat may only work on that note, so creating a second note
+     * or listing the folder is refused there. The binding lives in session metadata
+     * and only this session knows it, which is why the check reads it per call; it is
+     * scoped to the two actions that need it, so the common edit path pays nothing.
+     */
+    const noteBoundTo = Effect.fn("NoteTool.noteBoundTo")(function* (sessionID: Session.ID) {
+      const session = yield* ctx.session.get({ sessionID }).pipe(Effect.orElseSucceed(() => undefined))
+      return session === undefined ? undefined : Note.chatOf(session.metadata)
+    })
 
     const listing = Effect.fn("NoteTool.listing")(function* () {
       const found = yield* notes.list()
@@ -87,7 +97,7 @@ export const Plugin = {
       return reported(note)
     })
 
-    const run = Effect.fn("NoteTool.run")(function* (input: Input, sessionID: SessionID) {
+    const run = Effect.fn("NoteTool.run")(function* (input: Input) {
       switch (input.action) {
         case "list":
           return { output: yield* listing(), name: undefined, updated: undefined }
@@ -124,18 +134,6 @@ export const Plugin = {
               expectedMtime: yield* needStamp(input),
             }),
           )
-        case "link":
-          return reported(
-            yield* notes.link({
-              name: yield* needName(input),
-              session: sessionID,
-              expectedMtime: yield* needStamp(input),
-            }),
-          )
-        case "unlink":
-          return reported(
-            yield* notes.link({ name: yield* needName(input), expectedMtime: yield* needStamp(input) }),
-          )
       }
     })
 
@@ -149,6 +147,10 @@ export const Plugin = {
           output: Output,
           execute: (input, context) =>
             Effect.gen(function* () {
+              if (refusedInsideNote(input, context.sessionID)) {
+                const bound = yield* noteBoundTo(context.sessionID)
+                if (bound !== undefined) yield* refuse(bound, input.action)
+              }
               if (writes(input.action)) {
                 yield* permission.assert({
                   action: name,
@@ -159,7 +161,7 @@ export const Plugin = {
                   source: { type: "tool", messageID: context.messageID, id: context.id },
                 })
               }
-              const result = yield* run(input, SessionID.make(context.sessionID))
+              const result = yield* run(input)
               return { output: result, content: result.output, metadata: { name: result.name } }
               // A blocked permission and a stale mtime both belong in the model output as text,
               // not as a crash: the model can react to either by reading and trying again.
@@ -173,6 +175,22 @@ export const Plugin = {
 function writes(action: Input["action"]) {
   return action !== "list" && action !== "read"
 }
+
+/** A note's own chat edits that note; it never creates another one nor browses the folder. */
+function refusedInsideNote(input: Input, sessionID: string) {
+  return (input.action === "create" || input.action === "list") && sessionID !== ""
+}
+
+/**
+ * Refusal as model output rather than as a crash: the model reads it and answers in
+ * chat instead of retrying, and nothing on disk is touched.
+ */
+const refuse = (note: string, action: Input["action"]) =>
+  Effect.fail(
+    new ToolFailure({
+      message: `This chat is the dedicated chat of the note "${note}". It works only on that note: ${action} is refused, and no other file or note will be changed here. Reply in chat instead.`,
+    }),
+  )
 
 const needName = (input: Input) =>
   input.name === undefined

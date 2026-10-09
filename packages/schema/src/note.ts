@@ -1,6 +1,7 @@
 export * as Note from "./note.js"
 
-import { Result, Schema } from "effect"
+import { Option, Result, Schema } from "effect"
+import { Agent } from "./agent.js"
 import { ephemeral, inventory } from "./event.js"
 import { NonNegativeInt, optional } from "./schema.js"
 import { SessionID } from "./session-id.js"
@@ -22,7 +23,7 @@ export type Length = typeof Length.Type
 /** Length a note is treated as having when its frontmatter does not set one. */
 export const FallbackLength: Length = "balanced"
 
-export const Tag =Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,31}$/)).annotate({
+export const Tag = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,31}$/)).annotate({
   identifier: "Note.Tag",
   description: "Note tag (1 to 32 lowercase latin alphanumerics and hyphens, starting with an alphanumeric)",
 })
@@ -81,7 +82,28 @@ const Updated = ephemeral({
 })
 export const Event = { Updated, Definitions: inventory(Updated) }
 
-export const Rejection =Schema.Struct({
+/**
+ * Session metadata that makes a session the dedicated chat of one note. A note
+ * opens only the chat carrying its own name here, so an ordinary chat is never
+ * turned into a note's chat, and one chat never serves two notes.
+ */
+const ChatMetadata = Schema.Struct({ note: Schema.Struct({ name: Slug }) })
+const decodeChat = Schema.decodeUnknownOption(ChatMetadata)
+
+// The agent of every note's chat: it knows only the note tool, so a general
+// prompt (and its tool habits) never competes with writing into the note.
+export const agent = Agent.ID.make("notes")
+
+export function chatMetadata(name: Slug) {
+  return { note: { name } }
+}
+
+/** The note a session is the dedicated chat of, read from its metadata. */
+export function chatOf(metadata: unknown): Slug | undefined {
+  return Option.getOrUndefined(decodeChat(metadata))?.note.name
+}
+
+export const Rejection = Schema.Struct({
   input: Schema.String,
   reason: Schema.Literals(["empty", "too_short", "too_long", "not_slug", "no_free_name"]),
 }).annotate({ identifier: "Note.Rejection" })
