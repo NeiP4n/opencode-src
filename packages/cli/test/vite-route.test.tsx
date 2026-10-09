@@ -37,7 +37,7 @@ test("the dev route wrapper restores the current route without replaying its pro
     await app.waitFor(() => host.route !== undefined)
     for (const value of routes) {
       route.navigate(
-        value.type === "plugin"
+        value.type === "plugin" || value.type === "room"
           ? value
           : {
               ...value,
