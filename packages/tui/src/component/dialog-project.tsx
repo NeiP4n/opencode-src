@@ -127,13 +127,14 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
           esc
         </text>
       </box>
-      <box flexDirection="row" gap={1}>
+      {/* A click on a field or its label takes focus back from the team list. */}
+      <box flexDirection="row" gap={1} onMouseDown={() => focusField(fields.name)}>
         <box width={6}>
           <text fg={theme.text.muted}>Name</text>
         </box>
         {input("name", "My project", props.project?.name ?? "")}
       </box>
-      <box flexDirection="row" gap={1}>
+      <box flexDirection="row" gap={1} onMouseDown={() => focusField(fields.directory)}>
         <box width={6}>
           <text fg={theme.text.muted}>Path</text>
         </box>
@@ -145,7 +146,7 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
       </box>
       <Show when={!props.project}>
         <box flexDirection="row" gap={1}>
-          <box width={6}>
+          <box width={6} onMouseUp={focusTeam}>
             <text fg={teamFocused() ? theme.text.formfield.focused : theme.text.muted}>Team</text>
           </box>
           <box flexGrow={1}>
@@ -203,11 +204,20 @@ export function DialogProject(props: { project?: OrchestraProject; onDone: () =>
 
 function TeamOption(props: { selected: boolean; focused: boolean; name: string; detail: string; onClick: () => void }) {
   const theme = useTheme().surface("dialog")
+  const [hovered, setHovered] = createSignal(false)
   return (
     <box
       flexDirection="row"
       gap={1}
-      backgroundColor={props.selected && props.focused ? theme.background.formfield.focused : undefined}
+      backgroundColor={
+        props.selected && props.focused
+          ? theme.background.formfield.focused
+          : hovered()
+            ? theme.background.formfield.hovered
+            : undefined
+      }
+      onMouseOver={() => setHovered(true)}
+      onMouseOut={() => setHovered(false)}
       onMouseUp={props.onClick}
     >
       <text fg={props.selected ? theme.text.formfield.focused : theme.text.muted}>{props.selected ? "●" : "○"}</text>

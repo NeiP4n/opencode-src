@@ -165,6 +165,28 @@ test("a new project can start with an AI team from a template", async () => {
   expect(calls.find((call) => call.method === "POST")?.body).toEqual({ name: "Team", directory, template: "feature" })
 })
 
+test("the team is picked with the mouse and a click on a field takes the keyboard back", async () => {
+  await using state = await tmpdir()
+  const calls: Call[] = []
+  await using setup = await render(state.path, calls, [])
+
+  const add = cell(await setup.waitForFrame((frame) => frame.includes("+ Project")), "+ Project")
+  await setup.mockMouse.click(add.x, add.y)
+  const frame = await setup.waitForFrame((frame) => frame.includes("● No team") && frame.includes("Feature"))
+  const feature = cell(frame, "Feature")
+  await setup.mockMouse.click(feature.x, feature.y)
+  const picked = await setup.waitForFrame((frame) => frame.includes("● Feature"))
+
+  // back in the name field by mouse: typing goes there, not to the team list
+  const name = cell(picked, "Name")
+  await setup.mockMouse.click(name.x + 8, name.y)
+  await Bun.sleep(30)
+  await setup.mockInput.typeText("Mouse")
+  await setup.mockInput.pressEnter()
+  await setup.waitFor(() => calls.some((call) => call.method === "POST" && call.path === "/api/orchestra/project"))
+  expect(calls.find((call) => call.method === "POST")?.body).toEqual({ name: "Mouse", directory, template: "feature" })
+})
+
 test("a session is moved to another category from the tree", async () => {
   await using state = await tmpdir()
   const calls: Call[] = []
