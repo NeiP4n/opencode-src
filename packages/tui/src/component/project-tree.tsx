@@ -18,6 +18,7 @@ import { useNotes, type NotesTab } from "../context/notes"
 import { NotesPanel } from "./notes-panel"
 import { Row } from "./panel-row"
 import { useNow } from "./note-canvas"
+import { useT } from "../util/i18n"
 
 // The left panel: the operator's own projects, each a name and a directory,
 // with its main session (the orchestrator) and the sessions opened in that
@@ -28,6 +29,7 @@ import { useNow } from "./note-canvas"
 const ACCESS_ORDER: readonly OrchestraAccess[] = ["hidden", "read", "write", "full"]
 
 export function ProjectTree(props: { width: number }) {
+  const t = useT()
   const client = useClient()
   const data = useData()
   const route = useRoute()
@@ -179,9 +181,9 @@ export function ProjectTree(props: { width: number }) {
   return (
     <box width={props.width} height="100%" flexShrink={0} backgroundColor={theme.background.raised.base} paddingTop={1}>
       <box flexDirection="row" paddingLeft={1} paddingRight={1} paddingBottom={1}>
-        <Tab tab="projects" label="Projects" hover={hover} setHover={setHover} />
+        <Tab tab="projects" label={t("Projects")} hover={hover} setHover={setHover} />
         <text fg={theme.text.muted}>│</text>
-        <Tab tab="notes" label="Notes" hover={hover} setHover={setHover} />
+        <Tab tab="notes" label={t("Notes")} hover={hover} setHover={setHover} />
         <box flexGrow={1} />
         <Row
           id="new"
@@ -189,7 +191,7 @@ export function ProjectTree(props: { width: number }) {
           setHover={setHover}
           onClick={() => (notes.tab() === "notes" ? notes.setCreating(true) : edit())}
         >
-          <text fg={hover() === "new" ? theme.text.action.primary.hovered : theme.text.action.primary.base}>+ New</text>
+          <text fg={hover() === "new" ? theme.text.action.primary.hovered : theme.text.action.primary.base}>{t("+ New")}</text>
         </Row>
       </box>
       <Show when={notes.tab() === "notes"}>
@@ -309,7 +311,7 @@ export function ProjectTree(props: { width: number }) {
                   setHover={setHover}
                   onClick={() => route.navigate({ type: "home", location: { directory: project.directory } })}
                 >
-                  <text fg={theme.text.muted}>{"  + New session"}</text>
+                  <text fg={theme.text.muted}>{"  " + t("+ New session")}</text>
                 </Row>
               </Show>
             </box>

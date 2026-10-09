@@ -6,8 +6,10 @@ import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
 import { usePromptMove } from "../../component/prompt/move"
 import { hasConnectedProvider } from "../../util/connected-provider"
 import { SESSION_SIDEBAR_WIDTH } from "../../ui/layout"
+import { useT } from "../../util/i18n"
 
 export function SidebarOnboarding(props: { context: Plugin.Context; sessionID: string }) {
+  const t = useT()
   const dimensions = useTerminalDimensions()
   const [onboarding, updateOnboarding] = props.context.storage.store("getting-started", {
     initial: { dismissed: false },
@@ -41,7 +43,7 @@ export function SidebarOnboarding(props: { context: Plugin.Context; sessionID: s
         <box flexGrow={1} gap={1}>
           <box flexDirection="row" justifyContent="space-between">
             <text fg={props.context.theme.text.base}>
-              <b>Getting started</b>
+              <b>{t("Getting started")}</b>
             </text>
             <text
               id="sidebar.footer.getting-started.dismiss"
@@ -55,9 +57,11 @@ export function SidebarOnboarding(props: { context: Plugin.Context; sessionID: s
               ✕
             </text>
           </box>
-          <text fg={props.context.theme.text.muted}>Opencode++ includes free models so you can start immediately.</text>
           <text fg={props.context.theme.text.muted}>
-            Connect one of 75+ providers to use other models, including Claude, GPT and Gemini.
+            {t("Opencode++ includes free models so you can start immediately.")}
+          </text>
+          <text fg={props.context.theme.text.muted}>
+            {t("Connect one of 75+ providers to use other models, including Claude, GPT and Gemini.")}
           </text>
           <box
             id="sidebar.footer.getting-started.connect"
@@ -66,7 +70,7 @@ export function SidebarOnboarding(props: { context: Plugin.Context; sessionID: s
             justifyContent="space-between"
             onMouseUp={() => props.context.keymap.dispatch("provider.connect")}
           >
-            <text fg={props.context.theme.text.base}>Connect provider</text>
+            <text fg={props.context.theme.text.base}>{t("Connect provider")}</text>
             <text fg={props.context.theme.text.muted}>/connect</text>
           </box>
         </box>

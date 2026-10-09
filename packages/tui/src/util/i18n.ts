@@ -1,0 +1,169 @@
+import { useOptionalConfig } from "../config"
+
+export type Language = "en" | "ru"
+
+// English text is the key, so untranslated strings fall back to it as written.
+// `{name}` placeholders are filled from the values passed to `t`.
+const ru: Record<string, string> = {
+  // Bar
+  Server: "Сервер",
+  UI: "Интерфейс",
+  Theme: "Тема",
+  Tools: "Инструменты",
+  Registry: "Реестр",
+  Host: "Хост",
+  Connect: "Подключиться",
+  Experiments: "Эксперименты",
+  Language: "Язык",
+  "+ Project": "+ Проект",
+  // Server, UI, Theme and Tools panels
+  Status: "Состояние",
+  Connected: "Подключён",
+  Reconnect: "Переподключение",
+  "Last error": "Последняя ошибка",
+  Version: "Версия",
+  Address: "Адрес",
+  "Server details unavailable": "Сведения о сервере недоступны",
+  Loop: "Цикл",
+  Memory: "Память",
+  "Debug overlay": "Отладочный слой",
+  Name: "Название",
+  Mode: "Режим",
+  "Switch to {mode}": "Переключить на {mode}",
+  "Writing debug snapshot…": "Записываю отладочный снимок…",
+  "Write debug snapshot": "Записать отладочный снимок",
+  Render: "Отрисовка",
+  "Time to first draw": "Время до первой отрисовки",
+  "Turn token usage": "Токены за ход",
+  "Turn token usage (verbose)": "Токены за ход (подробно)",
+  // Side panels, prompt and footer
+  Projects: "Проекты",
+  Notes: "Заметки",
+  "+ New": "+ Новый",
+  "+ New session": "+ Новая сессия",
+  agents: "агенты",
+  commands: "команды",
+  Connecting: "Подключается",
+  Error: "Ошибка",
+  Disabled: "Выключен",
+  "Sign in": "Войти",
+  "Ask anything…": "Спроси что угодно…",
+  "Run a command…": "Выполни команду…",
+  "{count}/{total} connected": "подключено {count}/{total}",
+  "{count} failed": "ошибок: {count}",
+  "{count} need sign in": "нужен вход: {count}",
+  Context: "Контекст",
+  "{percent}% used": "занято {percent}%",
+  tokens: "токенов",
+  "{cost} spent": "потрачено {cost}",
+  "Getting started": "С чего начать",
+  "Opencode++ includes free models so you can start immediately.":
+    "В Opencode++ есть бесплатные модели — можно начинать сразу.",
+  "Connect one of 75+ providers to use other models, including Claude, GPT and Gemini.":
+    "Подключи одного из 75+ провайдеров, чтобы взять другие модели, включая Claude, GPT и Gemini.",
+  "Connect provider": "Подключить провайдера",
+  // Registry and Experiments
+  Ready: "Готово",
+  "For the model": "Для модели",
+  "AI terminal": "Терминал ИИ",
+  "Install {name}": "Установить {name}",
+  "no installer here": "здесь нечем установить",
+  "The AI's shell commands and hub commands run in nu. Nushell has no grammar the permission check understands, so each nu command is approved as a whole; each command shows the shell that ran it.":
+    "Команды ИИ и команды хаба выполняются в nu. Проверка разрешений не разбирает синтаксис Nushell, поэтому каждая команда nu одобряется целиком; у каждой команды видно, в какой оболочке она шла.",
+  Search: "Поиск",
+  "tool, category or task: yaml, ports, docker logs": "инструмент, категория или задача: yaml, порты, логи docker",
+  "Install missing ({count})": "Установить недостающие ({count})",
+  "All installed on": "Включить все установленные",
+  "All off": "Выключить все",
+  "Tools {page}/{pages}": "Инструменты {page}/{pages}",
+  'Nothing matches "{query}".': "Ничего не найдено по «{query}».",
+  "No catalog tools on this platform.": "Для этой платформы в каталоге нет инструментов.",
+  "The package databases are outdated, so installs fail. Update the system, then install again.":
+    "Базы пакетов устарели, поэтому установка падает. Обнови систему и установи снова.",
+  "Update system": "Обновить систему",
+  "↑↓ select · tab model on/off · enter install/remove · ←→ page · esc close":
+    "↑↓ выбор · tab вкл/выкл для модели · enter установить/удалить · ←→ страница · esc закрыть",
+  " [on] ": " [вкл] ",
+  " [off]": " [выкл]",
+  "{count} entry": "{count} запись",
+  "{count} entries": "записей: {count}",
+  installed: "установлен",
+  missing: "нет",
+  "Remove?": "Удалить?",
+  Remove: "Удалить",
+  Install: "Установить",
+  "No experiments available": "Экспериментов нет",
+  // Host
+  "This server only listens on this machine, so other devices cannot connect yet. Run `opencode service set hostname 0.0.0.0` and restart the service.":
+    "Сервер слушает только этот компьютер, другие устройства пока не подключатся. Выполни `opencode service set hostname 0.0.0.0` и перезапусти службу.",
+  "Open a session to host it as a room.": "Открой сессию, чтобы сделать из неё комнату.",
+  "Host this session": "Открыть комнату для этой сессии",
+  Room: "Комната",
+  "Join code": "Код входа",
+  "none yet": "пока нет",
+  expired: "истёк",
+  "expires in {time}": "истекает через {time}",
+  "not needed": "не нужен",
+  Approvals: "Разрешения",
+  "Who may allow or deny the AI when it asks to edit files or run commands.":
+    "Кто может разрешать или запрещать ИИ правку файлов и запуск команд.",
+  "Me and guests": "Я и гости",
+  "Only me": "Только я",
+  "AI outreach": "ИИ пишет сам",
+  "Where this session's AI may post on its own: rooms you linked, or any room it finds, asking you before each send.":
+    "Куда ИИ этой сессии может писать сам: в связанные комнаты или в любую найденную, спрашивая тебя перед каждой отправкой.",
+  "Linked rooms only": "Только связанные",
+  "Any room it finds": "Любая найденная",
+  Entry: "Вход",
+  "Whether guests need the join code or may join straight from the room list.":
+    "Нужен ли гостям код входа или можно войти прямо из списка комнат.",
+  "With a code": "По коду",
+  "Without a code": "Без кода",
+  "New join code": "Новый код",
+  "Get join code": "Получить код",
+  "Click again to stop hosting": "Нажми ещё раз, чтобы закрыть",
+  "Stop hosting": "Закрыть комнату",
+  "On the other device open Connect, pick this room or enter the address, then the join code.":
+    "На другом устройстве открой «Подключиться», выбери эту комнату или введи адрес, затем код.",
+  "On the other device open Connect and pick this room, or enter the address.":
+    "На другом устройстве открой «Подключиться» и выбери эту комнату или введи адрес.",
+  "Allow in Windows Firewall": "Разрешить в брандмауэре Windows",
+  "Windows Firewall blocks rooms until opencode is allowed on the local network; Windows asks for administrator rights once.":
+    "Брандмауэр Windows не пускает в комнаты, пока opencode не разрешён в локальной сети; Windows один раз спросит права администратора.",
+  "Windows Firewall rules added": "Правила брандмауэра Windows добавлены",
+  // Connect
+  "Rooms on this network": "Комнаты в этой сети",
+  "Searching…": "Ищу…",
+  "{count} found": "Найдено: {count}",
+  "No rooms found": "Комнат не найдено",
+  "Search again": "Искать снова",
+  Select: "Выбрать",
+  Join: "Войти",
+  "Join by address": "Вход по адресу",
+  "Your name": "Твоё имя",
+  "{name} (default)": "{name} (по умолчанию)",
+  "e.g. 192.168.1.5:49375": "напр. 192.168.1.5:49375",
+  "e.g. ABCD-EFGH, empty if not needed": "напр. ABCD-EFGH, пусто если не нужен",
+  "Enter the host's address": "Введи адрес хоста",
+  "No rooms at this address": "По этому адресу комнат нет",
+  "Pick a room above: this host shares several": "Выбери комнату выше: у этого хоста их несколько",
+  "This room needs the join code its host shows": "Для этой комнаты нужен код, который показывает хост",
+  "Joined rooms": "Мои комнаты",
+  "as {name}": "как {name}",
+  "Open chat": "Открыть чат",
+  "Click again to leave": "Нажми ещё раз, чтобы выйти",
+  Leave: "Выйти",
+  "Not found? Both computers must be on one network, and on Windows opencode must be allowed in the firewall.":
+    "Не находит? Оба компьютера должны быть в одной сети, а на Windows opencode должен быть разрешён в брандмауэре.",
+}
+
+export function translate(language: Language | undefined, text: string, values?: Record<string, string | number>) {
+  const template = language === "ru" ? (ru[text] ?? text) : text
+  if (!values) return template
+  return template.replace(/\{(\w+)\}/g, (match, key: string) => (key in values ? String(values[key]) : match))
+}
+
+export function useT() {
+  const config = useOptionalConfig()
+  return (text: string, values?: Record<string, string | number>) => translate(config?.data.language, text, values)
+}

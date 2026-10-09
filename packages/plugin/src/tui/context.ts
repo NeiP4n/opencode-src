@@ -493,6 +493,8 @@ export interface UI {
   readonly format: {
     path(value: string): string
   }
+  /** Interface language the user picked in the bottom bar. Reactive when read in a Solid computation. */
+  language(): "en" | "ru"
   readonly router: {
     register(page: Page): () => void
     navigate(destination: Destination): void

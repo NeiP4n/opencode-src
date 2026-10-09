@@ -23,6 +23,7 @@ import { useProjects } from "../context/projects"
 import { DialogExperiments } from "./dialog-experiments"
 import { usePlugin } from "../plugin/context"
 import { errorMessage } from "../util/error"
+import { useT } from "../util/i18n"
 
 const graphWidth = 23
 const sampleIntervalMilliseconds = 2_000
@@ -44,6 +45,7 @@ export function DevToolsBar() {
   const plugins = usePlugin()
   const themes = useThemes()
   const keymap = Keymap.use()
+  const t = useT()
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
   const { current: theme, mode, supports, setMode } = themes
@@ -269,28 +271,27 @@ export function DevToolsBar() {
                 : theme.text.muted
           }
         >
-          {" "}
-          Server
+          {" " + t("Server")}
         </text>
         <Show when={panel() === "server"}>
           <PanelBox>
-            <PanelTitle>Server</PanelTitle>
-            <Row label="Status" value={connected() ? "Connected" : client.connection.status()} />
+            <PanelTitle>{t("Server")}</PanelTitle>
+            <Row label={t("Status")} value={connected() ? t("Connected") : client.connection.status()} />
             <Show when={client.connection.attempt() > 0}>
-              <Row label="Reconnect" value={String(client.connection.attempt())} />
+              <Row label={t("Reconnect")} value={String(client.connection.attempt())} />
             </Show>
-            <Show when={client.connection.error()}>{(error) => <Row label="Last error" value={error()} />}</Show>
+            <Show when={client.connection.error()}>{(error) => <Row label={t("Last error")} value={error()} />}</Show>
             <Show when={server()}>
               {(value) => (
                 <>
-                  <Row label="Version" value={value().health.version} />
+                  <Row label={t("Version")} value={value().health.version} />
                   <Row label="PID" value={String(value().health.pid)} />
-                  <Row label="Address" value={value().address} />
+                  <Row label={t("Address")} value={value().address} />
                 </>
               )}
             </Show>
             <Show when={server.error}>
-              <text fg={elevatedTheme.text.feedback.error.base}>Server details unavailable</text>
+              <text fg={elevatedTheme.text.feedback.error.base}>{t("Server details unavailable")}</text>
             </Show>
           </PanelBox>
         </Show>
@@ -316,55 +317,54 @@ export function DevToolsBar() {
                 : theme.text.muted
           }
         >
-          {" "}
-          UI
+          {" " + t("UI")}
         </text>
         <Show when={panel() === "ui"}>
           <PanelBox>
-            <PanelTitle>UI</PanelTitle>
-            <Row label="Status" value={runtime()} />
+            <PanelTitle>{t("UI")}</PanelTitle>
+            <Row label={t("Status")} value={runtime()} />
             <ProcessStat
-              label="Loop"
+              label={t("Loop")}
               values={frontendSamples().map((sample) => sample.delay)}
               unit=" ms"
               decimals={1}
             />
             <ProcessStat label="CPU" values={frontendSamples().map((sample) => sample.cpu)} unit="%" />
             <ProcessStat
-              label="Memory"
+              label={t("Memory")}
               values={frontendSamples().map((sample) => sample.memory / 1024 / 1024)}
               unit=" MB"
               decimals={0}
             />
             <Action onClick={() => renderer.toggleDebugOverlay()} hoverBackground>
-              {debugOverlay() ? "[x]" : "[ ]"} Debug overlay
+              {debugOverlay() ? "[x]" : "[ ]"} {t("Debug overlay")}
             </Action>
           </PanelBox>
         </Show>
       </BarItem>
       <BarItem active={panel() === "theme"} onClick={() => toggle("theme")}>
-        <text fg={panel() === "theme" ? theme.text.action.primary.focused : theme.text.muted}>Theme</text>
+        <text fg={panel() === "theme" ? theme.text.action.primary.focused : theme.text.muted}>{t("Theme")}</text>
         <Show when={panel() === "theme"}>
           <PanelBox>
-            <PanelTitle>Theme</PanelTitle>
-            <Row label="Name" value={themes.selected} />
-            <Row label="Mode" value={mode()} />
+            <PanelTitle>{t("Theme")}</PanelTitle>
+            <Row label={t("Name")} value={themes.selected} />
+            <Row label={t("Mode")} value={mode()} />
             <For each={themePerformance()}>{(entry) => <Row label={entry.key} value={String(entry.value)} />}</For>
             <Show when={canSwitchMode()}>
               <Action onClick={() => setMode(nextMode())} hoverBackground>
-                Switch to {nextMode()}
+                {t("Switch to {mode}", { mode: nextMode() })}
               </Action>
             </Show>
           </PanelBox>
         </Show>
       </BarItem>
       <BarItem active={panel() === "tools"} onClick={() => toggle("tools")}>
-        <text fg={panel() === "tools" ? theme.text.action.primary.focused : theme.text.muted}>Tools</text>
+        <text fg={panel() === "tools" ? theme.text.action.primary.focused : theme.text.muted}>{t("Tools")}</text>
         <Show when={panel() === "tools"}>
           <PanelBox>
-            <PanelTitle>Tools</PanelTitle>
+            <PanelTitle>{t("Tools")}</PanelTitle>
             <Action onClick={() => void dump()} disabled={dumping()} hoverBackground>
-              {dumping() ? "Writing debug snapshot…" : "Write debug snapshot"}
+              {dumping() ? t("Writing debug snapshot…") : t("Write debug snapshot")}
             </Action>
             <Show when={dumpPath()}>
               {(file) => (
@@ -382,7 +382,7 @@ export function DevToolsBar() {
             </Show>
             <box marginTop={1}>
               <text fg={elevatedTheme.text.base} attributes={TextAttributes.BOLD}>
-                Render
+                {t("Render")}
               </text>
               <Action
                 onClick={() =>
@@ -392,7 +392,7 @@ export function DevToolsBar() {
                 }
                 hoverBackground
               >
-                {timing() ? "[x]" : "[ ]"} Time to first draw
+                {timing() ? "[x]" : "[ ]"} {t("Time to first draw")}
               </Action>
               <Action
                 onClick={() =>
@@ -402,7 +402,7 @@ export function DevToolsBar() {
                 }
                 hoverBackground
               >
-                {turnTokens() ? "[x]" : "[ ]"} Turn token usage
+                {turnTokens() ? "[x]" : "[ ]"} {t("Turn token usage")}
               </Action>
               <Show when={Boolean(turnTokens())}>
                 <Action
@@ -413,7 +413,7 @@ export function DevToolsBar() {
                   }
                   hoverBackground
                 >
-                  {verboseTurnTokens() ? "[x]" : "[ ]"} Turn token usage (verbose)
+                  {verboseTurnTokens() ? "[x]" : "[ ]"} {t("Turn token usage (verbose)")}
                 </Action>
               </Show>
             </box>
@@ -447,7 +447,7 @@ export function DevToolsBar() {
           dialog.setCentered(true)
         }}
       >
-        <text fg={theme.text.muted}>Registry</text>
+        <text fg={theme.text.muted}>{t("Registry")}</text>
       </BarItem>
       <BarItem
         active={false}
@@ -457,7 +457,7 @@ export function DevToolsBar() {
           dialog.setCentered(true)
         }}
       >
-        <text fg={theme.text.muted}>Host</text>
+        <text fg={theme.text.muted}>{t("Host")}</text>
       </BarItem>
       <BarItem
         active={false}
@@ -467,7 +467,7 @@ export function DevToolsBar() {
           dialog.setCentered(true)
         }}
       >
-        <text fg={theme.text.muted}>Connect</text>
+        <text fg={theme.text.muted}>{t("Connect")}</text>
       </BarItem>
       <Show when={projects.loaded() && projects.list().length === 0}>
         <BarItem
@@ -477,7 +477,7 @@ export function DevToolsBar() {
             openProjectDialog(dialog, projects.refetch)
           }}
         >
-          <text fg={theme.text.action.primary.base}>+ Project</text>
+          <text fg={theme.text.action.primary.base}>{t("+ Project")}</text>
         </BarItem>
       </Show>
       <BarItem
@@ -487,11 +487,25 @@ export function DevToolsBar() {
           dialog.replace(() => <DialogExperiments />)
         }}
       >
-        <text fg={theme.text.muted}>Experiments</text>
+        <text fg={theme.text.muted}>{t("Experiments")}</text>
       </BarItem>
       <box flexGrow={1} minWidth={0}>
         <TimeToFirstDraw visible={timing()} width="100%" fg={theme.text.muted} label="Time to first draw" />
       </box>
+      {/* Right edge. A popup here sat over the side panels, which took its clicks; the item switches the language itself. */}
+      <BarItem
+        active={false}
+        onClick={() =>
+          void config
+            .update((draft) => {
+              draft.language = config.data.language === "ru" ? "en" : "ru"
+            })
+            .catch(toast.error)
+        }
+      >
+        <text fg={theme.text.muted}>{t("Language")}</text>
+        <text fg={theme.text.action.primary.base}>{" " + (config.data.language === "ru" ? "RU" : "EN")}</text>
+      </BarItem>
     </box>
   )
 }

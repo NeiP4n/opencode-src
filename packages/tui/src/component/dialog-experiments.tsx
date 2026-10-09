@@ -3,6 +3,7 @@ import { useConfig } from "../config"
 import { DialogSelect } from "../ui/dialog-select"
 import { useTheme } from "../context/theme"
 import { useToast } from "../ui/toast"
+import { useT } from "../util/i18n"
 
 type Experiment = {
   id: string
@@ -16,6 +17,7 @@ type Experiment = {
 export const experiments: Experiment[] = []
 
 export function DialogExperiments() {
+  const t = useT()
   const config = useConfig()
   const theme = useTheme()
   const toast = useToast()
@@ -50,14 +52,14 @@ export function DialogExperiments() {
 
   return (
     <DialogSelect
-      title="Experiments"
+      title={t("Experiments")}
       options={options()}
       renderFilter={experiments.length > 0}
       onMove={(option) => setSelected(option.value)}
       onSelect={(option) => void change(option.value)}
       emptyView={
         <box paddingLeft={4} paddingRight={4}>
-          <text fg={theme.text.muted}>No experiments available</text>
+          <text fg={theme.text.muted}>{t("No experiments available")}</text>
         </box>
       }
       footerHints={experiments.length > 0 ? [{ title: "←/→", label: "change" }] : []}

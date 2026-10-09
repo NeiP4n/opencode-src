@@ -3,6 +3,7 @@ import { createMemo, createSignal, Match, Show, Switch } from "solid-js"
 import { contextUsage, formatContextUsage } from "../../util/session"
 import { useTerminalDimensions } from "@opentui/solid"
 import { stringWidth } from "../../util/string-width"
+import { useT } from "../../util/i18n"
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -16,6 +17,7 @@ export function PromptFooter(props: {
   showDetails: boolean
 }) {
   const dimensions = useTerminalDimensions()
+  const t = useT()
   const [liveHovered, setLiveHovered] = createSignal(false)
   const subagents = createMemo(() => {
     if (!props.sessionID) return 0
@@ -94,13 +96,13 @@ export function PromptFooter(props: {
           </Match>
           <Match when={props.showDetails && layout().shortcuts}>
             <text fg={props.context.theme.text.base} flexShrink={0}>
-              {shortcut("agent.cycle")} <span style={{ fg: props.context.theme.text.muted }}>agents</span>
+              {shortcut("agent.cycle")} <span style={{ fg: props.context.theme.text.muted }}>{t("agents")}</span>
             </text>
           </Match>
         </Switch>
         <Show when={props.showDetails && layout().shortcuts}>
           <text fg={props.context.theme.text.base} wrapMode="none" flexShrink={0}>
-            {shortcut("command.palette.show")} <span style={{ fg: props.context.theme.text.muted }}>commands</span>
+            {shortcut("command.palette.show")} <span style={{ fg: props.context.theme.text.muted }}>{t("commands")}</span>
           </text>
         </Show>
       </Match>

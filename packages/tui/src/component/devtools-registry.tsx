@@ -6,6 +6,7 @@ import { useConfig } from "../config"
 import { Keymap } from "../context/keymap"
 import { useTheme } from "../context/theme"
 import { useToast } from "../ui/toast"
+import { useT } from "../util/i18n"
 import { hubRegistryStatus, type RegistryOptions, type RegistryTool } from "../util/hub-registry"
 
 // Interactive catalog control for the Universal Tool Hub, opened from the
@@ -45,6 +46,7 @@ export function RegistryPanel(props: {
   onShell?: (shell: string) => void
 }) {
   const theme = useTheme().surface("dialog")
+  const t = useT()
   const toast = useToast()
   const options = props.options ?? {}
   const install = options.install ?? Hub.HubActions.installTool
@@ -119,8 +121,7 @@ export function RegistryPanel(props: {
     void HubState.setTerminal(name, { directory: options.directory }).catch((error: unknown) =>
       toast.show({ message: error instanceof Error ? error.message : String(error), variant: "error" }),
     )
-    // nu cannot be permission-checked as a general shell, so the shell tool keeps bash then.
-    if (name !== "nu") props.onShell?.(name)
+    props.onShell?.(name)
   }
 
   const runAction = async (
@@ -242,7 +243,7 @@ export function RegistryPanel(props: {
     <box paddingLeft={2} paddingRight={2} paddingBottom={1} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
         <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
-          Registry
+          {t("Registry")}
         </text>
         <text fg={theme.text.muted} onMouseUp={() => props.onClose?.()}>
           esc
@@ -250,15 +251,15 @@ export function RegistryPanel(props: {
       </box>
 
       <box flexDirection="row" gap={3}>
-        <Stat label="Ready" value={`${status().ready}/${status().total}`} />
+        <Stat label={t("Ready")} value={`${status().ready}/${status().total}`} />
         <Stat
-          label="For the model"
+          label={t("For the model")}
           value={`${status().tools.filter((row) => isOn(row.tool)).length}/${status().tools.length}`}
         />
       </box>
 
       <box flexDirection="row" gap={1}>
-        <text fg={theme.text.muted}>AI terminal</text>
+        <text fg={theme.text.muted}>{t("AI terminal")}</text>
         <For each={status().terminals}>
           {(item) => (
             <Switch>
@@ -276,11 +277,11 @@ export function RegistryPanel(props: {
               </Match>
               <Match when={item.installable}>
                 <Button disabled={busy() !== undefined} onClick={() => onInstall(item.name)}>
-                  {`Install ${item.name}`}
+                  {t("Install {name}", { name: item.name })}
                 </Button>
               </Match>
               <Match when={true}>
-                <text fg={theme.text.muted}>{`${item.name}: ${item.manual ?? "no installer here"}`}</text>
+                <text fg={theme.text.muted}>{`${item.name}: ${item.manual ?? t("no installer here")}`}</text>
               </Match>
             </Switch>
           )}
@@ -288,8 +289,9 @@ export function RegistryPanel(props: {
       </box>
       <Show when={aiTerminal() === "nu"}>
         <text fg={theme.text.muted} wrapMode="word">
-          Hub commands run in nu. Other shell commands stay in your regular shell, where they can be permission-checked;
-          each command shows the shell that ran it.
+          {t(
+            "The AI's shell commands and hub commands run in nu. Nushell has no grammar the permission check understands, so each nu command is approved as a whole; each command shows the shell that ran it.",
+          )}
         </text>
       </Show>
 
@@ -300,7 +302,7 @@ export function RegistryPanel(props: {
       </text>
 
       <box flexDirection="row" gap={1}>
-        <text fg={theme.text.muted}>Search</text>
+        <text fg={theme.text.muted}>{t("Search")}</text>
         <input
           flexGrow={1}
           onInput={(value) => {
@@ -313,7 +315,7 @@ export function RegistryPanel(props: {
           cursorColor={theme.text.formfield.focused}
           cursorStyle={config.cursor}
           focusedTextColor={theme.text.formfield.focused}
-          placeholder="tool, category or task: yaml, ports, docker logs"
+          placeholder={t("tool, category or task: yaml, ports, docker logs")}
           placeholderColor={theme.text.muted}
           ref={(input: InputRenderable) => {
             setTimeout(() => {
@@ -330,7 +332,7 @@ export function RegistryPanel(props: {
           disabled={busy() !== undefined || missing().length === 0}
           onClick={() => void onInstallMissing()}
         >
-          {`Install missing (${missing().length})`}
+          {t("Install missing ({count})", { count: missing().length })}
         </Button>
         <Button
           disabled={busy() !== undefined}
@@ -343,7 +345,7 @@ export function RegistryPanel(props: {
             )
           }
         >
-          All installed on
+          {t("All installed on")}
         </Button>
         <Button
           disabled={busy() !== undefined}
@@ -354,11 +356,11 @@ export function RegistryPanel(props: {
             )
           }
         >
-          All off
+          {t("All off")}
         </Button>
         <box flexGrow={1} />
         <Button onClick={() => turn(-1)}>‹</Button>
-        <text fg={theme.text.muted}>{`Tools ${current() + 1}/${pages()}`}</text>
+        <text fg={theme.text.muted}>{t("Tools {page}/{pages}", { page: current() + 1, pages: pages() })}</text>
         <Button onClick={() => turn(1)}>›</Button>
       </box>
 
@@ -382,14 +384,14 @@ export function RegistryPanel(props: {
         </For>
         <Show when={rows().length === 0}>
           <text fg={theme.text.muted}>
-            {query() ? `Nothing matches "${query()}".` : "No catalog tools on this platform."}
+            {query() ? t('Nothing matches "{query}".', { query: query() }) : t("No catalog tools on this platform.")}
           </text>
         </Show>
       </box>
 
       <Show when={stale()}>
         <text fg={theme.text.feedback.warning.base} wrapMode="word">
-          The package databases are outdated, so installs fail. Update the system, then install again.
+          {t("The package databases are outdated, so installs fail. Update the system, then install again.")}
         </text>
         <box flexDirection="row">
           <Button
@@ -397,7 +399,7 @@ export function RegistryPanel(props: {
             disabled={busy() !== undefined}
             onClick={() => void runAction("system", "updated", () => (options.update ?? Hub.HubActions.updateSystem)())}
           >
-            Update system
+            {t("Update system")}
           </Button>
         </box>
       </Show>
@@ -408,7 +410,9 @@ export function RegistryPanel(props: {
           </text>
         )}
       </Show>
-      <text fg={theme.text.muted}>↑↓ select · tab model on/off · enter install/remove · ←→ page · esc close</text>
+      <text fg={theme.text.muted}>
+        {t("↑↓ select · tab model on/off · enter install/remove · ←→ page · esc close")}
+      </text>
     </box>
   )
 }
@@ -443,6 +447,7 @@ function ToolRow(props: {
   onRemove: () => void
   onDisarm: () => void
 }) {
+  const t = useT()
   const theme = useTheme().surface("dialog")
   return (
     <box
@@ -456,7 +461,7 @@ function ToolRow(props: {
         onClick={props.onToggle}
         color={props.on ? theme.text.formfield.selected : theme.text.formfield.base}
       >
-        {props.on ? " [on] " : " [off]"}
+        {props.on ? t(" [on] ") : t(" [off]")}
       </Action>
       <box width={TOOL_COLUMN}>
         <text fg={props.tool.installed ? theme.text.base : theme.text.muted} wrapMode="none" truncate>
@@ -464,10 +469,10 @@ function ToolRow(props: {
         </text>
       </box>
       <box width={11}>
-        <text fg={theme.text.muted}>{`${props.tool.entries} ${props.tool.entries === 1 ? "entry" : "entries"}`}</text>
+        <text fg={theme.text.muted}>{t(props.tool.entries === 1 ? "{count} entry" : "{count} entries", { count: props.tool.entries })}</text>
       </box>
       <text fg={props.tool.installed ? theme.text.feedback.success.base : theme.text.feedback.warning.base}>
-        {props.tool.installed ? "installed" : "missing"}
+        {props.tool.installed ? t("installed") : t("missing")}
       </text>
       <box flexGrow={1} />
       <Show when={props.working}>
@@ -475,12 +480,12 @@ function ToolRow(props: {
       </Show>
       <Show when={!props.working && props.tool.installed}>
         <Button disabled={props.pending} onLeave={props.onDisarm} onClick={props.onRemove}>
-          {props.armed ? "Remove?" : "Remove"}
+          {props.armed ? t("Remove?") : t("Remove")}
         </Button>
       </Show>
       <Show when={!props.working && !props.tool.installed}>
         <Button disabled={props.pending} onClick={props.onInstall}>
-          Install
+          {t("Install")}
         </Button>
       </Show>
     </box>

@@ -32,6 +32,7 @@ import { useSessionTabs } from "../context/session-tabs"
 import { useOptionalPanel } from "../context/panel"
 import { useLocal } from "../context/local"
 import { abbreviateHome } from "../util/path-format"
+import { useConfig } from "../config"
 
 export type Dispose = () => Promise<void>
 
@@ -82,6 +83,7 @@ export function usePluginHost() {
     sessionTabs: useSessionTabs(),
     panel: useOptionalPanel(),
     local: useLocal(),
+    config: useConfig().data,
   }
 }
 
@@ -207,6 +209,7 @@ export function createPluginContext(input: {
       format: {
         path: (value) => abbreviateHome(value, host.paths.home),
       },
+      language: () => host.config.language ?? "en",
       router: {
         register(page) {
           if (input.registry.has("routes", page.name)) throw new Error(`Route already registered: ${page.name}`)

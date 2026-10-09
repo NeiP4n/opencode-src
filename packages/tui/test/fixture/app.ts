@@ -30,11 +30,19 @@ export async function createAppFixture(
   const events = createEventStream()
   const calls = createFetch(input.fetch, events)
   const server = Bun.serve({ port: 0, fetch: (request) => calls.fetch(request) })
+  // Updates apply to an in-memory copy so settings changed in a test show on screen.
+  const config: Config.Info = structuredClone(input.config ?? { animations: false })
   const task = Effect.runPromise(
     run({
       app: { name: "test", version: "test", channel: "test" },
       server: { endpoint: { url: server.url.toString() } },
-      config: { get: async () => input.config ?? { animations: false }, update: async () => ({}) },
+      config: {
+        get: async () => config,
+        update: async (update) => {
+          update(config)
+          return structuredClone(config)
+        },
+      },
       packages: { prepare: async () => ({ directory: "" }) },
       terminalHandoff: async () => ({ renderer: setup.renderer, mode: "dark", complete: ready.resolve }),
       args: input.args ?? {},

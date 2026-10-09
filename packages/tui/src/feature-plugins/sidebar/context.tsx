@@ -3,6 +3,7 @@ import { createMemo, Show } from "solid-js"
 import { contextUsage } from "../../util/session"
 import { Locale } from "../../util/locale"
 import { SESSION_SIDEBAR_WIDTH } from "../../ui/layout"
+import { useT } from "../../util/i18n"
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -14,6 +15,7 @@ const BAR_WIDTH = SESSION_SIDEBAR_WIDTH - 5
 
 export function SidebarContext(props: { context: Plugin.Context; sessionID: string }) {
   const theme = props.context.theme
+  const t = useT()
   const msg = createMemo(() => props.context.data.session.message.list(props.sessionID))
   const session = createMemo(() => props.context.data.session.get(props.sessionID))
   const cost = createMemo(() => props.context.data.session.cost(props.sessionID))
@@ -33,9 +35,9 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
       <box>
         <box flexDirection="row" justifyContent="space-between">
           <text fg={theme.text.base}>
-            <b>Context</b>
+            <b>{t("Context")}</b>
           </text>
-          <Show when={state()?.percent}>{(percent) => <text fg={level(percent())}>{percent()}% used</text>}</Show>
+          <Show when={state()?.percent}>{(percent) => <text fg={level(percent())}>{t("{percent}% used", { percent: percent() })}</text>}</Show>
         </box>
         <Show when={state()?.percent}>
           {(percent) => {
@@ -53,13 +55,13 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
             {(value) => (
               <text fg={theme.text.muted} wrapMode="none">
                 {Locale.number(value().tokens)}
-                <Show when={value().limit}>{(limit) => ` / ${Locale.number(limit())}`}</Show> tokens
+                <Show when={value().limit}>{(limit) => ` / ${Locale.number(limit())}`}</Show> {t("tokens")}
               </text>
             )}
           </Show>
           <Show when={cost() > 0}>
             <text fg={theme.text.muted} wrapMode="none" flexShrink={0}>
-              {money.format(cost())} spent
+              {t("{cost} spent", { cost: money.format(cost()) })}
             </text>
           </Show>
         </box>

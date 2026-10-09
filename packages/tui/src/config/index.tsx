@@ -243,6 +243,9 @@ export const Info = Schema.Struct({
   experimental: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)).annotate({
     description: "Experimental features that may change or be removed at any time",
   }),
+  language: Schema.optional(Schema.Literals(["en", "ru"])).annotate({
+    description: "Interface language of the panels and room windows (default: en)",
+  }),
   animations: Schema.optional(Schema.Boolean).annotate({ description: "Enable interface animations" }),
   mouse: Schema.optional(Schema.Boolean).annotate({ description: "Enable terminal mouse capture" }),
   cursor: Schema.optional(Cursor),
@@ -366,6 +369,11 @@ export function ConfigProvider(props: {
   return (
     <ConfigContext.Provider value={{ data: config, path: host?.path, update }}>{props.children}</ConfigContext.Provider>
   )
+}
+
+// Components that may render outside the app (plugin slots in isolation) read config optionally.
+export function useOptionalConfig() {
+  return useContext(ConfigContext)
 }
 
 export function useConfig() {

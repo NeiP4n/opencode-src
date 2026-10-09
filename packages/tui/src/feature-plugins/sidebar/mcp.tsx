@@ -1,10 +1,12 @@
 import { Plugin } from "@opencode/plugin/tui"
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js"
 import { DialogMcp } from "../../component/dialog-mcp"
+import { useT } from "../../util/i18n"
 
 export function SidebarMcp(props: { context: Plugin.Context; sessionID: string }) {
   const [view, updateView] = props.context.storage.store("view", { initial: { open: true } })
   const theme = props.context.theme
+  const t = useT()
   const session = createMemo(() => props.context.data.session.get(props.sessionID))
   const list = createMemo(() => props.context.data.location.mcp.server.list(session()?.location) ?? [])
   const count = (status: string) => list().filter((item) => item.status.status === status).length
@@ -38,20 +40,20 @@ export function SidebarMcp(props: { context: Plugin.Context; sessionID: string }
             <b>MCP</b>
           </text>
           <text fg={theme.text.muted} wrapMode="none">
-            {count("connected")}/{list().length} connected
+            {t("{count}/{total} connected", { count: count("connected"), total: list().length })}
           </text>
         </box>
         {/* Expanded rows already show each problem; keep them visible while collapsed. */}
         <Show when={collapsed() && (count("failed") > 0 || count("needs_auth") > 0)}>
           <text wrapMode="none">
             <Show when={count("failed") > 0}>
-              <span style={{ fg: theme.text.feedback.error.base }}>{count("failed")} failed</span>
+              <span style={{ fg: theme.text.feedback.error.base }}>{t("{count} failed", { count: count("failed") })}</span>
             </Show>
             <Show when={count("failed") > 0 && count("needs_auth") > 0}>
               <span style={{ fg: theme.text.muted }}> · </span>
             </Show>
             <Show when={count("needs_auth") > 0}>
-              <span style={{ fg: theme.text.feedback.warning.base }}>{count("needs_auth")} need sign in</span>
+              <span style={{ fg: theme.text.feedback.warning.base }}>{t("{count} need sign in", { count: count("needs_auth") })}</span>
             </Show>
           </text>
         </Show>
@@ -90,11 +92,11 @@ export function SidebarMcp(props: { context: Plugin.Context; sessionID: string }
                     flexShrink={0}
                   >
                     <Switch fallback={item.status.status}>
-                      <Match when={item.status.status === "connected"}>Connected</Match>
-                      <Match when={item.status.status === "pending"}>Connecting</Match>
-                      <Match when={item.status.status === "failed"}>Error</Match>
-                      <Match when={item.status.status === "disabled"}>Disabled</Match>
-                      <Match when={item.status.status === "needs_auth"}>Sign in</Match>
+                      <Match when={item.status.status === "connected"}>{t("Connected")}</Match>
+                      <Match when={item.status.status === "pending"}>{t("Connecting")}</Match>
+                      <Match when={item.status.status === "failed"}>{t("Error")}</Match>
+                      <Match when={item.status.status === "disabled"}>{t("Disabled")}</Match>
+                      <Match when={item.status.status === "needs_auth"}>{t("Sign in")}</Match>
                     </Switch>
                   </text>
                 </box>
