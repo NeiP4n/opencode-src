@@ -91,10 +91,12 @@ echo "Installing dependencies…"
 (cd "$DIR" && bun install --frozen-lockfile --filter ./packages/cli)
 
 mkdir -p "$BIN"
+# The preload is passed by absolute path: bunfig.toml names it by package, and Bun resolves
+# that from the directory opencode is started in, so `opencode` failed outside the checkout.
 cat >"$BIN/opencode" <<WRAPPER
 #!/bin/sh
 # Opencode++ $VERSION, installed by opencode-pp-install.sh.
-exec "$(command -v bun)" --config="$DIR/packages/cli/bunfig.toml" "$DIR/packages/cli/src/index.ts" "\$@"
+exec "$(command -v bun)" --preload="$DIR/packages/cli/node_modules/@opentui/solid/scripts/preload.js" "$DIR/packages/cli/src/index.ts" "\$@"
 WRAPPER
 chmod +x "$BIN/opencode"
 

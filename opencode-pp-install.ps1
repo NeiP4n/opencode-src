@@ -78,9 +78,11 @@ if ($Installed -ne 0) { throw "bun install failed." }
 New-Item -ItemType Directory -Force -Path $Bin | Out-Null
 $Bun = (Get-Command bun).Source
 $Cli = Join-Path $Source "packages\cli"
+# The preload goes by absolute path: bunfig.toml names it by package, which Bun resolves from
+# the directory opencode is started in, so the command failed outside the checkout.
 Set-Content -Path (Join-Path $Bin "opencode.cmd") -Encoding ASCII -Value @"
 @echo off
-"$Bun" --config="$Cli\bunfig.toml" "$Cli\src\index.ts" %*
+"$Bun" --preload="$Cli\node_modules\@opentui\solid\scripts\preload.js" "$Cli\src\index.ts" %*
 "@
 
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
