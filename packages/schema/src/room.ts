@@ -25,6 +25,8 @@ export const Info = Schema.Struct({
   ai: AiMessaging,
   // Whether guests may answer the model's permission requests; otherwise only the host can.
   guestApprovals: Schema.Boolean,
+  // Whether guests may join without a code; absent on rooms saved before the option existed.
+  open: Schema.Boolean.pipe(Schema.optional),
   created: Schema.Number,
 }).annotate({ identifier: "Room.Info" })
 export interface Info extends Schema.Schema.Type<typeof Info> {}

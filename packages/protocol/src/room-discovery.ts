@@ -6,6 +6,9 @@
 import { Option, Schema } from "effect"
 
 export const PORT = 41499
+// Guests listen for answers on this fixed port so a firewall rule can let them in;
+// Windows drops answers to a random port when the app has a block rule.
+export const REPLY_PORT = 41500
 export const QUERY = "opencode-rooms?"
 
 const ReplySchema = Schema.Struct({ name: Schema.String, port: Schema.Int })

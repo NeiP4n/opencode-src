@@ -118,7 +118,10 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
         rooms
           .list()
           .pipe(
-            Effect.map((list) => ({ host: hostname(), rooms: list.map((room) => ({ id: room.id, name: room.name })) })),
+            Effect.map((list) => ({
+              host: hostname(),
+              rooms: list.map((room) => ({ id: room.id, name: room.name, open: room.open === true })),
+            })),
           ),
       )
       .handle(
@@ -127,10 +130,14 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
           const name = ctx.payload.name.trim()
           if (name === "" || name.length > 64)
             return yield* new InvalidRequestError({ message: "Name must be 1 to 64 characters", field: "name" })
-          const roomID = yield* codes.redeemCode(ctx.payload.code)
+          const code = ctx.payload.code?.trim()
+          const roomID = code ? yield* codes.redeemCode(code) : ctx.payload.roomID
           // A code can outlive its room; both cases read the same to the guest.
           const room = roomID ? yield* rooms.get(roomID).pipe(Effect.orElseSucceed(() => undefined)) : undefined
-          if (!room) return yield* new UnauthorizedError({ message: "Join code is wrong or expired" })
+          if (!room || (!code && !room.open))
+            return yield* new UnauthorizedError({
+              message: code ? "Join code is wrong or expired" : "This room needs the join code its host shows",
+            })
           return { ...ServerRooms.issueToken(auth, room.id, name), room }
         }),
       )

@@ -47,6 +47,7 @@ export const RoomGroup = HttpApiGroup.make("server.room")
         name: Schema.String.pipe(Schema.optional),
         ai: Room.AiMessaging.pipe(Schema.optional),
         guestApprovals: Schema.Boolean.pipe(Schema.optional),
+        open: Schema.Boolean.pipe(Schema.optional),
       }),
       success: Schema.Struct({ data: Room.Info }),
       error: SessionNotFoundError,
@@ -65,6 +66,7 @@ export const RoomGroup = HttpApiGroup.make("server.room")
         name: Schema.String.pipe(Schema.optional),
         ai: Room.AiMessaging.pipe(Schema.optional),
         guestApprovals: Schema.Boolean.pipe(Schema.optional),
+        open: Schema.Boolean.pipe(Schema.optional),
       }),
       success: Schema.Struct({ data: Room.Info }),
       error: RoomNotFoundError,
@@ -106,27 +108,32 @@ export const RoomGroup = HttpApiGroup.make("server.room")
     HttpApiEndpoint.get("room.public", "/api/room/public", {
       success: Schema.Struct({
         host: Schema.String,
-        rooms: Schema.Array(Schema.Struct({ id: Room.ID, name: Schema.String })),
+        rooms: Schema.Array(Schema.Struct({ id: Room.ID, name: Schema.String, open: Schema.Boolean })),
       }),
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "room.public",
         summary: "List joinable rooms",
         description:
-          "Names of the rooms this host shares, for devices looking for rooms on the network. Joining still needs a code.",
+          "Names of the rooms this host shares, for devices looking for rooms on the network, and whether each one lets guests in without a code.",
       }),
     ),
   )
   .add(
     HttpApiEndpoint.post("room.join", "/api/room/join", {
-      payload: Schema.Struct({ code: Schema.String, name: Schema.String }),
+      // An open room is joined by its ID; any other room needs the code its host hands out.
+      payload: Schema.Struct({
+        code: Schema.String.pipe(Schema.optional),
+        roomID: Room.ID.pipe(Schema.optional),
+        name: Schema.String,
+      }),
       success: Room.Joined,
       error: [UnauthorizedError, InvalidRequestError],
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "room.join",
         summary: "Join room",
-        description: "Redeem a join code for a guest token scoped to one room.",
+        description: "Redeem a join code, or name an open room, for a guest token scoped to one room.",
       }),
     ),
   )

@@ -20,6 +20,7 @@ export const CreateInput = Schema.Struct({
   name: Schema.String.pipe(Schema.optional),
   ai: Room.AiMessaging.pipe(Schema.optional),
   guestApprovals: Schema.Boolean.pipe(Schema.optional),
+  open: Schema.Boolean.pipe(Schema.optional),
 }).annotate({ identifier: "Room.CreateInput" })
 export type CreateInput = typeof CreateInput.Type
 
@@ -27,6 +28,7 @@ export const UpdateInput = Schema.Struct({
   name: Schema.String.pipe(Schema.optional),
   ai: Room.AiMessaging.pipe(Schema.optional),
   guestApprovals: Schema.Boolean.pipe(Schema.optional),
+  open: Schema.Boolean.pipe(Schema.optional),
 }).annotate({ identifier: "Room.UpdateInput" })
 export type UpdateInput = typeof UpdateInput.Type
 
@@ -77,6 +79,7 @@ const layer = Layer.effect(
           name: input.name?.trim() || "Room",
           ai: input.ai ?? "linked",
           guestApprovals: input.guestApprovals ?? false,
+          open: input.open ?? false,
           created: Date.now(),
         })
       }),
@@ -87,6 +90,7 @@ const layer = Layer.effect(
           name: input.name?.trim() || room.name,
           ai: input.ai ?? room.ai,
           guestApprovals: input.guestApprovals ?? room.guestApprovals,
+          open: input.open ?? room.open ?? false,
         })
       }),
       remove: Effect.fn("Room.remove")(function* (id: ID) {

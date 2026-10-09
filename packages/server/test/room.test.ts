@@ -105,8 +105,24 @@ it.live("devices on the network see room names without a credential", () =>
     const { call, room } = yield* setup
     const listed = yield* call("/api/room/public")
     expect(listed.status).toBe(200)
-    expect(listed.body.rooms).toEqual([{ id: room.id, name: "Lab" }])
+    expect(listed.body.rooms).toEqual([{ id: room.id, name: "Lab", open: false }])
     expect(typeof listed.body.host).toBe("string")
+  }).pipe(Effect.scoped),
+)
+
+it.live("an open room admits guests by its ID without a code; a closed one does not", () =>
+  Effect.gen(function* () {
+    const { call, room } = yield* setup
+    const closed = yield* call("/api/room/join", { method: "POST", body: { roomID: room.id, name: "Phone" } })
+    expect(closed.status).toBe(401)
+
+    yield* call(`/api/room/${room.id}`, { method: "PATCH", headers: host, body: { open: true } })
+    expect((yield* call("/api/room/public")).body.rooms).toEqual([{ id: room.id, name: "Lab", open: true }])
+    const joined = yield* call("/api/room/join", { method: "POST", body: { roomID: room.id, name: "Phone" } })
+    expect(joined.status).toBe(200)
+    expect(joined.body.room).toMatchObject({ id: room.id, open: true })
+    const view = yield* call(`/api/room/${room.id}/guest`, { headers: { authorization: `Bearer ${joined.body.token}` } })
+    expect(view.status).toBe(200)
   }).pipe(Effect.scoped),
 )
 
