@@ -44,8 +44,8 @@ ${render(current)}`
     (namespace) => namespace.name,
     (before, after) => before.description !== after.description,
   )
-  if (descriptions.added.length > 0 || descriptions.removed.length > 0 || descriptions.changed.length > 0)
-    return replacement
+  if (descriptions.changed.length > 0) return replacement
+  if (currentComplete && (descriptions.added.length > 0 || descriptions.removed.length > 0)) return replacement
 
   const diff = Instructions.diffByKey(
     previous.namespaces.flatMap((namespace) => namespace.entries),
@@ -55,23 +55,38 @@ ${render(current)}`
   )
   const entriesChanged = diff.added.length > 0 || diff.removed.length > 0 || diff.changed.length > 0
 
+  // A partial catalog's entries are only examples and the model finds the rest with
+  // `search`, so tools moving in or out of them need no restatement. MCP servers that
+  // connect one by one would otherwise append the whole catalog to history each time.
   if (!currentComplete) {
-    if (entriesChanged) return replacement
     const namespaces = Instructions.diffByKey(
       previous.namespaces,
       current.namespaces,
       (namespace) => namespace.name,
       (before, after) => before.count !== after.count,
     )
-    const changed = namespaces.added.length > 0 || namespaces.removed.length > 0 || namespaces.changed.length > 0
+    const changed =
+      namespaces.added.length > 0 ||
+      namespaces.removed.length > 0 ||
+      namespaces.changed.length > 0 ||
+      diff.changed.length > 0
     if (!changed) return replacement
 
     const parts = ["The Code Mode tool catalog has changed."]
     if (namespaces.added.length > 0) {
       parts.push(
-        `New tool namespaces are available: ${namespaces.added
-          .map((namespace) => `\`${namespace.name}\` (${namespace.count} tools)`)
-          .join(", ")}.`,
+        [
+          "New tool namespaces are available; find their tools with `search`:",
+          ...namespaces.added.map((namespace) => CodeModeCatalog.namespaceLine({ ...namespace, entries: [] })),
+        ].join("\n"),
+      )
+    }
+    if (diff.changed.length > 0) {
+      parts.push(
+        [
+          "Changed tool listings supersede the previously listed ones:",
+          ...diff.changed.map((change) => change.current.line),
+        ].join("\n"),
       )
     }
     if (namespaces.changed.length > 0) {

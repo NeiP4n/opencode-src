@@ -237,6 +237,15 @@ describe("CodeModeInstructions.update", () => {
     expect(text).not.toContain("The following tools are no longer available")
   })
 
+  test("a server connecting to a partial catalog adds a namespace line, not the whole catalog again", () => {
+    const alpha = Array.from({ length: 40 }, (_, index) => entry(`alpha.tool${index}`, `Tool ${index}`))
+    const docs = { type: "namespace" as const, name: "docs", description: "Library docs", tools: [entry("docs.find", "Find")] }
+    const text = update(alpha, [...alpha, docs], 30)
+    expect(text).toContain("New tool namespaces are available; find their tools with `search`:\n- docs (1 tool, none shown) // Library docs")
+    expect(text).not.toContain("This catalog supersedes")
+    expect(text).not.toContain("## Available tools")
+  })
+
   test("renders namespace-only deltas without persisting hidden tool entries", () => {
     const alpha = Array.from({ length: 10 }, (_, index) => entry(`alpha.tool${index}`, `Tool ${index}`))
     const text = update(alpha, [...alpha, entry("alpha.tool10", "Tool 10")], 0)
