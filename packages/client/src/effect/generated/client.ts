@@ -377,6 +377,9 @@ import type {
   OrchestraProjectMainOutput,
   OrchestraProjectSessionsInput,
   OrchestraProjectSessionsOutput,
+  OrchestraOwnerListOutput,
+  OrchestraOwnerSetInput,
+  OrchestraOwnerSetOutput,
   OrchestraAccessInput,
   OrchestraAccessOutput,
   OrchestraCategoryInput,
@@ -2236,6 +2239,17 @@ const EndpointOrchestraProjectSessions =
       ),
     )
 
+const EndpointOrchestraOwnerList = (raw: RawClient["server.orchestra"]) => () =>
+  preserveEffect<OrchestraOwnerListOutput>()(raw["orchestra.owner.list"]({}).pipe(Effect.mapError(mapClientError)))
+
+const EndpointOrchestraOwnerSet = (raw: RawClient["server.orchestra"]) => (input: OrchestraOwnerSetInput) =>
+  preserveEffect<OrchestraOwnerSetOutput>()(
+    raw["orchestra.owner.set"]({
+      params: { sessionID: input["sessionID"] },
+      payload: { projectID: input["projectID"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointOrchestraAccess = (raw: RawClient["server.orchestra"]) => (input: OrchestraAccessInput) =>
   preserveEffect<OrchestraAccessOutput>()(
     raw["orchestra.access"]({ params: { sessionID: input["sessionID"] }, payload: { access: input["access"] } }).pipe(
@@ -2272,6 +2286,7 @@ const adaptGroupOrchestra = (raw: RawClient["server.orchestra"]) => ({
     update: EndpointOrchestraRoleUpdate(raw),
     remove: EndpointOrchestraRoleRemove(raw),
   },
+  owner: { list: EndpointOrchestraOwnerList(raw), set: EndpointOrchestraOwnerSet(raw) },
   access: EndpointOrchestraAccess(raw),
   category: EndpointOrchestraCategory(raw),
 })

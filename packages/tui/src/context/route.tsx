@@ -9,6 +9,8 @@ export type HomeRoute = {
   prompt?: PromptInfo
   // Location carried over from the previous session or project picker so a new session lands there.
   location?: LocationRef
+  // The project whose "+ New session" opened home; the new session stays with it.
+  project?: string
 }
 
 export type SessionRoute = {

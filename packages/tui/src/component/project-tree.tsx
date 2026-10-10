@@ -66,17 +66,14 @@ export function ProjectTree(props: { width: number }) {
   // only on the hovered session.
   const narrow = () => props.width < 36
   const shared = createMemo(() => new Set((rooms.latest ?? []).map((room) => room.sessionID)))
-  const owner = (directory: string) =>
-    // The deepest project wins when one project directory sits inside another.
-    projects()
-      .filter((project) => Orchestra.contains(project.directory, directory))
-      .toSorted((a, b) => b.directory.length - a.directory.length)[0]
+  const owner = (session: { id: string; location: { directory: string } }) =>
+    Orchestra.ownerOf(projects(), session.location.directory, projectList.owner(session.id))
 
   const sessionProject = () => {
     const session = current()
     return (
       session &&
-      projects().find((item) => item.main === session.id || owner(session.location.directory)?.id === item.id)
+      projects().find((item) => item.main === session.id || owner(session)?.id === item.id)
     )
   }
 
@@ -210,7 +207,7 @@ export function ProjectTree(props: { width: number }) {
           !session.parentID &&
           !removed[session.id] &&
           session.id !== project.main &&
-          owner(session.location.directory)?.id === project.id,
+          owner(session)?.id === project.id,
       )
 
   // Categories in first-seen order; sessions without one come last, under "Other"

@@ -3856,6 +3856,15 @@ export type OrchestraProjectSessionsOperation<E = never> = (
   input: OrchestraProjectSessionsInput,
 ) => Effect.Effect<OrchestraProjectSessionsOutput, E>
 
+export type OrchestraOwnerListOutput = { readonly [x: string]: Orchestra.ProjectID }
+export type OrchestraOwnerListOperation<E = never> = () => Effect.Effect<OrchestraOwnerListOutput, E>
+
+export type OrchestraOwnerSetInput = { readonly sessionID: Session.ID; readonly projectID: Orchestra.ProjectID }
+export type OrchestraOwnerSetOutput = void
+export type OrchestraOwnerSetOperation<E = never> = (
+  input: OrchestraOwnerSetInput,
+) => Effect.Effect<OrchestraOwnerSetOutput, E>
+
 export type OrchestraAccessInput = { readonly sessionID: Session.ID; readonly access: Orchestra.Access }
 export type OrchestraAccessOutput = void
 export type OrchestraAccessOperation<E = never> = (
@@ -3889,6 +3898,7 @@ export interface OrchestraApi<E = never> {
     readonly update: OrchestraRoleUpdateOperation<E>
     readonly remove: OrchestraRoleRemoveOperation<E>
   }
+  readonly owner: { readonly list: OrchestraOwnerListOperation<E>; readonly set: OrchestraOwnerSetOperation<E> }
   readonly access: OrchestraAccessOperation<E>
   readonly category: OrchestraCategoryOperation<E>
 }

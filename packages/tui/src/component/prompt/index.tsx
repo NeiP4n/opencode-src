@@ -78,6 +78,8 @@ export type PromptProps = {
   disabled?: boolean
   muted?: boolean
   onSubmit?: () => void
+  // A submit created a new session; `request` settles when the server has it.
+  onCreate?: (sessionID: string, request: Promise<unknown>) => void
   onEmptySubmit?: () => boolean | Promise<boolean>
   ref?: (ref: PromptRef | undefined) => void
   placeholders?: {
@@ -1241,6 +1243,7 @@ export function Prompt(props: PromptProps) {
         },
       })
       if (newSessionID !== undefined) created.request.catch(() => args.restoreNewSessionID(newSessionID))
+      props.onCreate?.(created.id, created.request)
       sessionID = created.id
       session = data.session.get(created.id)
       newSession = {

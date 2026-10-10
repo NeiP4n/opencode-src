@@ -201,6 +201,32 @@ export const OrchestraGroup = HttpApiGroup.make("server.orchestra")
     ),
   )
   .add(
+    HttpApiEndpoint.get("orchestra.owner.list", "/api/orchestra/owner", {
+      success: Schema.Record(Schema.String, Orchestra.ProjectID),
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.owner.list",
+        summary: "List session owners",
+        description:
+          "The project that opened each session a project opened, by session ID. Other sessions belong to the deepest project containing their directory.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.put("orchestra.owner.set", "/api/orchestra/owner/:sessionID", {
+      params: { sessionID: Session.ID },
+      payload: Schema.Struct({ projectID: Orchestra.ProjectID }),
+      success: HttpApiSchema.NoContent,
+      error: [SessionNotFoundError, ProjectNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "orchestra.owner.set",
+        summary: "Set session owner",
+        description: "Keep a session with the project that opened it, even when other projects share its directory.",
+      }),
+    ),
+  )
+  .add(
     HttpApiEndpoint.put("orchestra.access", "/api/orchestra/access/:sessionID", {
       params: { sessionID: Session.ID },
       payload: Schema.Struct({ access: Orchestra.Access }),

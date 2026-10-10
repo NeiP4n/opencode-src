@@ -375,6 +375,9 @@ import type {
   OrchestraProjectMainOutput,
   OrchestraProjectSessionsInput,
   OrchestraProjectSessionsOutput,
+  OrchestraOwnerListOutput,
+  OrchestraOwnerSetInput,
+  OrchestraOwnerSetOutput,
   OrchestraAccessInput,
   OrchestraAccessOutput,
   OrchestraCategoryInput,
@@ -3074,6 +3077,31 @@ export function make(options: ClientOptions) {
               path: `/api/orchestra/role/${encodeURIComponent(input.roleID)}`,
               successStatus: 204,
               declaredStatuses: [400, 401],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
+      owner: {
+        list: (requestOptions?: RequestOptions) =>
+          request<OrchestraOwnerListOutput>(
+            {
+              method: "GET",
+              path: `/api/orchestra/owner`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        set: (input: OrchestraOwnerSetInput, requestOptions?: RequestOptions) =>
+          request<OrchestraOwnerSetOutput>(
+            {
+              method: "PUT",
+              path: `/api/orchestra/owner/${encodeURIComponent(input.sessionID)}`,
+              body: { projectID: input["projectID"] },
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
               empty: true,
             },
             requestOptions,

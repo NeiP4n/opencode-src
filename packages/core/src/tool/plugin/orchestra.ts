@@ -60,11 +60,7 @@ export const Plugin = {
         .get(sessionID)
         .pipe(Effect.mapError(() => new ToolFailure({ message: `Session not found: ${sessionID}` })))
       const access = yield* orchestra.access(session.id)
-      if (
-        session.id === project.main ||
-        access === "hidden" ||
-        !Orchestra.contains(project.directory, session.location.directory)
-      )
+      if (session.id === project.main || access === "hidden" || !(yield* orchestra.owns(project, session)))
         return yield* new ToolFailure({ message: `Session not found: ${sessionID}` })
       if (!Orchestra.allows(access, required))
         return yield* new ToolFailure({
@@ -158,8 +154,12 @@ export const Plugin = {
                     return yield* new ToolFailure({
                       message: `Unknown role ${input.role}. Roles: ${roles.map((role) => role.id).join(", ")}`,
                     })
+                  // Claimed first, so the new member never shows up in another project's team.
+                  const id = SessionSchema.ID.create()
+                  yield* orchestra.claim(id, project.id).pipe(Effect.orDie)
                   const created = yield* sessions
                     .create({
+                      id,
                       location: { directory: AbsolutePath.make(project.directory) },
                       title: input.title?.trim() || undefined,
                       agent: role?.agent,

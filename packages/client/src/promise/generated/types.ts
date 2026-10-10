@@ -7781,6 +7781,15 @@ export type OrchestraProjectSessionsOutput = {
   category: { [x: string]: string }
 }
 
+export type OrchestraOwnerListOutput = { [x: string]: string }
+
+export type OrchestraOwnerSetInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly projectID: { readonly projectID: string }["projectID"]
+}
+
+export type OrchestraOwnerSetOutput = void
+
 export type OrchestraAccessInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]
   readonly access: { readonly access: "hidden" | "read" | "write" | "full" }["access"]

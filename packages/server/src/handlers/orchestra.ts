@@ -103,6 +103,17 @@ export const OrchestraHandler = HttpApiBuilder.group(Api, "server.orchestra", (h
           return { data, access: yield* orchestra.accessMany(ids), category: yield* orchestra.categories(ids) }
         }),
       )
+      .handle("orchestra.owner.list", () => orchestra.owners())
+      .handle(
+        "orchestra.owner.set",
+        Effect.fn(function* (ctx) {
+          yield* sessions.get(ctx.params.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          yield* orchestra
+            .claim(ctx.params.sessionID, ctx.payload.projectID)
+            .pipe(Effect.catchTag("Orchestra.ProjectNotFoundError", missingProject))
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
       .handle(
         "orchestra.category",
         Effect.fn(function* (ctx) {

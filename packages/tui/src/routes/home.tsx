@@ -8,6 +8,9 @@ import { useLocal } from "../context/local"
 import { useEditorContext } from "../context/editor"
 import { useData } from "../context/data"
 import { useLocation } from "../context/location"
+import { useProjects } from "../context/projects"
+import { useToast } from "../ui/toast"
+import { errorMessage } from "../util/error"
 import { FormPrompt } from "./session/form"
 import { Slot } from "../plugin/render"
 import { useTerminalDimensions } from "@opentui/solid"
@@ -31,6 +34,8 @@ export function Home() {
   const editor = useEditorContext()
   const data = useData()
   const location = useLocation()
+  const projects = useProjects()
+  const toast = useToast()
   const dimensions = useTerminalDimensions()
   const [logoWidth, setLogoWidth] = createSignal(0)
   // Global MCP elicitations can arrive without a session route, so keep them reachable from Home.
@@ -99,7 +104,19 @@ export function Home() {
         <box height={1} flexShrink={0} />
         <UpdateNotification width={logoWidth()} />
         <box width="100%" maxWidth={75} zIndex={1000} paddingTop={1} flexShrink={0} position="relative">
-          <Prompt ref={bind} placeholders={placeholder} disabled={forms().length > 0} />
+          <Prompt
+            ref={bind}
+            placeholders={placeholder}
+            disabled={forms().length > 0}
+            onCreate={(sessionID, request) => {
+              // Opened from a project's "+ New session": it stays with that project even
+              // when other projects share the directory.
+              if (!route.project) return
+              projects
+                .claim(sessionID, route.project, request)
+                .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
+            }}
+          />
         </box>
         <box flexGrow={1} minHeight={0} />
       </box>

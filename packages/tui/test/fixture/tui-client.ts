@@ -175,6 +175,7 @@ export function createFetch(override?: FetchHandler, events?: ReturnType<typeof 
     if (url.pathname === "/api/note" && request.method === "GET")
       return json({ location: { directory, project: { id: "proj_test", directory: worktree } }, data: [] })
     if (url.pathname === "/api/orchestra/project") return json([])
+    if (url.pathname === "/api/orchestra/owner") return json({})
     throw new Error(`unexpected request: ${url.pathname}`)
   }
   fetch.preconnect = () => {}

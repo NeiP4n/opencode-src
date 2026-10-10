@@ -73,14 +73,11 @@ export function DialogHost(props: { onClose?: () => void }) {
     setCodes((previous) => ({ ...previous, [roomID]: { ...issued, until: Date.now() + issued.expires_in * 1000 } }))
   }
 
-  // The project the open session belongs to: the deepest project directory holding it.
+  // The project the open session belongs to.
   const project = () => {
     const session = sessionID() ? data.session.get(sessionID()!) : undefined
     if (!session) return
-    return projects
-      .list()
-      .filter((item) => Orchestra.contains(item.directory, session.location.directory))
-      .toSorted((a, b) => b.directory.length - a.directory.length)[0]
+    return Orchestra.ownerOf(projects.list(), session.location.directory, projects.owner(session.id))
   }
 
   // A new room is useless without a code, so hosting hands one out right away. A project

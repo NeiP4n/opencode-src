@@ -103,7 +103,9 @@ const it = testEffect(
     [
       SessionExecution.node.replace(executionNode),
       Global.node.replace(tempGlobalLayer),
-      Location.node.replace(Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make("/project") })))),
+      Location.node.replace(
+        Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make("/project") }))),
+      ),
       offlineModels,
     ],
   ),
@@ -157,9 +159,29 @@ describe("Orchestra team", () => {
       const ownIDs = (yield* orchestra.sessions(project.id)).map((session) => session.id)
       expect(ownIDs).not.toContain(neighbour.main)
       expect((yield* orchestra.sessions(neighbour.id)).map((session) => session.id)).not.toContain(main)
+      // and neither team is copied into the other one
+      expect(ownIDs.toSorted()).toEqual(members.map((session) => session.id).toSorted())
+      const theirs = yield* orchestra.sessions(neighbour.id)
+      expect(theirs.map((session) => session.agent).toSorted()).toEqual([
+        Orchestra.role("reviewer"),
+        Orchestra.role("writer"),
+      ])
+      expect(yield* orchestra.owns(project, theirs[0])).toBe(false)
+      expect(yield* orchestra.owns(neighbour, theirs[0])).toBe(true)
+
+      // a session no project opened goes to the oldest project in the directory until one claims it
+      const sessions = yield* Session.Service
+      const loose = yield* sessions.create({ location: { directory: developer.location.directory } })
+      expect(yield* orchestra.owns(project, loose)).toBe(true)
+      yield* orchestra.claim(loose.id, neighbour.id)
+      expect(yield* orchestra.owns(project, loose)).toBe(false)
+      expect((yield* orchestra.sessions(neighbour.id)).map((session) => session.id)).toContain(loose.id)
+      // forgetting a project hands its sessions back to the directory rule
+      yield* orchestra.remove(neighbour.id)
+      expect(yield* orchestra.owners()).not.toHaveProperty(loose.id)
+      expect(yield* orchestra.owns(project, loose)).toBe(true)
 
       // a run the operator started themselves is not reported
-      const sessions = yield* Session.Service
       yield* sessions.prompt({ sessionID: developer.id, text: "operator's own question" })
       yield* Effect.sleep("50 millis")
       expect(yield* reports(main)).toHaveLength(1)
@@ -246,7 +268,11 @@ describe("Orchestra team", () => {
       const invalid = yield* orchestra.saveRole(undefined, { ...auditor, model: "no-slash" }).pipe(Effect.flip)
       expect(invalid.field).toBe("model")
       const unknown = yield* orchestra
-        .saveTemplate(undefined, { name: "X", description: "", members: [{ agent: Orchestra.role("nobody"), title: "", category: "" }] })
+        .saveTemplate(undefined, {
+          name: "X",
+          description: "",
+          members: [{ agent: Orchestra.role("nobody"), title: "", category: "" }],
+        })
         .pipe(Effect.flip)
       expect(unknown.field).toBe("members")
     }).pipe(Effect.scoped),

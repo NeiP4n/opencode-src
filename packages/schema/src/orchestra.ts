@@ -38,8 +38,8 @@ export const ProjectID = Schema.String.check(Schema.isStartsWith("prj")).pipe(
 export type ProjectID = typeof ProjectID.Type
 
 // A project the operator created: a name and a directory. Its sessions are the
-// sessions opened in that directory or below it; `main` is its orchestra
-// session, absent until it is opened the first time.
+// ones it opened and the others in that directory or below it (see ownerOf);
+// `main` is its orchestra session, absent until it is opened the first time.
 export const Project = Schema.Struct({
   id: ProjectID,
   name: Schema.String,
@@ -55,6 +55,23 @@ export function contains(project: string, directory: string) {
   const root =
     project.endsWith("/") || project.endsWith("\\") ? project : project + (project.includes("\\") ? "\\" : "/")
   return directory.startsWith(root)
+}
+
+// The project a session belongs to. A session a project opened stays with it, so
+// several projects can share one directory without seeing each other's team. Any
+// other session goes to the deepest project containing its directory, the oldest
+// one when several share that directory.
+export function ownerOf<T extends Pick<Project, "directory" | "created"> & { id: string }>(
+  projects: ReadonlyArray<T>,
+  directory: string,
+  claimed?: string,
+) {
+  return (
+    projects.find((project) => project.id === claimed) ??
+    projects
+      .filter((project) => contains(project.directory, directory))
+      .toSorted((a, b) => b.directory.length - a.directory.length || a.created - b.created)[0]
+  )
 }
 
 // Where a role or team comes from. "builtin" ships with opencode, "edited" is

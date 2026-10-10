@@ -21,6 +21,7 @@ export const Access = Orchestra.Access
 export type Access = Orchestra.Access
 export const allows = Orchestra.allows
 export const contains = Orchestra.contains
+export const ownerOf = Orchestra.ownerOf
 export const Project = Orchestra.Project
 export type Project = Orchestra.Project
 export const ProjectID = Orchestra.ProjectID
@@ -74,8 +75,14 @@ export interface Interface {
   readonly remove: (id: ProjectID) => Effect.Effect<void, ProjectNotFoundError>
   // The project's main session, created in the project's directory on first use.
   readonly main: (id: ProjectID) => Effect.Effect<SessionSchema.Info, ProjectNotFoundError>
-  // Top-level sessions opened in the project's directory or below it, every project's main session excluded.
+  // Top-level sessions the project owns (see ownerOf), every project's main session excluded.
   readonly sessions: (id: ProjectID) => Effect.Effect<ReadonlyArray<SessionSchema.Info>, ProjectNotFoundError>
+  // Whether a session belongs to the project, so the orchestrator never reaches another project's team.
+  readonly owns: (project: Project, session: SessionSchema.Info) => Effect.Effect<boolean>
+  // Which project opened each session that a project opened, by session ID.
+  readonly owners: () => Effect.Effect<Record<string, ProjectID>>
+  // Records that the project opened this session, so it stays with it in a shared directory.
+  readonly claim: (sessionID: SessionID, projectID: ProjectID) => Effect.Effect<void, ProjectNotFoundError>
   // The project whose main session this is, if any.
   readonly mainOf: (sessionID: SessionID) => Effect.Effect<Project | undefined>
   readonly access: (sessionID: SessionID) => Effect.Effect<Access>
@@ -118,12 +125,15 @@ const CATEGORY = "orchestra/category/"
 const TASK = "orchestra/task/"
 const ROLE = "orchestra/role/"
 const TEMPLATE = "orchestra/template/"
+// The project that opened a session. Without it, every project in one directory would share one team.
+const OWNER = "orchestra/owner/"
 // Reports longer than this are cut; the orchestrator reads the rest with the sessions tool.
 const REPORT_LIMIT = 6000
 // How many recent top-level sessions are scanned when listing a project.
 const SCAN_LIMIT = 500
 const decodeProject = Schema.decodeUnknownOption(Project)
 const decodeAccess = Schema.decodeUnknownOption(Access)
+const decodeProjectID = Schema.decodeUnknownOption(ProjectID)
 // A task that is waiting for its report: which main session to deliver it to and when it was sent.
 const Task = Schema.Struct({ main: SessionID, sent: Schema.Number })
 const decodeTask = Schema.decodeUnknownOption(Task)
@@ -157,6 +167,29 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
       return project.value
     })
 
+    const owners = Effect.fn("Orchestra.owners")(function* () {
+      const read = (after?: string): Effect.Effect<KV.Entry[]> =>
+        kv
+          .scan({ prefix: OWNER, after, limit: 1000 })
+          .pipe(
+            Effect.flatMap((result) =>
+              result.next
+                ? read(result.next).pipe(Effect.map((rest) => [...result.entries, ...rest]))
+                : Effect.succeed([...result.entries]),
+            ),
+          )
+      return Object.fromEntries(
+        (yield* read()).flatMap((entry) =>
+          Option.toArray(decodeProjectID(entry.value)).map((id) => [entry.key.slice(OWNER.length), id]),
+        ),
+      )
+    })
+
+    const owns = Effect.fn("Orchestra.owns")(function* (project: Project, session: SessionSchema.Info) {
+      const claimed = Option.getOrUndefined(decodeProjectID(yield* kv.get(OWNER + session.id)))
+      return Orchestra.ownerOf(yield* projects(), session.location.directory, claimed)?.id === project.id
+    })
+
     const save = (project: Project) =>
       kv.set(PROJECT + project.id, Schema.encodeSync(Project)(project)).pipe(Effect.as(project))
 
@@ -168,8 +201,11 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
     })
 
     const mainSession = Effect.fnUntraced(function* (project: Project) {
+      const id = SessionID.create()
+      yield* kv.set(OWNER + id, project.id)
       const created = yield* sessions
         .create({
+          id,
           location: { directory: AbsolutePath.make(project.directory) },
           title: `${project.name} · Orchestrator`,
           agent: Orchestra.agent,
@@ -271,9 +307,7 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
     return Service.of({
       projects,
       create: Effect.fn("Orchestra.create")(function* (input) {
-        const template = input.template
-          ? (yield* templates()).find((item) => item.id === input.template)
-          : undefined
+        const template = input.template ? (yield* templates()).find((item) => item.id === input.template) : undefined
         if (input.template && !template) return yield* new TemplateNotFoundError({ template: input.template })
         const resolved = yield* directory(input.directory)
         const project = yield* save({
@@ -287,20 +321,23 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
         // Sessions list newest first, so opening the last member first shows the team in template order.
         yield* Effect.forEach(
           template.members.toReversed(),
-          (member) =>
-            sessions
-              .create({
-                location: { directory: AbsolutePath.make(resolved) },
-                title: member.title,
-                agent: member.agent,
-                model: modelOf(team.find((role) => role.agent === member.agent)),
-              })
-              .pipe(
-                Effect.orDie,
-                Effect.flatMap((session) =>
-                  Effect.all([kv.set(ACCESS + session.id, "full"), kv.set(CATEGORY + session.id, member.category)]),
-                ),
+          (member) => {
+            // Claimed before it exists, so nothing ever lists the session under another project.
+            const id = SessionID.create()
+            return kv.set(OWNER + id, project.id).pipe(
+              Effect.andThen(
+                sessions.create({
+                  id,
+                  location: { directory: AbsolutePath.make(resolved) },
+                  title: member.title,
+                  agent: member.agent,
+                  model: modelOf(team.find((role) => role.agent === member.agent)),
+                }),
               ),
+              Effect.orDie,
+              Effect.andThen(Effect.all([kv.set(ACCESS + id, "full"), kv.set(CATEGORY + id, member.category)])),
+            )
+          },
           { discard: true },
         )
         const main = yield* mainSession(project)
@@ -317,6 +354,13 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
       remove: Effect.fn("Orchestra.remove")(function* (id) {
         yield* get(id)
         yield* kv.remove(PROJECT + id)
+        // Its sessions go back to whichever project contains their directory.
+        const claims = yield* owners()
+        yield* Effect.forEach(
+          Object.keys(claims).filter((sessionID) => claims[sessionID] === id),
+          (sessionID) => kv.remove(OWNER + sessionID),
+          { discard: true },
+        )
       }),
       main: Effect.fn("Orchestra.main")(function* (id) {
         const project = yield* get(id)
@@ -331,14 +375,22 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
       }),
       sessions: Effect.fn("Orchestra.sessions")(function* (id) {
         const project = yield* get(id)
+        const all = yield* projects()
+        const claims = yield* owners()
         const recent = (yield* sessions.list({ parentID: null, limit: SCAN_LIMIT, order: "desc" })).data
         // Another project in the same directory has its own orchestrator; it never joins this team.
         return recent.filter(
           (session) =>
             session.id !== project.main &&
             session.agent !== Orchestra.agent &&
-            Orchestra.contains(project.directory, session.location.directory),
+            Orchestra.ownerOf(all, session.location.directory, claims[session.id])?.id === project.id,
         )
+      }),
+      owns,
+      owners,
+      claim: Effect.fn("Orchestra.claim")(function* (sessionID, projectID) {
+        yield* get(projectID)
+        yield* kv.set(OWNER + sessionID, projectID)
       }),
       mainOf: Effect.fn("Orchestra.mainOf")(function* (sessionID) {
         return (yield* projects()).find((project) => project.main === sessionID)
@@ -386,7 +438,12 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
         const target = yield* slot(ROLE, id, yield* roles(), spec.name)
         yield* kv.set(ROLE + target.key, Schema.encodeSync(StoredRole)({ ...spec, created: target.created }))
         yield* PubSub.publish(changed, undefined)
-        return { ...spec, id: target.key, agent: Orchestra.role(target.key), origin: originOf(Orchestra.roles, target.key) }
+        return {
+          ...spec,
+          id: target.key,
+          agent: Orchestra.role(target.key),
+          origin: originOf(Orchestra.roles, target.key),
+        }
       }),
       removeRole: Effect.fn("Orchestra.removeRole")(function* (id) {
         const role = (yield* roles()).find((item) => item.id === id)
