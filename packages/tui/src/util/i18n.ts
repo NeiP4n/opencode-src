@@ -133,6 +133,9 @@ const ru: Record<string, string> = {
   "Allow in Windows Firewall": "Разрешить в брандмауэре Windows",
   "Windows Firewall blocks rooms until opencode is allowed on the local network; Windows asks for administrator rights once.":
     "Брандмауэр Windows не пускает в комнаты, пока opencode не разрешён в локальной сети; Windows один раз спросит права администратора.",
+  "Windows Firewall lets opencode rooms through.": "Брандмауэр Windows пропускает комнаты opencode.",
+  "Windows Firewall still lacks the rules; was the administrator prompt declined?":
+    "В брандмауэре Windows так и нет правил; запрос прав администратора был отклонён?",
   "Windows Firewall rules added": "Правила брандмауэра Windows добавлены",
   // Connect
   "Rooms on this network": "Комнаты в этой сети",
@@ -185,6 +188,7 @@ const ru: Record<string, string> = {
     "Комнат пока нет: на том компьютере открой сессию и нажми «+ Хост».",
   "+ Connect": "+ Подключиться",
   "leave?": "выйти?",
+  "close?": "закрыть?",
   "No rooms yet. Host a session or connect to someone else's.":
     "Комнат пока нет. Открой свою сессию как комнату или подключись к чужой.",
   "host {host}": "хост {host}",

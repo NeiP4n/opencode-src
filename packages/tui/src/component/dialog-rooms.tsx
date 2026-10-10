@@ -624,63 +624,133 @@ export function DialogPeople(props: { roomID: string; name: string; onClose?: ()
 }
 
 // Windows Firewall drops room traffic for an app the user never allowed, and the
-// prompt that would ask never shows for the background service. One elevated
-// PowerShell run removes block rules for this program and lets the local subnet
-// reach the server port and the discovery ports.
+// prompt that would ask never shows for the background service. The window reads which
+// of its rules exist and offers one elevated PowerShell run only when some are missing
+// or a block rule for this program is in the way.
 function FirewallHelp(props: { ports: readonly number[] }) {
   const theme = useTheme().surface("dialog")
   const toast = useToast()
   const t = useT()
   const [busy, setBusy] = createSignal(false)
+  const [state, { refetch }] = createResource(
+    () => (process.platform === "win32" ? [...props.ports] : undefined),
+    (ports) => readFirewall(ports),
+  )
   const allow = () => {
     setBusy(true)
     void allowInWindowsFirewall(props.ports)
-      .then(() => toast.show({ message: t("Windows Firewall rules added"), variant: "success" }))
+      .then(() => readFirewall(props.ports))
+      .then((after) => {
+        void refetch()
+        // The elevated run reports nothing back, so what the firewall now holds is the answer.
+        if (firewallAllows(after)) return toast.show({ message: t("Windows Firewall rules added"), variant: "success" })
+        toast.show({
+          message: t("Windows Firewall still lacks the rules; was the administrator prompt declined?"),
+          variant: "error",
+        })
+      })
       .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
       .finally(() => setBusy(false))
   }
+  // A failed read leaves the button: offering it is harmless, hiding it could strand the operator.
+  const allowed = () => !state.error && state.state === "ready" && firewallAllows(state())
   return (
-    <Show when={process.platform === "win32"}>
-      <box>
-        <text fg={theme.text.muted} wrapMode="word">
-          {t(
-            "Windows Firewall blocks rooms until opencode is allowed on the local network; Windows asks for administrator rights once.",
-          )}
-        </text>
-        <box flexDirection="row">
-          <Button disabled={busy()} onClick={allow}>
-            {t("Allow in Windows Firewall")}
-          </Button>
+    <Show when={process.platform === "win32" && state.state !== "pending" && state.state !== "unresolved"}>
+      <Show
+        when={!allowed()}
+        fallback={<text fg={theme.text.muted}>{t("Windows Firewall lets opencode rooms through.")}</text>}
+      >
+        <box>
+          <text fg={theme.text.muted} wrapMode="word">
+            {t(
+              "Windows Firewall blocks rooms until opencode is allowed on the local network; Windows asks for administrator rights once.",
+            )}
+          </text>
+          <box flexDirection="row">
+            <Button disabled={busy()} onClick={allow}>
+              {t("Allow in Windows Firewall")}
+            </Button>
+          </box>
         </box>
-      </box>
+      </Show>
     </Show>
   )
 }
 
-async function allowInWindowsFirewall(ports: readonly number[]) {
-  const name = "'opencode rooms'"
-  const rule = `-DisplayName ${name} -Direction Inbound -Action Allow -RemoteAddress LocalSubnet -Profile Any`
+const RULE = "opencode rooms"
+
+// One rule per purpose, so allowing from Connect never drops the server port Host allowed.
+export function firewallRules(ports: readonly number[]) {
+  return [RULE, `${RULE} discovery`, ...ports.map((port) => `${RULE} tcp ${port}`)]
+}
+
+// The output of the read script: a "rule:<name>" line per rule present and "block" when a
+// block rule for this program exists, which wins over every allow rule.
+export function parseFirewall(output: string, ports: readonly number[]) {
+  const lines = output.split(/\r?\n/).map((line) => line.trim())
+  return {
+    missing: firewallRules(ports).filter((name) => !lines.includes(`rule:${name}`)),
+    blocked: lines.includes("block"),
+  }
+}
+
+export function firewallAllows(state: { missing: readonly string[]; blocked: boolean } | undefined) {
+  return state !== undefined && state.missing.length === 0 && !state.blocked
+}
+
+const program = () => `$program = '${process.execPath.replaceAll("'", "''")}'`
+const blockRules =
+  "Get-NetFirewallApplicationFilter -Program $program -ErrorAction SilentlyContinue | Get-NetFirewallRule | Where-Object { $_.Action -eq 'Block' -and $_.Enabled -eq 'True' }"
+
+// Reading rules needs no administrator rights.
+async function readFirewall(ports: readonly number[]) {
   const script = [
-    `$program = '${process.execPath.replaceAll("'", "''")}'`,
-    // A dismissed firewall prompt leaves block rules for the program, and block rules win over allow rules.
-    "Get-NetFirewallApplicationFilter -Program $program -ErrorAction SilentlyContinue | Get-NetFirewallRule | Where-Object { $_.Action -eq 'Block' } | Remove-NetFirewallRule",
-    `Remove-NetFirewallRule -DisplayName ${name} -ErrorAction SilentlyContinue`,
-    `New-NetFirewallRule ${rule} -Program $program`,
-    `New-NetFirewallRule ${rule} -Protocol UDP -LocalPort ${DISCOVERY_PORTS.join(",")}`,
-    ...(ports.length ? [`New-NetFirewallRule ${rule} -Protocol TCP -LocalPort ${ports.join(",")}`] : []),
+    program(),
+    ...firewallRules(ports).map(
+      (name) => `if (Get-NetFirewallRule -DisplayName '${name}' -ErrorAction SilentlyContinue) { 'rule:${name}' }`,
+    ),
+    `if (${blockRules}) { 'block' }`,
   ].join("; ")
-  const encoded = Buffer.from(script, "utf16le").toString("base64")
+  const child = Bun.spawn(["powershell", "-NoProfile", "-EncodedCommand", encode(script)], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const output = await new Response(child.stdout).text()
+  if ((await child.exited) !== 0)
+    throw new Error((await new Response(child.stderr).text()).trim() || "PowerShell failed")
+  return parseFirewall(output, ports)
+}
+
+async function allowInWindowsFirewall(ports: readonly number[]) {
+  const rule = `-Direction Inbound -Action Allow -RemoteAddress LocalSubnet -Profile Any`
+  const [app, discovery, ...tcp] = firewallRules(ports)
+  // Each rule is replaced by its own name only, so rules for other ports stay.
+  const replace = (name: string, filter: string) =>
+    `Remove-NetFirewallRule -DisplayName '${name}' -ErrorAction SilentlyContinue; New-NetFirewallRule -DisplayName '${name}' ${rule} ${filter}`
+  const script = [
+    program(),
+    // A dismissed firewall prompt leaves block rules for the program, and block rules win over allow rules.
+    `${blockRules} | Remove-NetFirewallRule`,
+    replace(app, "-Program $program"),
+    replace(discovery, `-Protocol UDP -LocalPort ${DISCOVERY_PORTS.join(",")}`),
+    ...tcp.map((name, index) => replace(name, `-Protocol TCP -LocalPort ${ports[index]}`)),
+  ].join("; ")
   const child = Bun.spawn(
     [
       "powershell",
       "-NoProfile",
       "-Command",
-      `Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-EncodedCommand','${encoded}'`,
+      `Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-EncodedCommand','${encode(script)}'`,
     ],
     { stdout: "ignore", stderr: "pipe" },
   )
   if ((await child.exited) !== 0)
     throw new Error((await new Response(child.stderr).text()).trim() || "PowerShell failed")
+}
+
+// PowerShell takes an encoded command as base64 of UTF-16LE, which spares all quoting.
+function encode(script: string) {
+  return Buffer.from(script, "utf16le").toString("base64")
 }
 
 function Header(props: { title: string; onClose?: () => void }) {

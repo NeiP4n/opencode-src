@@ -466,3 +466,32 @@ test("a joined room its host closed shows why and can be left without a crash", 
     await host.stop()
   }
 })
+
+test("the red cross on a hosted room closes it after a second click", async () => {
+  await using state = await tmpdir()
+  const closed: string[] = []
+  await using setup = await createAppFixture({
+    width: 130,
+    height: 40,
+    state: state.path,
+    config: { animations: false, debug: { devtools: true } },
+    fetch: (url, request) => {
+      if (url.pathname === "/api/location") return json(location)
+      if (url.pathname === "/api/room") return json({ data: closed.length ? [] : [room] })
+      if (url.pathname === `/api/room/${room.id}/member`) return json({ data: [] })
+      if (url.pathname === `/api/room/${room.id}` && request.method === "DELETE") {
+        closed.push(room.id)
+        return new Response(null, { status: 204 })
+      }
+    },
+  })
+  const tree = await setup.waitForFrame((frame) => /⇄ Lab +people: 0 ×/.test(frame))
+  const cross = cell(tree, "people: 0 ×")
+  await setup.mockMouse.click(cross.x + "people: 0 ".length, cross.y)
+  const armed = await setup.waitForFrame((frame) => frame.includes("close?"))
+  expect(closed).toEqual([])
+  const sure = cell(armed, "close?")
+  await setup.mockMouse.click(sure.x + 1, sure.y)
+  await setup.waitFor(() => closed.length > 0)
+  await setup.waitForFrame((frame) => !frame.includes("⇄ Lab"))
+})

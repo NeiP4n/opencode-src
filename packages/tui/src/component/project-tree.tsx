@@ -10,7 +10,7 @@ import { useTheme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
-import { roomListRevision, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
+import { roomListChanged, roomListRevision, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
 import { DialogConnect, DialogHost, DialogPeople } from "./dialog-rooms"
 import { openProjectDialog } from "./dialog-project"
 import { useProjects } from "../context/projects"
@@ -187,6 +187,16 @@ export function ProjectTree(props: { width: number }) {
     void updateJoined((draft) => {
       draft.joined = draft.joined.filter((item) => !sameRoom(item, room))
     })
+  }
+
+  // Closing a room stops sharing its session: the session stays, every guest token stops working.
+  const stopHosting = (roomID: string) => {
+    if (armed() !== `hosted:${roomID}`) return setArmed(`hosted:${roomID}`)
+    setArmed()
+    void client.api.room
+      .remove({ roomID })
+      .then(() => roomListChanged())
+      .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
   }
 
   const openRooms = (window: typeof DialogHost) => {
@@ -418,6 +428,23 @@ export function ProjectTree(props: { width: number }) {
                     {` ${t("people: {count}", { count: online()[room.id] ?? 0 })}`}
                   </text>
                 </box>
+                <box
+                  onMouseOut={() => setArmed()}
+                  onMouseUp={(event) => {
+                    event.stopPropagation()
+                    stopHosting(room.id)
+                  }}
+                >
+                  <text
+                    fg={
+                      armed() === `hosted:${room.id}`
+                        ? theme.text.action.destructive.focused
+                        : theme.text.action.destructive.base
+                    }
+                  >
+                    {armed() === `hosted:${room.id}` ? ` ${t("close?")}` : " ×"}
+                  </text>
+                </box>
               </Row>
             )}
           </For>
@@ -444,7 +471,13 @@ export function ProjectTree(props: { width: number }) {
                     leave(room)
                   }}
                 >
-                  <text fg={armed() === roomKey(room) ? theme.text.feedback.error.base : theme.text.muted}>
+                  <text
+                    fg={
+                      armed() === roomKey(room)
+                        ? theme.text.action.destructive.focused
+                        : theme.text.action.destructive.base
+                    }
+                  >
                     {armed() === roomKey(room) ? ` ${t("leave?")}` : " ×"}
                   </text>
                 </box>
