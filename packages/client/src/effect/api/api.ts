@@ -2496,6 +2496,7 @@ export type RoomCreateInput = {
   readonly name?: string | undefined
   readonly ai?: "linked" | "discovered" | undefined
   readonly guestApprovals?: boolean | undefined
+  readonly defaultRole?: "viewer" | "member" | "helper" | undefined
   readonly open?: boolean | undefined
 }
 export type RoomCreateOutput = Room.Info
@@ -2506,6 +2507,7 @@ export type RoomUpdateInput = {
   readonly name?: string | undefined
   readonly ai?: "linked" | "discovered" | undefined
   readonly guestApprovals?: boolean | undefined
+  readonly defaultRole?: "viewer" | "member" | "helper" | undefined
   readonly open?: boolean | undefined
 }
 export type RoomUpdateOutput = Room.Info
@@ -2529,6 +2531,7 @@ export type RoomJoinInput = {
   readonly code?: string | undefined
   readonly roomID?: Room.ID | undefined
   readonly name: string
+  readonly device?: string | undefined
 }
 export type RoomJoinOutput = Room.Joined
 export type RoomJoinOperation<E = never> = (input: RoomJoinInput) => Effect.Effect<RoomJoinOutput, E>
@@ -2537,9 +2540,68 @@ export type RoomGuestGetInput = { readonly roomID: Room.ID }
 export type RoomGuestGetOutput = {
   readonly room: Room.Info
   readonly guest: Room.Guest
+  readonly role: "viewer" | "member" | "helper"
   readonly session: Session.Info
 }
 export type RoomGuestGetOperation<E = never> = (input: RoomGuestGetInput) => Effect.Effect<RoomGuestGetOutput, E>
+
+export type RoomGuestSessionMessagesInput = {
+  readonly roomID: Room.ID
+  readonly limit?: number | undefined
+  readonly order?: "asc" | "desc" | undefined
+  readonly cursor?: string | undefined
+  readonly type?:
+    | "agent-switched"
+    | "model-switched"
+    | "location-switched"
+    | "user"
+    | "synthetic"
+    | "system"
+    | "skill"
+    | "shell"
+    | "assistant"
+    | "compaction"
+    | undefined
+}
+export type RoomGuestSessionMessagesOutput = {
+  readonly data: ReadonlyArray<SessionMessage.Info>
+  readonly cursor: { readonly previous?: string | undefined; readonly next?: string | undefined }
+}
+export type RoomGuestSessionMessagesOperation<E = never> = (
+  input: RoomGuestSessionMessagesInput,
+) => Effect.Effect<RoomGuestSessionMessagesOutput, E>
+
+export type RoomMemberListInput = { readonly roomID: Room.ID }
+export type RoomMemberListOutput = ReadonlyArray<Room.MemberView>
+export type RoomMemberListOperation<E = never> = (input: RoomMemberListInput) => Effect.Effect<RoomMemberListOutput, E>
+
+export type RoomMemberUpdateInput = {
+  readonly roomID: Room.ID
+  readonly guestID: string
+  readonly role: "viewer" | "member" | "helper"
+}
+export type RoomMemberUpdateOutput = Room.Member
+export type RoomMemberUpdateOperation<E = never> = (
+  input: RoomMemberUpdateInput,
+) => Effect.Effect<RoomMemberUpdateOutput, E>
+
+export type RoomMemberRemoveInput = { readonly roomID: Room.ID; readonly guestID: string }
+export type RoomMemberRemoveOutput = void
+export type RoomMemberRemoveOperation<E = never> = (
+  input: RoomMemberRemoveInput,
+) => Effect.Effect<RoomMemberRemoveOutput, E>
+
+export type RoomMemberBanInput = { readonly roomID: Room.ID; readonly guestID: string }
+export type RoomMemberBanOutput = Room.Ban
+export type RoomMemberBanOperation<E = never> = (input: RoomMemberBanInput) => Effect.Effect<RoomMemberBanOutput, E>
+
+export type RoomBanListInput = { readonly roomID: Room.ID }
+export type RoomBanListOutput = ReadonlyArray<Room.Ban>
+export type RoomBanListOperation<E = never> = (input: RoomBanListInput) => Effect.Effect<RoomBanListOutput, E>
+
+export type RoomBanRemoveInput = { readonly roomID: Room.ID; readonly banID: string }
+export type RoomBanRemoveOutput = void
+export type RoomBanRemoveOperation<E = never> = (input: RoomBanRemoveInput) => Effect.Effect<RoomBanRemoveOutput, E>
 
 export type RoomGuestLogInput = {
   readonly roomID: Room.ID
@@ -3535,6 +3597,7 @@ export interface RoomApi<E = never> {
   readonly join: RoomJoinOperation<E>
   readonly guest: {
     readonly get: RoomGuestGetOperation<E>
+    readonly session: { readonly messages: RoomGuestSessionMessagesOperation<E> }
     readonly log: RoomGuestLogOperation<E>
     readonly messages: RoomGuestMessagesOperation<E>
     readonly note: RoomGuestNoteOperation<E>
@@ -3544,6 +3607,13 @@ export interface RoomApi<E = never> {
       readonly reply: RoomGuestPermissionReplyOperation<E>
     }
   }
+  readonly member: {
+    readonly list: RoomMemberListOperation<E>
+    readonly update: RoomMemberUpdateOperation<E>
+    readonly remove: RoomMemberRemoveOperation<E>
+    readonly ban: RoomMemberBanOperation<E>
+  }
+  readonly ban: { readonly list: RoomBanListOperation<E>; readonly remove: RoomBanRemoveOperation<E> }
 }
 
 export type OrchestraProjectListOutput = ReadonlyArray<Orchestra.Project>

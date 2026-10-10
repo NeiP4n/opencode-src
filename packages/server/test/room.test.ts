@@ -121,7 +121,9 @@ it.live("an open room admits guests by its ID without a code; a closed one does 
     const joined = yield* call("/api/room/join", { method: "POST", body: { roomID: room.id, name: "Phone" } })
     expect(joined.status).toBe(200)
     expect(joined.body.room).toMatchObject({ id: room.id, open: true })
-    const view = yield* call(`/api/room/${room.id}/guest`, { headers: { authorization: `Bearer ${joined.body.token}` } })
+    const view = yield* call(`/api/room/${room.id}/guest`, {
+      headers: { authorization: `Bearer ${joined.body.token}` },
+    })
     expect(view.status).toBe(200)
   }).pipe(Effect.scoped),
 )
@@ -220,5 +222,97 @@ it.live("closing a room revokes its guests", () =>
     ).toBe(404)
     // the code dies with the room
     expect((yield* call("/api/room/join", { method: "POST", body: { code, name: "Late" } })).status).toBe(401)
+  }).pipe(Effect.scoped),
+)
+
+it.live("guests join as members the host lists, and a viewer may read but not post", () =>
+  Effect.gen(function* () {
+    const { call, room, code, session } = yield* setup
+    const joined = (yield* call("/api/room/join", { method: "POST", body: { code, name: "Phone", device: "dev-1" } }))
+      .body
+    expect(joined.role).toBe("member")
+    const guest = { authorization: `Bearer ${joined.token}` }
+    expect((yield* call(`/api/room/${room.id}/guest`, { headers: guest })).body.role).toBe("member")
+
+    const members = (yield* call(`/api/room/${room.id}/member`, { headers: host })).body.data
+    expect(members).toMatchObject([
+      { id: joined.guest.id, name: "Phone", role: "member", device: "dev-1", online: true },
+    ])
+    // the member list is the host's: a guest token does not open it
+    expect((yield* call(`/api/room/${room.id}/member`, { headers: guest })).status).toBe(401)
+
+    // guests read the full session, as the host's own message list pages it
+    const full = yield* call(`/api/room/${room.id}/guest/session/message`, { headers: guest })
+    expect(full.status).toBe(200)
+    expect(full.body.cursor).toBeDefined()
+    yield* call(`/api/room/${room.id}/guest/prompt`, { method: "POST", headers: guest, body: { text: "hi" } })
+    expect((yield* call(`/api/session/${session.id}/inbox`, { headers: host })).status).toBe(200)
+
+    const updated = yield* call(`/api/room/${room.id}/member/${joined.guest.id}`, {
+      method: "PATCH",
+      headers: host,
+      body: { role: "viewer" },
+    })
+    expect(updated.body.data.role).toBe("viewer")
+    expect((yield* call(`/api/room/${room.id}/guest/message`, { headers: guest })).status).toBe(200)
+    const blocked = yield* call(`/api/room/${room.id}/guest/prompt`, {
+      method: "POST",
+      headers: guest,
+      body: { text: "may I?" },
+    })
+    expect(blocked.status).toBe(403)
+  }).pipe(Effect.scoped),
+)
+
+it.live("a kicked guest loses the room until it joins again; a banned one cannot", () =>
+  Effect.gen(function* () {
+    const { call, room, code } = yield* setup
+    const join = (name: string, device: string) =>
+      call("/api/room/join", { method: "POST", body: { code, name, device } })
+    const first = (yield* join("Phone", "dev-1")).body
+    const guest = { authorization: `Bearer ${first.token}` }
+
+    expect(
+      (yield* call(`/api/room/${room.id}/member/${first.guest.id}`, { method: "DELETE", headers: host })).status,
+    ).toBe(204)
+    expect((yield* call(`/api/room/${room.id}/guest`, { headers: guest })).status).toBe(401)
+
+    const again = (yield* join("Phone", "dev-1")).body
+    expect(again.token).toBeDefined()
+    const ban = yield* call(`/api/room/${room.id}/member/${again.guest.id}/ban`, { method: "POST", headers: host })
+    expect(ban.body.data).toMatchObject({ name: "Phone", device: "dev-1" })
+    expect(
+      (yield* call(`/api/room/${room.id}/guest`, { headers: { authorization: `Bearer ${again.token}` } })).status,
+    ).toBe(401)
+    // a new name does not get past the ban; another device does
+    expect((yield* join("Tablet", "dev-1")).status).toBe(401)
+    expect((yield* join("Tablet", "dev-2")).status).toBe(200)
+
+    const bans = (yield* call(`/api/room/${room.id}/ban`, { headers: host })).body.data
+    expect(bans).toHaveLength(1)
+    yield* call(`/api/room/${room.id}/ban/${bans[0].id}`, { method: "DELETE", headers: host })
+    expect((yield* join("Phone", "dev-1")).status).toBe(200)
+  }).pipe(Effect.scoped),
+)
+
+it.live("a helper answers permission requests; a member may not", () =>
+  Effect.gen(function* () {
+    const { call, room, code } = yield* setup
+    const joined = (yield* call("/api/room/join", { method: "POST", body: { code, name: "Phone" } })).body
+    const guest = { authorization: `Bearer ${joined.token}` }
+    const reply = () =>
+      call(`/api/room/${room.id}/guest/permission/per_missing/reply`, {
+        method: "POST",
+        headers: guest,
+        body: { decision: "once" },
+      })
+    expect((yield* reply()).status).toBe(403)
+    yield* call(`/api/room/${room.id}/member/${joined.guest.id}`, {
+      method: "PATCH",
+      headers: host,
+      body: { role: "helper" },
+    })
+    // past the role check the request is simply unknown
+    expect((yield* reply()).status).toBe(404)
   }).pipe(Effect.scoped),
 )

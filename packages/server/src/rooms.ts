@@ -17,7 +17,13 @@ const TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60
 export interface Interface {
   readonly issueCode: (roomID: Room.ID) => Effect.Effect<Room.JoinCode>
   readonly redeemCode: (code: string) => Effect.Effect<Room.ID | undefined>
+  // Presence lives in memory: every guest request marks its guest as seen.
+  readonly touch: (guestID: string) => void
+  readonly seen: (guestID: string) => number | undefined
 }
+
+// Guests poll every couple of seconds, so a longer silence means they left.
+export const ONLINE_MS = 15_000
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ServerRooms") {}
 
@@ -27,7 +33,10 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const codes = yield* Cache.make<string, Room.ID>({ capacity: 1_000, lookup: noLookup, timeToLive: CODE_TTL })
+    const presence = new Map<string, number>()
     return Service.of({
+      touch: (guestID) => void presence.set(guestID, Date.now()),
+      seen: (guestID) => presence.get(guestID),
       issueCode: Effect.fn("ServerRooms.issueCode")(function* (roomID) {
         const code = Array.from({ length: CODE_LENGTH }, () => ALPHABET[randomInt(ALPHABET.length)]).join("")
         yield* Cache.set(codes, code, roomID)

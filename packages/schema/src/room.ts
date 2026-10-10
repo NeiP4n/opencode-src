@@ -18,13 +18,21 @@ export type ID = typeof ID.Type
 export const AiMessaging = Schema.Literals(["linked", "discovered"])
 export type AiMessaging = typeof AiMessaging.Type
 
+// What a guest may do in a room. Viewers read, members also post prompts, and
+// helpers also answer the host model's permission requests.
+export const Role = Schema.Literals(["viewer", "member", "helper"])
+export type Role = typeof Role.Type
+
 export const Info = Schema.Struct({
   id: ID,
   sessionID: SessionID,
   name: Schema.String,
   ai: AiMessaging,
-  // Whether guests may answer the model's permission requests; otherwise only the host can.
+  // Rooms saved before roles existed: whether guests could answer permission requests.
+  // Read only to choose defaultRole for such rooms.
   guestApprovals: Schema.Boolean,
+  // The role a guest gets on joining; absent on rooms saved before roles existed.
+  defaultRole: Role.pipe(Schema.optional),
   // Whether guests may join without a code; absent on rooms saved before the option existed.
   open: Schema.Boolean.pipe(Schema.optional),
   created: Schema.Number,
@@ -43,11 +51,44 @@ export const Guest = Schema.Struct({
 }).annotate({ identifier: "Room.Guest" })
 export interface Guest extends Schema.Schema.Type<typeof Guest> {}
 
+// A guest the host admitted. Removing the member revokes its token; the device key
+// and address are what a ban matches when the same person tries to join again.
+export const Member = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  role: Role,
+  // A random key the guest's client keeps across joins.
+  device: Schema.String.pipe(Schema.optional),
+  // The network address it joined from; absent for loopback, which tunnels such as Porthole share.
+  address: Schema.String.pipe(Schema.optional),
+  joined: Schema.Number,
+}).annotate({ identifier: "Room.Member" })
+export interface Member extends Schema.Schema.Type<typeof Member> {}
+
+// A member as the host sees it, with when the server last heard from them.
+export const MemberView = Schema.Struct({
+  ...Member.fields,
+  seen: Schema.Number.pipe(Schema.optional),
+  online: Schema.Boolean,
+}).annotate({ identifier: "Room.MemberView" })
+export interface MemberView extends Schema.Schema.Type<typeof MemberView> {}
+
+// Keeps a banned guest out of one room by device key or by address.
+export const Ban = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  device: Schema.String.pipe(Schema.optional),
+  address: Schema.String.pipe(Schema.optional),
+  created: Schema.Number,
+}).annotate({ identifier: "Room.Ban" })
+export interface Ban extends Schema.Schema.Type<typeof Ban> {}
+
 // What a guest receives for a valid join code: the token to send as a Bearer
 // credential on guest routes, scoped to this one room.
 export const Joined = Schema.Struct({
   token: Schema.String,
   guest: Guest,
+  role: Role,
   room: Info,
 }).annotate({ identifier: "Room.Joined" })
 export interface Joined extends Schema.Schema.Type<typeof Joined> {}

@@ -15,11 +15,18 @@ export type Info = Room.Info
 export const Message = Room.Message
 export type Message = Room.Message
 
+export const Role = Room.Role
+export type Role = Room.Role
+
+export type Member = Room.Member
+export type Ban = Room.Ban
+
 export const CreateInput = Schema.Struct({
   sessionID: SessionID,
   name: Schema.String.pipe(Schema.optional),
   ai: Room.AiMessaging.pipe(Schema.optional),
   guestApprovals: Schema.Boolean.pipe(Schema.optional),
+  defaultRole: Room.Role.pipe(Schema.optional),
   open: Schema.Boolean.pipe(Schema.optional),
 }).annotate({ identifier: "Room.CreateInput" })
 export type CreateInput = typeof CreateInput.Type
@@ -28,6 +35,7 @@ export const UpdateInput = Schema.Struct({
   name: Schema.String.pipe(Schema.optional),
   ai: Room.AiMessaging.pipe(Schema.optional),
   guestApprovals: Schema.Boolean.pipe(Schema.optional),
+  defaultRole: Room.Role.pipe(Schema.optional),
   open: Schema.Boolean.pipe(Schema.optional),
 }).annotate({ identifier: "Room.UpdateInput" })
 export type UpdateInput = typeof UpdateInput.Type
@@ -42,6 +50,27 @@ export interface Interface {
   readonly create: (input: CreateInput) => Effect.Effect<Info>
   readonly update: (id: ID, input: UpdateInput) => Effect.Effect<Info, NotFoundError>
   readonly remove: (id: ID) => Effect.Effect<void, NotFoundError>
+  readonly members: (id: ID) => Effect.Effect<ReadonlyArray<Member>>
+  readonly member: (id: ID, guestID: string) => Effect.Effect<Member | undefined>
+  readonly saveMember: (id: ID, member: Member) => Effect.Effect<Member>
+  readonly removeMember: (id: ID, guestID: string) => Effect.Effect<void>
+  readonly bans: (id: ID) => Effect.Effect<ReadonlyArray<Ban>>
+  readonly ban: (id: ID, ban: Ban) => Effect.Effect<Ban>
+  readonly unban: (id: ID, banID: string) => Effect.Effect<void>
+}
+
+// The role a new guest gets: the room's choice, or for rooms saved before roles
+// existed, helper when guests could answer permission requests.
+export function joinRole(room: Info): Role {
+  return room.defaultRole ?? (room.guestApprovals ? "helper" : "member")
+}
+
+export function banned(bans: ReadonlyArray<Ban>, guest: { device?: string; address?: string }) {
+  return bans.some(
+    (ban) =>
+      (ban.device !== undefined && ban.device === guest.device) ||
+      (ban.address !== undefined && ban.address === guest.address),
+  )
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Room") {}
@@ -49,7 +78,12 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Ro
 // Rooms are a handful of small records owned by this host, so they live in the
 // shared KV table under one prefix instead of needing their own migration.
 const PREFIX = "room/"
+// Members and bans sit under their room's ID so closing a room drops them in one scan each.
+const MEMBERS = "room-member/"
+const BANS = "room-ban/"
 const decode = Schema.decodeUnknownOption(Info)
+const decodeMember = Schema.decodeUnknownOption(Room.Member)
+const decodeBan = Schema.decodeUnknownOption(Room.Ban)
 
 const layer = Layer.effect(
   Service,
@@ -63,6 +97,14 @@ const layer = Layer.effect(
     })
 
     const save = (room: Info) => kv.set(PREFIX + room.id, Schema.encodeSync(Info)(room)).pipe(Effect.as(room))
+
+    const scan = <A>(prefix: string, decodeEntry: (value: unknown) => Option.Option<A>) =>
+      kv
+        .scan({ prefix, limit: 1000 })
+        .pipe(Effect.map((result) => result.entries.flatMap((entry) => Option.toArray(decodeEntry(entry.value)))))
+
+    const members = (id: ID) => scan(`${MEMBERS}${id}/`, decodeMember)
+    const bans = (id: ID) => scan(`${BANS}${id}/`, decodeBan)
 
     return Service.of({
       list: Effect.fn("Room.list")(function* () {
@@ -79,6 +121,7 @@ const layer = Layer.effect(
           name: input.name?.trim() || "Room",
           ai: input.ai ?? "linked",
           guestApprovals: input.guestApprovals ?? false,
+          defaultRole: input.defaultRole ?? "member",
           open: input.open ?? false,
           created: Date.now(),
         })
@@ -90,12 +133,38 @@ const layer = Layer.effect(
           name: input.name?.trim() || room.name,
           ai: input.ai ?? room.ai,
           guestApprovals: input.guestApprovals ?? room.guestApprovals,
+          defaultRole: input.defaultRole ?? room.defaultRole,
           open: input.open ?? room.open ?? false,
         })
       }),
       remove: Effect.fn("Room.remove")(function* (id: ID) {
         yield* get(id)
         yield* kv.remove(PREFIX + id)
+        yield* Effect.forEach(yield* members(id), (member) => kv.remove(`${MEMBERS}${id}/${member.id}`))
+        yield* Effect.forEach(yield* bans(id), (ban) => kv.remove(`${BANS}${id}/${ban.id}`))
+      }),
+      members: Effect.fn("Room.members")(function* (id: ID) {
+        return (yield* members(id)).toSorted((a, b) => a.joined - b.joined)
+      }),
+      member: Effect.fn("Room.member")(function* (id: ID, guestID: string) {
+        return Option.getOrUndefined(decodeMember(yield* kv.get(`${MEMBERS}${id}/${guestID}`)))
+      }),
+      saveMember: Effect.fn("Room.saveMember")(function* (id: ID, member: Member) {
+        yield* kv.set(`${MEMBERS}${id}/${member.id}`, Schema.encodeSync(Room.Member)(member))
+        return member
+      }),
+      removeMember: Effect.fn("Room.removeMember")(function* (id: ID, guestID: string) {
+        yield* kv.remove(`${MEMBERS}${id}/${guestID}`)
+      }),
+      bans: Effect.fn("Room.bans")(function* (id: ID) {
+        return (yield* bans(id)).toSorted((a, b) => a.created - b.created)
+      }),
+      ban: Effect.fn("Room.ban")(function* (id: ID, ban: Ban) {
+        yield* kv.set(`${BANS}${id}/${ban.id}`, Schema.encodeSync(Room.Ban)(ban))
+        return ban
+      }),
+      unban: Effect.fn("Room.unban")(function* (id: ID, banID: string) {
+        yield* kv.remove(`${BANS}${id}/${banID}`)
       }),
     })
   }),
