@@ -6,6 +6,8 @@ import { hostname } from "node:os"
 import { useConfig } from "../config"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
+import { useProjects } from "../context/projects"
+import { Orchestra } from "@opencode/schema/orchestra"
 import { useRoute } from "../context/route"
 import { useTheme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
@@ -23,6 +25,7 @@ export function DialogHost(props: { onClose?: () => void }) {
   const dialog = useDialog()
   const client = useClient()
   const data = useData()
+  const projects = useProjects()
   const route = useRoute()
   const theme = useTheme().surface("dialog")
   const toast = useToast()
@@ -70,12 +73,28 @@ export function DialogHost(props: { onClose?: () => void }) {
     setCodes((previous) => ({ ...previous, [roomID]: { ...issued, until: Date.now() + issued.expires_in * 1000 } }))
   }
 
-  // A new room is useless without a code, so hosting hands one out right away.
-  const share = () => {
+  // The project the open session belongs to: the deepest project directory holding it.
+  const project = () => {
+    const session = sessionID() ? data.session.get(sessionID()!) : undefined
+    if (!session) return
+    return projects
+      .list()
+      .filter((item) => Orchestra.contains(item.directory, session.location.directory))
+      .toSorted((a, b) => b.directory.length - a.directory.length)[0]
+  }
+
+  // A new room is useless without a code, so hosting hands one out right away. A project
+  // room shares every session under the project directory; the open session opens first.
+  const share = (whole: boolean) => {
     const id = sessionID()
     if (!id) return
+    const target = whole ? project() : undefined
     void run(async () => {
-      const room = await client.api.room.create({ sessionID: id, name: data.session.get(id)?.title || undefined })
+      const room = await client.api.room.create({
+        sessionID: id,
+        name: target?.name ?? (data.session.get(id)?.title || undefined),
+        directory: target?.directory,
+      })
       await issue(room.id)
     })
   }
@@ -165,10 +184,17 @@ export function DialogHost(props: { onClose?: () => void }) {
         fallback={<text fg={theme.text.muted}>{t("Open a session to host it as a room.")}</text>}
       >
         <Show when={!shared()}>
-          <box flexDirection="row">
-            <Button variant="primary" disabled={busy()} onClick={share}>
+          <box flexDirection="row" gap={1}>
+            <Button variant="primary" disabled={busy()} onClick={() => share(false)}>
               {t("Host this session")}
             </Button>
+            <Show when={project()}>
+              {(item) => (
+                <Button disabled={busy()} onClick={() => share(true)}>
+                  {t("Host project {name}", { name: item().name })}
+                </Button>
+              )}
+            </Show>
           </box>
         </Show>
       </Show>
@@ -178,6 +204,7 @@ export function DialogHost(props: { onClose?: () => void }) {
             <Labeled label={t("Room")}>
               <text fg={theme.text.base} attributes={TextAttributes.BOLD} wrapMode="none" truncate>
                 {room.name}
+                <span style={{ fg: theme.text.muted }}>{` · ${room.directory ? t("whole project") : t("one session")}`}</span>
               </text>
             </Labeled>
             <Show
@@ -495,9 +522,10 @@ export function DialogConnect(props: { onClose?: () => void }) {
 
 type RoomRole = RoomMemberView["role"]
 
-export const ROLE_LABEL = { viewer: "Viewer", member: "Member", helper: "Helper" } as const
-const ROLE_HELP = "Viewers only watch, members also write, helpers also allow or deny the AI's requests."
-const ROLES = ["viewer", "member", "helper"] as const
+export const ROLE_LABEL = { viewer: "Viewer", member: "Member", helper: "Helper", cohost: "Cohost" } as const
+const ROLE_HELP =
+  "Viewers only watch, members also write and start sessions, helpers also allow or deny the AI's requests, cohosts also pick the model and agent and run commands."
+const ROLES = ["viewer", "member", "helper", "cohost"] as const
 
 export function nextRole(role: RoomRole) {
   return ROLES[(ROLES.indexOf(role) + 1) % ROLES.length]

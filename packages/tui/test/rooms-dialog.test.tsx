@@ -43,6 +43,7 @@ async function render(
         })
       if (url.pathname === "/api/room") return json({ data: [room] })
       if (url.pathname === `/api/room/${room.id}/member`) return json({ data: [] })
+      if (url.pathname === `/api/room/${room.id}/ban`) return json({ data: [] })
       if (url.pathname === `/api/room/${room.id}/code` && request.method === "POST")
         return json({ code: "ABCD-EFGH", expires_in: 600 })
     },
@@ -119,6 +120,7 @@ async function renderSession(state: string, input: { rooms: () => unknown[]; onC
       }
       if (url.pathname === "/api/room") return json({ data: input.rooms() })
       if (url.pathname === `/api/room/${room.id}/member`) return json({ data: [] })
+      if (url.pathname === `/api/room/${room.id}/ban`) return json({ data: [] })
       if (url.pathname === `/api/room/${room.id}/code` && request.method === "POST")
         return json({ code: "ABCD-EFGH", expires_in: 600 })
       if (url.pathname === `/api/session/${room.sessionID}`) return json({ data: session })
@@ -161,7 +163,10 @@ test("hosting a session issues a join code at once and shows the indicator", asy
   expect(bar).not.toContain("⇄ Multiplayer · Lab")
   const entry = cell(bar, "+ Host")
   await setup.mockMouse.click(entry.x, entry.y)
-  const dialog = await setup.waitForFrame((frame) => frame.includes("Host this session"))
+  // the address loads after the window opens and moves the button down
+  const dialog = await setup.waitForFrame(
+    (frame) => frame.includes("Host this session") && frame.includes("192.168.1.5:4096"),
+  )
   const button = cell(dialog, "Host this session")
   await setup.mockMouse.click(button.x + 2, button.y)
   const issued = await setup.waitForFrame((frame) => /ABCD-EFGH {2}expires in (10:00|9:5\d)/.test(frame))
@@ -188,8 +193,9 @@ test("the Language bar item switches the bar and room windows to Russian and bac
 
 test("a joined room opens in the main area like a session and stays in the left panel under Multiplayer", async () => {
   await using state = await tmpdir()
-  const remote = { ...room, id: "room_far", sessionID: "ses_far", name: "Far lab", open: true }
+  const remote = { ...room, id: "room_far", sessionID: "ses_far", name: "Far lab", open: true, directory }
   const shared = { ...session, id: remote.sessionID, title: "Far lab" }
+  const second = { ...session, id: "ses_second", title: "Second task" }
   const messages = [
     {
       id: "msg_1",
@@ -231,8 +237,14 @@ test("a joined room opens in the main area like a session and stays in the left 
       if (url.pathname === "/api/room/public") return json({ host: "studio", rooms: [remote] })
       if (url.pathname === "/api/room/join" && request.method === "POST")
         return json({ token: "token", guest: { id: "guest_1", name: "Bo" }, role: "member", room: remote })
+      if (url.pathname === `${guest}/session` && request.method === "GET") return json({ data: [shared, second] })
       if (url.pathname === guest)
-        return json({ room: remote, guest: { id: "guest_1", name: "Bo" }, role: "member", session: shared })
+        return json({
+          room: remote,
+          guest: { id: "guest_1", name: "Bo" },
+          role: "member",
+          session: url.searchParams.get("sessionID") === second.id ? second : shared,
+        })
       if (url.pathname === `${guest}/session/message`) return json({ data: messages.toReversed(), cursor: {} })
       if (url.pathname === `${guest}/message`)
         return json({ data: [], running: false, note: { name: "release-plan", title: "Release plan" } })
@@ -274,20 +286,33 @@ test("a joined room opens in the main area like a session and stays in the left 
         !frame.includes("Join by address"),
     )
     expect(joined).toContain("Hello from far")
-    expect(joined).toContain("⇄ Multiplayer · Far lab · host 127.0.0.1")
+    expect(joined).toContain("⇄ Multiplayer")
     expect(joined).toContain("[Member]")
+    // the right panel tells what the session is and who may change it
+    expect(joined).toMatch(/Role +Member/)
+    expect(joined).toContain("The host or a cohost picks")
     // A separate section below the projects: hosted sessions and joined rooms, each marked as multiplayer.
     expect(joined).toMatch(/⇄ Multiplayer +\+ Host \+ Connect/)
-    expect(joined).toMatch(/⇄ Lab +people: 0/)
+    expect(joined).toMatch(/⇄ Lab +×/)
     expect(joined).toContain(`⇄ Far lab · 127.0.0.1:${host.port}`)
 
     await setup.mockInput.typeText("next step please")
     setup.mockInput.pressEnter()
     await setup.waitFor(() => prompts.length > 0)
-    expect(prompts).toEqual([{ text: "next step please" }])
+    expect(prompts).toEqual([{ text: "next step please", sessionID: shared.id }])
+
+    // a project room lists its sessions under the room; another one opens and takes the prompts
+    const listed = await setup.waitForFrame((frame) => frame.includes("Second task") && frame.includes("+ New session"))
+    const row = cell(listed, "Second task")
+    await setup.mockMouse.click(row.x + 1, row.y)
+    await setup.waitForFrame((frame) => /Second task/.test(frame.split("\n").slice(0, 3).join("\n")))
+    await setup.mockInput.typeText("over here")
+    setup.mockInput.pressEnter()
+    await setup.waitFor(() => prompts.length > 1)
+    expect(prompts[1]).toEqual({ text: "over here", sessionID: second.id })
 
     // the note the room writes into opens in place of the transcript
-    const chip = await setup.waitForFrame((frame) => frame.includes("Note: Release plan"))
+    const chip = await setup.waitForFrame((frame) => frame.includes("Note: Release"))
     const read = cell(chip, "Read note")
     await setup.mockMouse.click(read.x + 1, read.y)
     await setup.waitForFrame((frame) => frame.includes("Ship the notes canvas.") && frame.includes("Back to chat"))
@@ -354,7 +379,7 @@ test("Host opens a loopback-only service to the network with one click", async (
   expect(opened).toBe(1)
 })
 
-test("the People window lists guests, steps their role and removes or bans them", async () => {
+test("Participants under Multiplayer lists guests, steps their role and removes or bans them", async () => {
   await using state = await tmpdir()
   const calls: { method: string; path: string; body?: unknown }[] = []
   const members = [
@@ -376,22 +401,22 @@ test("the People window lists guests, steps their role and removes or bans them"
           body: request.method === "PATCH" ? await request.json() : undefined,
         })
       if (url.pathname === `/api/room/${room.id}/member` && request.method === "GET") return json({ data: members })
-      if (url.pathname === `/api/room/${room.id}/ban`) return json({ data: [] })
+      if (url.pathname === `/api/room/${room.id}/ban`)
+        return json({ data: [{ id: "ban_1", name: "Max", created: 0, device: "dev-9" }] })
       if (url.pathname.startsWith(`/api/room/${room.id}/member/`) && request.method === "PATCH")
         return json({ data: members[0] })
-      if (url.pathname.startsWith(`/api/room/${room.id}/member/`)) return new Response(null, { status: 204 })
+      if (url.pathname.startsWith(`/api/room/${room.id}/`)) return new Response(null, { status: 204 })
     },
   })
-  // the hosted room's row counts who is connected and opens the window
-  const tree = await setup.waitForFrame((frame) => frame.includes("people: 1"))
-  const people = cell(tree, "people: 1")
-  await setup.mockMouse.click(people.x + 2, people.y)
-  const frame = await setup.waitForFrame((frame) => frame.includes("People · Lab") && frame.includes("Sam"))
-  expect(frame).toMatch(/● Ann · online · 192\.168\.1\.7/)
-  expect(frame).toMatch(/○ Sam · away/)
+  const frame = await setup.waitForFrame((frame) => frame.includes("Participants") && frame.includes("Sam"))
+  expect(frame).toContain("1/2 online")
+  expect(frame).toMatch(/● Ann +\[Member\] × ban/)
+  expect(frame).toMatch(/○ Sam +\[Viewer\] × ban/)
+  expect(frame).toMatch(/Max +unban/)
 
-  const role = cell(frame, "[ Member ]")
-  await setup.mockMouse.click(role.x + 2, role.y)
+  const lines = frame.split("\n")
+  const ann = lines.findIndex((line) => line.includes("● Ann"))
+  await setup.mockMouse.click(lines[ann].indexOf("[Member]") + 2, ann)
   await setup.waitFor(() => calls.some((call) => call.method === "PATCH"))
   expect(calls.find((call) => call.method === "PATCH")).toEqual({
     method: "PATCH",
@@ -399,12 +424,12 @@ test("the People window lists guests, steps their role and removes or bans them"
     body: { role: "helper" },
   })
 
-  // removing asks twice; the last Kick on screen is Sam's
-  const kick = cell(setup.captureCharFrame(), "[ Kick ]")
-  await setup.mockMouse.click(kick.x + 2, kick.y)
-  await setup.waitForFrame((frame) => frame.includes("Kick?"))
+  // removing asks twice
+  const sam = lines.findIndex((line) => line.includes("○ Sam"))
+  await setup.mockMouse.click(lines[sam].indexOf("×"), sam)
+  const armed = await setup.waitForFrame((frame) => frame.includes("Kick?"))
   expect(calls.some((call) => call.method === "DELETE")).toBe(false)
-  const sure = cell(setup.captureCharFrame(), "Kick?")
+  const sure = cell(armed, "Kick?")
   await setup.mockMouse.click(sure.x + 1, sure.y)
   await setup.waitFor(() => calls.some((call) => call.method === "DELETE"))
   expect(calls.find((call) => call.method === "DELETE")?.path).toBe(`/api/room/${room.id}/member/guest_2`)
@@ -479,15 +504,16 @@ test("the red cross on a hosted room closes it after a second click", async () =
       if (url.pathname === "/api/location") return json(location)
       if (url.pathname === "/api/room") return json({ data: closed.length ? [] : [room] })
       if (url.pathname === `/api/room/${room.id}/member`) return json({ data: [] })
+      if (url.pathname === `/api/room/${room.id}/ban`) return json({ data: [] })
       if (url.pathname === `/api/room/${room.id}` && request.method === "DELETE") {
         closed.push(room.id)
         return new Response(null, { status: 204 })
       }
     },
   })
-  const tree = await setup.waitForFrame((frame) => /⇄ Lab +people: 0 ×/.test(frame))
-  const cross = cell(tree, "people: 0 ×")
-  await setup.mockMouse.click(cross.x + "people: 0 ".length, cross.y)
+  const tree = await setup.waitForFrame((frame) => /⇄ Lab +×/.test(frame))
+  const row = tree.split("\n").findIndex((line) => line.includes("⇄ Lab"))
+  await setup.mockMouse.click(tree.split("\n")[row].indexOf("×"), row)
   const armed = await setup.waitForFrame((frame) => frame.includes("close?"))
   expect(closed).toEqual([])
   const sure = cell(armed, "close?")

@@ -9,12 +9,12 @@ export function roomClient(room: Pick<JoinedRoom, "url" | "token">) {
 // session transcript and the data layer use, answered by the room's guest
 // routes. Everything else belongs to the host and rejects, so a component that
 // reaches past the slice fails loudly instead of touching this computer's server.
-export function guestApi(room: JoinedRoom): OpenCodeClient {
+export function guestApi(room: JoinedRoom, sessionID?: string): OpenCodeClient {
   const remote = roomClient(room)
   const roomID = room.roomID
   const slice = {
     session: {
-      get: () => remote.room.guest.get({ roomID }).then((result) => result.session),
+      get: () => remote.room.guest.get({ roomID, sessionID }).then((result) => result.session),
       inbox: { list: async () => [] },
       form: { list: async () => [] },
     },
@@ -22,6 +22,7 @@ export function guestApi(room: JoinedRoom): OpenCodeClient {
       list: (input: { limit?: number; order?: "asc" | "desc"; cursor?: string; type?: string }) =>
         remote.room.guest.session.messages({
           roomID,
+          sessionID,
           limit: input.limit,
           order: input.order,
           cursor: input.cursor,
@@ -29,18 +30,20 @@ export function guestApi(room: JoinedRoom): OpenCodeClient {
         }),
     },
     permission: {
-      list: () => remote.room.guest.permission.list({ roomID }),
+      list: () => remote.room.guest.permission.list({ roomID, sessionID }),
       reply: (input: { requestID: string; decision: "once" | "always" | "reject"; message?: string }) =>
         remote.room.guest.permission.reply({
           roomID,
           requestID: input.requestID,
           decision: input.decision,
           message: input.message,
+          sessionID,
         }),
     },
     form: { list: async () => [] },
     event: {
-      subscribe: (options?: { signal?: AbortSignal; onActivity?: () => void }) => events(remote, roomID, options),
+      subscribe: (options?: { signal?: AbortSignal; onActivity?: () => void }) =>
+        events(remote, roomID, sessionID, options),
     },
   }
   // A typed client cannot be assembled from a slice; the proxy stands in for the rest of it.
@@ -53,9 +56,10 @@ export function guestApi(room: JoinedRoom): OpenCodeClient {
 async function* events(
   remote: ReturnType<typeof roomClient>,
   roomID: string,
+  sessionID: string | undefined,
   options?: { signal?: AbortSignal; onActivity?: () => void },
 ) {
-  const log = remote.room.guest.log({ roomID, follow: true }, options)[Symbol.asyncIterator]()
+  const log = remote.room.guest.log({ roomID, sessionID, follow: true }, options)[Symbol.asyncIterator]()
   for (let item = await log.next(); !item.done; item = await log.next()) {
     if (item.value.type === "log.synced") break
   }

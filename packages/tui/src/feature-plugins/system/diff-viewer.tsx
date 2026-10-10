@@ -1209,7 +1209,7 @@ function Commands(props: { context: Plugin.Context }) {
               : route.type === "session"
                 ? { type: "session", sessionID: route.sessionID }
                 : route.type === "room"
-                  ? { type: "room", url: route.url, roomID: route.roomID }
+                  ? { type: "room", url: route.url, roomID: route.roomID, sessionID: route.sessionID }
                   : {
                       type: "plugin",
                       id: route.id,

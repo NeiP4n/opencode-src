@@ -29,6 +29,8 @@ export type RoomRoute = {
   type: "room"
   url: string
   roomID: string
+  // A session of a project room; the room's own session when absent.
+  sessionID?: string
 }
 
 export type Route = HomeRoute | SessionRoute | PluginRoute | RoomRoute

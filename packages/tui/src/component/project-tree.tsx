@@ -1,7 +1,14 @@
 import { TextAttributes } from "@opentui/core"
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
-import type { OrchestraAccess, OrchestraProject } from "@opencode/client/promise"
+import type {
+  OrchestraAccess,
+  OrchestraProject,
+  RoomBan,
+  RoomInfo,
+  RoomMemberView,
+  SessionInfo,
+} from "@opencode/client/promise"
 import { Orchestra } from "@opencode/schema/orchestra"
 import { useClient } from "../context/client"
 import { useData } from "../context/data"
@@ -11,7 +18,8 @@ import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
 import { roomListChanged, roomListRevision, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
-import { DialogConnect, DialogHost, DialogPeople } from "./dialog-rooms"
+import { DialogConnect, DialogHost, nextRole, ROLE_LABEL } from "./dialog-rooms"
+import { roomClient } from "../util/room-guest"
 import { openProjectDialog } from "./dialog-project"
 import { useProjects } from "../context/projects"
 import { DialogPrompt } from "../ui/dialog-prompt"
@@ -44,22 +52,6 @@ export function ProjectTree(props: { width: number }) {
   const notes = useNotes()
   const [rooms] = createResource(roomListRevision, () => client.api.room.list().catch(() => []))
   const [joined, updateJoined] = useJoinedRooms()
-  // Guests connected to each hosted room, re-read every few seconds while the panel shows.
-  const [online, setOnline] = createSignal<Record<string, number>>({})
-  const countOnline = () =>
-    void Promise.all(
-      (rooms.latest ?? []).map((room) =>
-        client.api.room.member
-          .list({ roomID: room.id })
-          .then((members) => [room.id, members.filter((member) => member.online).length] as const)
-          .catch(() => [room.id, 0] as const),
-      ),
-    ).then((counts) => setOnline(Object.fromEntries(counts)))
-  createEffect(on(() => rooms.latest, countOnline))
-  onMount(() => {
-    const timer = setInterval(countOnline, 5000)
-    onCleanup(() => clearInterval(timer))
-  })
   const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
   const [access, setAccess] = createStore<Record<string, OrchestraAccess>>({})
   const [category, setCategory] = createStore<Record<string, string | undefined>>({})
@@ -176,7 +168,8 @@ export function ProjectTree(props: { width: number }) {
   }
 
   const roomKey = (room: JoinedRoom) => `room:${room.url}#${room.roomID}`
-  const openRoom = (room: JoinedRoom) => route.navigate({ type: "room", url: room.url, roomID: room.roomID })
+  const openRoom = (room: JoinedRoom, sessionID?: string) =>
+    route.navigate({ type: "room", url: room.url, roomID: room.roomID, sessionID })
   const viewing = (room: JoinedRoom) => route.data.type === "room" && sameRoom(route.data, room)
 
   // Leaving only forgets the token here; the host keeps the room and its chat.
@@ -398,6 +391,7 @@ export function ProjectTree(props: { width: number }) {
               )}
             </For>
           </box>
+          <RoomPeople rooms={rooms.latest ?? []} hover={hover} setHover={setHover} />
           <For each={rooms.latest ?? []}>
             {(room) => (
               <Row
@@ -411,21 +405,6 @@ export function ProjectTree(props: { width: number }) {
                 <box flexGrow={1} minWidth={0}>
                   <text fg={theme.text.base} wrapMode="none" truncate>
                     {room.name}
-                  </text>
-                </box>
-                <box
-                  onMouseUp={(event) => {
-                    event.stopPropagation()
-                    dialog.replace(
-                      () => <DialogPeople roomID={room.id} name={room.name} onClose={() => dialog.clear()} />,
-                      undefined,
-                      { size: "large" },
-                    )
-                    dialog.setCentered(true)
-                  }}
-                >
-                  <text fg={hover() === `hosted:${room.id}` ? theme.text.action.primary.base : theme.text.muted}>
-                    {` ${t("people: {count}", { count: online()[room.id] ?? 0 })}`}
                   </text>
                 </box>
                 <box
@@ -450,38 +429,47 @@ export function ProjectTree(props: { width: number }) {
           </For>
           <For each={joined.joined}>
             {(room) => (
-              <Row
-                id={roomKey(room)}
-                hover={hover}
-                setHover={setHover}
-                selected={viewing(room)}
-                onClick={() => openRoom(room)}
-              >
-                <text fg={theme.text.action.secondary.base}>{"  ⇄ "}</text>
-                <box flexGrow={1} minWidth={0}>
-                  <text fg={theme.text.base} wrapMode="none" truncate>
-                    {room.name}
-                    <span style={{ fg: theme.text.muted }}>{` · ${new URL(room.url).host}`}</span>
-                  </text>
-                </box>
-                <box
-                  onMouseOut={() => setArmed()}
-                  onMouseUp={(event) => {
-                    event.stopPropagation()
-                    leave(room)
-                  }}
+              <>
+                <Row
+                  id={roomKey(room)}
+                  hover={hover}
+                  setHover={setHover}
+                  selected={viewing(room) && route.data.type === "room" && !route.data.sessionID}
+                  onClick={() => openRoom(room)}
                 >
-                  <text
-                    fg={
-                      armed() === roomKey(room)
-                        ? theme.text.action.destructive.focused
-                        : theme.text.action.destructive.base
-                    }
+                  <text fg={theme.text.action.secondary.base}>{"  ⇄ "}</text>
+                  <box flexGrow={1} minWidth={0}>
+                    <text fg={theme.text.base} wrapMode="none" truncate>
+                      {room.name}
+                      <span style={{ fg: theme.text.muted }}>{` · ${new URL(room.url).host}`}</span>
+                    </text>
+                  </box>
+                  <box
+                    onMouseOut={() => setArmed()}
+                    onMouseUp={(event) => {
+                      event.stopPropagation()
+                      leave(room)
+                    }}
                   >
-                    {armed() === roomKey(room) ? ` ${t("leave?")}` : " ×"}
-                  </text>
-                </box>
-              </Row>
+                    <text
+                      fg={
+                        armed() === roomKey(room)
+                          ? theme.text.action.destructive.focused
+                          : theme.text.action.destructive.base
+                      }
+                    >
+                      {armed() === roomKey(room) ? ` ${t("leave?")}` : " ×"}
+                    </text>
+                  </box>
+                </Row>
+                <RoomSessions
+                  room={room}
+                  hover={hover}
+                  setHover={setHover}
+                  current={route.data.type === "room" && sameRoom(route.data, room) ? route.data.sessionID : undefined}
+                  onOpen={(sessionID) => openRoom(room, sessionID)}
+                />
+              </>
             )}
           </For>
           <Show when={(rooms.latest ?? []).length === 0 && joined.joined.length === 0}>
@@ -570,5 +558,223 @@ function ProjectNotes() {
         void notes.remove(target, note).catch(fail)
       }}
     />
+  )
+}
+
+// The sessions of a joined project room, under the room in the left panel, with a row to
+// start another. A room sharing one session lists nothing here; the room row opens it.
+function RoomSessions(props: {
+  room: JoinedRoom
+  hover: () => string | undefined
+  setHover: (id: string | undefined) => void
+  current?: string
+  onOpen: (sessionID: string) => void
+}) {
+  const theme = useTheme()
+  const toast = useToast()
+  const t = useT()
+  const remote = roomClient(props.room)
+  const roomID = props.room.roomID
+  const [sessions, setSessions] = createSignal<readonly SessionInfo[]>([])
+  const [project, setProject] = createSignal(false)
+  // A gone host or a removed guest just lists nothing; the room view says why.
+  const load = () =>
+    void Promise.all([remote.room.guest.get({ roomID }), remote.room.guest.session.list({ roomID })])
+      .then(([joined, list]) => {
+        setProject(joined.room.directory !== undefined)
+        setSessions(list)
+      })
+      .catch(() => setSessions([]))
+  onMount(() => {
+    load()
+    const timer = setInterval(load, 5000)
+    onCleanup(() => clearInterval(timer))
+  })
+  const start = () =>
+    void remote.room.guest.session
+      .create({ roomID })
+      .then((created) => {
+        setSessions((list) => [created, ...list])
+        props.onOpen(created.id)
+      })
+      .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
+  const key = (id: string) => `room:${props.room.url}#${roomID}:${id}`
+  return (
+    <Show when={project()}>
+      <For each={sessions()}>
+        {(session) => (
+          <Row
+            id={key(session.id)}
+            hover={props.hover}
+            setHover={props.setHover}
+            selected={props.current === session.id}
+            onClick={() => props.onOpen(session.id)}
+          >
+            <text fg={theme.text.muted}>{"      ○ "}</text>
+            <box flexGrow={1} minWidth={0}>
+              <text fg={theme.text.base} wrapMode="none" truncate>
+                {session.title || t("Untitled")}
+              </text>
+            </box>
+          </Row>
+        )}
+      </For>
+      <Row id={key("new")} hover={props.hover} setHover={props.setHover} onClick={start}>
+        <text fg={theme.text.muted}>{"      " + t("+ New session")}</text>
+      </Row>
+    </Show>
+  )
+}
+
+// Who is in the rooms this computer hosts, right under the Multiplayer heading: whether
+// each guest is connected, the role a click steps through, and removing or banning
+// after a second click. Banned guests follow, each with a way back in.
+function RoomPeople(props: {
+  rooms: readonly RoomInfo[]
+  hover: () => string | undefined
+  setHover: (id: string | undefined) => void
+}) {
+  const client = useClient()
+  const theme = useTheme()
+  const toast = useToast()
+  const t = useT()
+  const [open, setOpen] = createSignal(true)
+  const [members, setMembers] = createSignal<Record<string, readonly RoomMemberView[]>>({})
+  const [bans, setBans] = createSignal<Record<string, readonly RoomBan[]>>({})
+  const [armed, setArmed] = createSignal<string>()
+  // Guests report in every couple of seconds; reading as often keeps "online" honest.
+  const read = () =>
+    Promise.all(
+      props.rooms.map((room) =>
+        Promise.all([
+          client.api.room.member.list({ roomID: room.id }).catch(() => []),
+          client.api.room.ban.list({ roomID: room.id }).catch(() => []),
+        ]).then(([listed, banned]) => ({ id: room.id, listed, banned })),
+      ),
+    ).then((list) => {
+      setMembers(Object.fromEntries(list.map((item) => [item.id, item.listed])))
+      setBans(Object.fromEntries(list.map((item) => [item.id, item.banned])))
+    })
+  createEffect(
+    on(
+      () => props.rooms,
+      () => void read(),
+    ),
+  )
+  onMount(() => {
+    const timer = setInterval(() => void read(), 3000)
+    onCleanup(() => clearInterval(timer))
+  })
+
+  const people = () => props.rooms.flatMap((room) => (members()[room.id] ?? []).map((member) => ({ room, member })))
+  const banned = () => props.rooms.flatMap((room) => (bans()[room.id] ?? []).map((ban) => ({ room, ban })))
+  const named = (name: string, room: RoomInfo) => (props.rooms.length > 1 ? `${name} · ${room.name}` : name)
+
+  const act = (action: () => Promise<unknown>) =>
+    void action()
+      .then(read)
+      .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
+  const confirm = (key: string, action: () => Promise<unknown>) => {
+    if (armed() !== key) return setArmed(key)
+    setArmed()
+    act(action)
+  }
+  const cycle = (room: RoomInfo, member: RoomMemberView) => {
+    const role = nextRole(member.role)
+    setMembers((all) => ({
+      ...all,
+      [room.id]: (all[room.id] ?? []).map((item) => (item.id === member.id ? { ...item, role } : item)),
+    }))
+    act(() => client.api.room.member.update({ roomID: room.id, guestID: member.id, role }))
+  }
+  const destructive = (key: string) =>
+    armed() === key ? theme.text.action.destructive.focused : theme.text.action.destructive.base
+
+  return (
+    <Show when={props.rooms.length > 0}>
+      <Row id="people" hover={props.hover} setHover={props.setHover} onClick={() => setOpen(!open())}>
+        <text fg={theme.text.muted}>{open() ? "  ▾ " : "  ▸ "}</text>
+        <box flexGrow={1} minWidth={0}>
+          <text fg={theme.text.base} wrapMode="none" truncate>
+            {t("Participants")}
+          </text>
+        </box>
+        <text fg={theme.text.muted}>
+          {t("{online}/{total} online", {
+            online: people().filter((item) => item.member.online).length,
+            total: people().length,
+          })}
+        </text>
+      </Row>
+      <Show when={open()}>
+        <Show
+          when={people().length > 0}
+          fallback={
+            <box paddingLeft={6} paddingRight={1}>
+              <text fg={theme.text.muted}>{t("No guests have joined yet.")}</text>
+            </box>
+          }
+        >
+          <For each={people()}>
+            {(item) => (
+              <box flexDirection="row" paddingLeft={5} paddingRight={1}>
+                <text fg={item.member.online ? theme.text.feedback.success.base : theme.text.muted}>
+                  {item.member.online ? "● " : "○ "}
+                </text>
+                <box flexGrow={1} minWidth={0}>
+                  <text fg={theme.text.base} wrapMode="none" truncate>
+                    {named(item.member.name, item.room)}
+                  </text>
+                </box>
+                <box onMouseUp={() => cycle(item.room, item.member)}>
+                  <text fg={theme.text.formfield.base}>{` [${t(ROLE_LABEL[item.member.role])}]`}</text>
+                </box>
+                <box
+                  onMouseOut={() => setArmed()}
+                  onMouseUp={() =>
+                    confirm(`kick:${item.member.id}`, () =>
+                      client.api.room.member.remove({ roomID: item.room.id, guestID: item.member.id }),
+                    )
+                  }
+                >
+                  <text fg={destructive(`kick:${item.member.id}`)}>
+                    {armed() === `kick:${item.member.id}` ? ` ${t("Kick?")}` : " ×"}
+                  </text>
+                </box>
+                <box
+                  onMouseOut={() => setArmed()}
+                  onMouseUp={() =>
+                    confirm(`ban:${item.member.id}`, () =>
+                      client.api.room.member.ban({ roomID: item.room.id, guestID: item.member.id }),
+                    )
+                  }
+                >
+                  <text fg={destructive(`ban:${item.member.id}`)}>
+                    {armed() === `ban:${item.member.id}` ? ` ${t("Ban?")}` : ` ${t("ban")}`}
+                  </text>
+                </box>
+              </box>
+            )}
+          </For>
+        </Show>
+        <For each={banned()}>
+          {(item) => (
+            <box flexDirection="row" paddingLeft={5} paddingRight={1}>
+              <text fg={theme.text.action.destructive.base}>{"⊘ "}</text>
+              <box flexGrow={1} minWidth={0}>
+                <text fg={theme.text.muted} wrapMode="none" truncate>
+                  {named(item.ban.name, item.room)}
+                </text>
+              </box>
+              <box
+                onMouseUp={() => act(() => client.api.room.ban.remove({ roomID: item.room.id, banID: item.ban.id }))}
+              >
+                <text fg={theme.text.action.primary.base}>{` ${t("unban")}`}</text>
+              </box>
+            </box>
+          )}
+        </For>
+      </Show>
+    </Show>
   )
 }

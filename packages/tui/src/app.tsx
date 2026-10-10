@@ -1416,9 +1416,20 @@ function App() {
                 </Match>
                 <Match when={route.data.type === "room" ? route.data : undefined}>
                   {(target) => (
-                    // Keyed by the room so switching rooms starts a fresh chat; leaving a room drops it.
-                    <Show when={joinedRooms.joined.find((item) => sameRoom(item, target()))} keyed>
-                      {(room) => <RoomChat room={room} />}
+                    // Keyed by room and session so switching either starts a fresh view; leaving a room drops it.
+                    <Show
+                      when={
+                        joinedRooms.joined.some((item) => sameRoom(item, target()))
+                          ? `${target().url}#${target().roomID}#${target().sessionID ?? ""}`
+                          : undefined
+                      }
+                      keyed
+                    >
+                      {(view) => (
+                        <Show when={view ? joinedRooms.joined.find((item) => sameRoom(item, target())) : undefined}>
+                          {(room) => <RoomChat room={room()} sessionID={target().sessionID} />}
+                        </Show>
+                      )}
                     </Show>
                   )}
                 </Match>
