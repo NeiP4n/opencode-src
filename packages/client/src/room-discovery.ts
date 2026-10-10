@@ -12,6 +12,15 @@ export type FoundRoom = {
   readonly open: boolean
 }
 
+// An opencode server that answered, with the rooms it shares; a server sharing none is still listed.
+export type FoundServer = {
+  readonly url: string
+  readonly host: string
+  // This computer's own server, which answers the scan like any other.
+  readonly own: boolean
+  readonly rooms: readonly FoundRoom[]
+}
+
 // UDP ports a firewall must open for discovery: hosts listen on the first, guests on the second.
 export const DISCOVERY_PORTS = [PORT, REPLY_PORT] as const
 
@@ -20,33 +29,42 @@ const LIST_TIMEOUT_MS = 2000
 
 // Rooms shared by other computers on the local network. Broadcasts reach the
 // same Wi-Fi or LAN only; rooms over a VPN such as Radmin are joined by address.
-export async function scanRooms(): Promise<FoundRoom[]> {
+export async function scanRooms(): Promise<FoundServer[]> {
   const servers = await findServers()
-  const lists = await Promise.all(servers.map((server) => listRooms(server.url).catch(() => [])))
-  return lists.flat()
+  const found = await Promise.all(servers.map((server) => readServer(server.url, server.own).catch(() => undefined)))
+  return found.filter((server) => server !== undefined)
 }
 
-// Rooms one host shares, for an address typed by hand when broadcasts do not get through.
-export async function listRooms(url: string): Promise<FoundRoom[]> {
+// One host and the rooms it shares, for an address typed by hand when broadcasts do not get through.
+export async function readServer(url: string, own = false): Promise<FoundServer> {
   const list = await OpenCode.make({ baseUrl: url }).room.public({ signal: AbortSignal.timeout(LIST_TIMEOUT_MS) })
-  return list.rooms.map((room) => ({ id: room.id, name: room.name, host: list.host, url, open: room.open }))
+  return {
+    url,
+    host: list.host,
+    own,
+    rooms: list.rooms.map((room) => ({ id: room.id, name: room.name, host: list.host, url, open: room.open })),
+  }
 }
 
 function findServers() {
   const own = new Set(addresses().map((item) => item.address))
-  return new Promise<{ url: string }[]>((resolve) => {
-    const found = new Set<string>()
+  return new Promise<{ url: string; own: boolean }[]>((resolve) => {
+    // URL to whether it is this computer's server.
+    const found = new Map<string, boolean>()
     const socket = createSocket({ type: "udp4", reuseAddr: true })
     const finish = () => {
       clearTimeout(timer)
       socket.removeAllListeners()
       socket.close()
-      resolve([...found].map((url) => ({ url })))
+      resolve([...found].map(([url, own]) => ({ url, own })))
     }
     const timer = setTimeout(finish, LISTEN_MS)
     socket.on("message", (message, peer) => {
       const reply = decodeReply(message.toString())
-      if (reply && !own.has(peer.address)) found.add(`http://${peer.address}:${reply.port}`)
+      if (!reply) return
+      // This computer answers once per adapter; one loopback entry stands for all of them.
+      if (own.has(peer.address)) return found.set(`http://127.0.0.1:${reply.port}`, true)
+      found.set(`http://${peer.address}:${reply.port}`, false)
     })
     // A socket error ends the scan early with whatever answered so far.
     socket.once("error", finish)

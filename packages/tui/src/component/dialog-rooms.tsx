@@ -15,7 +15,7 @@ import { useT } from "../util/i18n"
 import { roomListChanged, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
 import { Button } from "./devtools-registry"
 import { roomClient } from "./room-chat"
-import { DISCOVERY_PORTS, listRooms, scanRooms, type FoundRoom } from "@opencode/client/room-discovery"
+import { DISCOVERY_PORTS, readServer, scanRooms, type FoundRoom } from "@opencode/client/room-discovery"
 
 // Host: the rooms this computer shares. A room is one session other devices
 // join with a short code; only this computer's AI answers in it.
@@ -263,9 +263,10 @@ export function DialogConnect(props: { onClose?: () => void }) {
     if (code) return enter(url, { code })
     setBusy(true)
     setJoinError()
-    void listRooms(url)
-      .then((rooms) => {
-        setFound((previous) => [...(previous ?? []).filter((room) => room.url !== url), ...rooms])
+    void readServer(url)
+      .then((server) => {
+        const rooms = server.rooms
+        setFound((previous) => [...(previous ?? []).filter((item) => item.url !== url), server])
         const unlocked = rooms.filter((room) => room.open)
         if (rooms.length === 0) return setJoinError(t("No rooms at this address"))
         if (unlocked.length === 1 && rooms.length === 1) return enter(url, { roomID: unlocked[0].id })
@@ -352,24 +353,40 @@ export function DialogConnect(props: { onClose?: () => void }) {
             {found.loading
               ? t("Searching…")
               : found()?.length
-                ? t("{count} found", { count: found()!.length })
-                : t("No rooms found")}
+                ? t("Servers found: {count}", { count: found()!.length })
+                : t("No servers found")}
           </text>
           <Button disabled={found.loading} onClick={() => void rescan()}>
             {t("Search again")}
           </Button>
         </box>
+        {/* Every server that answered, with its rooms; one sharing none shows so the operator knows it was reached. */}
         <For each={found() ?? []}>
-          {(room) => (
-            <box flexDirection="row" gap={1}>
-              <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
-                {room.name}
+          {(server) => (
+            <box>
+              <text fg={theme.text.muted} wrapMode="none" truncate>
+                {`${server.host} · ${new URL(server.url).host}${server.own ? ` · ${t("this computer")}` : ""}`}
               </text>
-              <text fg={theme.text.muted}>{`${room.host} · ${new URL(room.url).host}`}</text>
-              <box flexGrow={1} />
-              <Button variant="primary" disabled={busy()} onClick={() => pick(room)}>
-                {room.open ? t("Join") : t("Select")}
-              </Button>
+              <For each={server.rooms}>
+                {(room) => (
+                  <box flexDirection="row" gap={1} paddingLeft={2}>
+                    <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
+                      {room.name}
+                    </text>
+                    <box flexGrow={1} />
+                    <Button variant="primary" disabled={busy()} onClick={() => pick(room)}>
+                      {room.open ? t("Join") : t("Select")}
+                    </Button>
+                  </box>
+                )}
+              </For>
+              <Show when={server.rooms.length === 0}>
+                <box paddingLeft={2}>
+                  <text fg={theme.text.muted} wrapMode="word">
+                    {t("No rooms hosted yet: on that computer open a session and press + Host.")}
+                  </text>
+                </box>
+              </Show>
             </box>
           )}
         </For>

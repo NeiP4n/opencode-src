@@ -134,8 +134,6 @@ const ru: Record<string, string> = {
   // Connect
   "Rooms on this network": "Комнаты в этой сети",
   "Searching…": "Ищу…",
-  "{count} found": "Найдено: {count}",
-  "No rooms found": "Комнат не найдено",
   "Search again": "Искать снова",
   Select: "Выбрать",
   Join: "Войти",
@@ -154,6 +152,11 @@ const ru: Record<string, string> = {
   // Multiplayer: the left panel section and a joined room's chat
   Multiplayer: "Мультиплеер",
   "+ Host": "+ Хост",
+  "Servers found: {count}": "Найдено серверов: {count}",
+  "No servers found": "Серверов не найдено",
+  "this computer": "этот компьютер",
+  "No rooms hosted yet: on that computer open a session and press + Host.":
+    "Комнат пока нет: на том компьютере открой сессию и нажми «+ Хост».",
   "+ Connect": "+ Подключиться",
   hosting: "хост",
   "leave?": "выйти?",
