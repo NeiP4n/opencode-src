@@ -71,6 +71,7 @@ import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogOpen, DialogOpenKey, moveOpenSession } from "./component/dialog-open"
 import { ProjectTree } from "./component/project-tree"
 import { RoomChat } from "./component/room-chat"
+import { basicSymbolsNeeded, replaceMissingGlyphs } from "./ui/console-glyphs"
 import { DialogConnect, DialogHost } from "./component/dialog-rooms"
 import { sameRoom, useJoinedRooms } from "./util/room"
 import { openTeamEditor } from "./component/dialog-teams"
@@ -270,6 +271,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
         )
       })
       renderer.setMaxListeners(15)
+      if (basicSymbolsNeeded()) renderer.addPostProcessFn(replaceMissingGlyphs)
       const clipboard = yield* Effect.acquireRelease(
         Effect.sync(() => createTuiClipboard(renderer)),
         (clipboard) =>

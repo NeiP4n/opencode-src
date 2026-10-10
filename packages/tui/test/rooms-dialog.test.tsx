@@ -218,3 +218,17 @@ test("a joined room opens in the main area and stays in the left panel under Mul
     await host.stop()
   }
 })
+
+test("the classic Windows console gets drawable stand-ins for the panel's symbols", async () => {
+  process.env.OPENCODE_BASIC_SYMBOLS = "1"
+  try {
+    await using state = await tmpdir()
+    await using setup = await render(state.path)
+    const frame = await setup.waitForFrame((frame) => frame.includes("+ Connect"))
+    expect(frame).toContain("↔ Multiplayer")
+    expect(frame).not.toContain("⇄")
+    expect(frame).toContain("√ Server")
+  } finally {
+    delete process.env.OPENCODE_BASIC_SYMBOLS
+  }
+})
