@@ -118,7 +118,7 @@ export function DialogTeams(props: { onClose: () => void; tab?: Tab }) {
                     selected={index() === cursor()}
                     focused={focus.is("list")}
                     onClick={() => pick(id)}
-                    label={id === NEW ? t(tab() === "teams" ? "+ New team" : "+ New role") : (item()?.name ?? id)}
+                    label={id === NEW ? t(tab() === "teams" ? "+ New team" : "+ New role") : builtinName(t, item()) ?? id}
                     badge={item()?.origin === "builtin" ? undefined : item()?.origin}
                   />
                 )
@@ -535,7 +535,7 @@ function TeamForm(props: {
                         wrapMode="none"
                         truncate
                       >
-                        {role()?.name ?? member.agent}
+                        {builtinName(t, role()) ?? member.agent}
                       </text>
                     </box>
                     <text
@@ -589,6 +589,16 @@ function TeamForm(props: {
       />
     </box>
   )
+}
+
+// Built-in roles and teams ship with English names; unedited ones read in the operator's
+// language in lists. Forms keep the stored text, so saving never rewrites it unnoticed.
+export function builtinName(
+  t: (text: string) => string,
+  item: { name: string; origin: OrchestraRole["origin"] } | undefined,
+) {
+  if (!item) return undefined
+  return item.origin === "builtin" ? t(item.name) : item.name
 }
 
 const LABEL_WIDTH = 12

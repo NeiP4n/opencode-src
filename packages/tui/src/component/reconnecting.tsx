@@ -1,9 +1,11 @@
 import { RGBA } from "@opentui/core"
 import { useTheme } from "../context/theme"
+import { useT } from "../util/i18n"
 import { Spinner } from "./spinner"
 
 export function Reconnecting(props: { managed?: boolean }) {
   const theme = useTheme()
+  const t = useT()
 
   return (
     <box
@@ -28,11 +30,9 @@ export function Reconnecting(props: { managed?: boolean }) {
         paddingRight={2}
         gap={1}
       >
-        <Spinner color={theme.text.base}>{props.managed ? "Restarting service…" : "Connection lost…"}</Spinner>
+        <Spinner color={theme.text.base}>{t(props.managed ? "Restarting service…" : "Connection lost…")}</Spinner>
         <text fg={theme.text.muted}>
-          {props.managed
-            ? "Your session will resume automatically."
-            : "Reconnecting to the server automatically."}
+          {t(props.managed ? "Your session will resume automatically." : "Reconnecting to the server automatically.")}
         </text>
       </box>
     </box>

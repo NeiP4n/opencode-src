@@ -1,6 +1,6 @@
 import { TextAttributes, type InputRenderable } from "@opentui/core"
-import { createResource, createSignal, For, onMount, Show } from "solid-js"
-import type { OrchestraProject } from "@opencode/client/promise"
+import { createSignal, For, onMount, Show } from "solid-js"
+import type { OrchestraProject, OrchestraTemplate } from "@opencode/client/promise"
 import { useConfig } from "../config"
 import { useClient } from "../context/client"
 import { Keymap } from "../context/keymap"
@@ -9,8 +9,9 @@ import { useTheme } from "../context/theme"
 import type { DialogContext } from "../ui/dialog"
 import { errorMessage } from "../util/error"
 import { useT } from "../util/i18n"
+import { isRecord } from "../util/record"
 import { Button } from "./devtools-registry"
-import { openTeamEditor } from "./dialog-teams"
+import { builtinName, openTeamEditor } from "./dialog-teams"
 
 // Create a project, or rename it, move it to another directory or forget it.
 // Projects are the operator's own: a name and a directory, nothing discovered.
@@ -35,14 +36,19 @@ export function DialogProject(props: {
   const [busy, setBusy] = createSignal(false)
   const [armed, setArmed] = createSignal(false)
   const fields: { name?: InputRenderable; directory?: InputRenderable } = {}
-  const [templates] = createResource(
-    () => !props.project,
-    () => client.api.orchestra.template.list().catch(() => []),
-  )
+  // Loaded when the dialog opens, which may be while the client is still connecting:
+  // a failure is shown with a retry instead of an empty list that silently means "No team".
+  const [templates, setTemplates] = createSignal<readonly OrchestraTemplate[]>()
+  const [templatesFailed, setTemplatesFailed] = createSignal(false)
+  const loadTemplates = () => {
+    setTemplatesFailed(false)
+    client.api.orchestra.template.list().then(setTemplates, () => setTemplatesFailed(true))
+  }
   // 0 is "No team"; n picks templates()[n - 1].
   const [team, setTeam] = createSignal(0)
   const [teamFocused, setTeamFocused] = createSignal(false)
   const focusTeam = () => {
+    if (templatesFailed()) loadTemplates()
     fields.name?.blur()
     fields.directory?.blur()
     setTeamFocused(true)
@@ -56,18 +62,26 @@ export function DialogProject(props: {
     setTeam((team() + direction + count) % count)
   }
 
-  onMount(() =>
+  onMount(() => {
+    if (!props.project) loadTemplates()
     setTimeout(() => {
       if (fields.name && !fields.name.isDestroyed) fields.name.focus()
-    }, 1),
-  )
+    }, 1)
+  })
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true)
     setError()
     await action()
       .then(() => props.onDone())
-      .catch((cause: unknown) => setError(errorMessage(cause)))
+      .catch((cause: unknown) =>
+        // The server names the field it rejected; its own text is English.
+        setError(
+          isRecord(cause) && cause.field === "directory"
+            ? t("Not an existing directory: {directory}", { directory: fields.directory?.value.trim() ?? "" })
+            : errorMessage(cause),
+        ),
+      )
     setBusy(false)
   }
 
@@ -187,8 +201,10 @@ export function DialogProject(props: {
                 <TeamOption
                   selected={team() === index() + 1}
                   focused={teamFocused()}
-                  name={template.name}
-                  detail={template.members.map((member) => member.title).join(", ")}
+                  name={builtinName(t, template) ?? template.id}
+                  detail={template.members
+                    .map((member) => (template.origin === "builtin" ? t(member.title) : member.title))
+                    .join(", ")}
                   onClick={() => {
                     setTeam(index() + 1)
                     focusTeam()
@@ -196,6 +212,19 @@ export function DialogProject(props: {
                 />
               )}
             </For>
+            <Show when={!templates() && !templatesFailed()}>
+              <box paddingLeft={2}>
+                <text fg={theme.text.muted}>{t("Loading teams…")}</text>
+              </box>
+            </Show>
+            <Show when={templatesFailed()}>
+              <box flexDirection="row" gap={1} paddingLeft={2}>
+                <text fg={theme.text.feedback.error.base}>{t("Could not load teams")}</text>
+                <text fg={theme.text.action.primary.base} onMouseUp={loadTemplates}>
+                  {t("Retry")}
+                </text>
+              </box>
+            </Show>
             <Show when={props.onEditTeams}>
               <box paddingLeft={2} onMouseUp={editTeams}>
                 <text fg={theme.text.action.primary.base}>{t("Edit teams and roles…")}</text>

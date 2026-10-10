@@ -35,9 +35,10 @@ const feature = {
 
 type Call = { method: string; path: string; body?: unknown }
 
-function render(state: string, calls: Call[], language?: "ru") {
+function render(state: string, calls: Call[], language?: "ru", options: { templateFailures?: number } = {}) {
   const roles: Record<string, unknown>[] = [developer]
   const teams: Record<string, unknown>[] = [feature]
+  const failures = { templates: options.templateFailures ?? 0 }
   return createAppFixture({
     width: 140,
     height: 44,
@@ -48,6 +49,8 @@ function render(state: string, calls: Call[], language?: "ru") {
       const body = request.method === "GET" ? undefined : await request.json().catch(() => undefined)
       if (url.pathname.startsWith("/api/orchestra")) calls.push({ method: request.method, path: url.pathname, body })
       if (url.pathname === "/api/location") return json(location)
+      if (url.pathname === "/api/orchestra/project" && request.method === "POST")
+        return json({ _tag: "InvalidRequestError", message: "Not an existing directory: /nope", field: "directory" }, { status: 400 })
       if (url.pathname === "/api/orchestra/project") return json([])
       if (url.pathname === "/api/orchestra/role" && request.method === "POST") {
         const role = { ...(body as object), id: "auditor", agent: "team-auditor", origin: "custom" }
@@ -59,6 +62,10 @@ function render(state: string, calls: Call[], language?: "ru") {
         const team = { ...(body as object), id: "audit", origin: "custom" }
         teams.push(team)
         return json(team)
+      }
+      if (url.pathname === "/api/orchestra/template" && failures.templates > 0) {
+        failures.templates--
+        return new Response("unavailable", { status: 503 })
       }
       if (url.pathname === "/api/orchestra/template") return json(teams)
       if (url.pathname === "/api/session") return json({ data: [session], cursor: {} })
@@ -160,4 +167,34 @@ test("the team editor follows the language switch", async () => {
   expect(frame).toContain("+ Новая команда")
   expect(frame).toContain("Участники")
   expect(frame).not.toContain("Members")
+})
+
+async function openNewProject(setup: Awaited<ReturnType<typeof render>>, label: string) {
+  const bar = await setup.waitForFrame((frame) => frame.includes(label))
+  const item = cell(bar, label)
+  await setup.mockMouse.click(item.x + 1, item.y)
+}
+
+test("the new-project dialog says when teams did not load and retries", async () => {
+  await using state = await tmpdir()
+  await using setup = await render(state.path, [], undefined, { templateFailures: 1 })
+  await openNewProject(setup, "+ Project")
+  const failed = await setup.waitForFrame((frame) => frame.includes("Could not load teams"))
+  const retry = cell(failed, "Retry")
+  await setup.mockMouse.click(retry.x + 1, retry.y)
+  const loaded = await setup.waitForFrame((frame) => frame.includes("Feature") && frame.includes("Developer"))
+  expect(loaded).not.toContain("Could not load teams")
+})
+
+test("the new-project dialog reads built-in teams and a bad path in Russian", async () => {
+  await using state = await tmpdir()
+  await using setup = await render(state.path, [], "ru")
+  await openNewProject(setup, "+ Проект")
+  const frame = await setup.waitForFrame((frame) => frame.includes("Фича"))
+  expect(frame).toContain("Фича · Разработчик")
+  setup.mockInput.pressTab()
+  for (let i = 0; i < 80; i++) setup.mockInput.pressBackspace()
+  setup.mockInput.typeText("/nope")
+  setup.mockInput.pressEnter()
+  await setup.waitForFrame((frame) => frame.includes("Такого каталога нет: /nope"))
 })
