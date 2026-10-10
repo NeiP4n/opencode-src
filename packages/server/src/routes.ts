@@ -33,6 +33,7 @@ import { WellKnown } from "@opencode/core/wellknown"
 import { Workspace } from "@opencode/core/workspace"
 import { Room } from "@opencode/core/room"
 import { Orchestra } from "@opencode/core/orchestra"
+import { Peer } from "@opencode/core/peer"
 import { Watcher } from "@opencode/core/filesystem/watcher"
 import { HttpRouter } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -76,6 +77,7 @@ const applicationServiceNodes = [
   ServerRooms.node,
   Room.node,
   Orchestra.node,
+  Peer.node,
   LocationServiceMap.node,
   LocationActivity.node,
   SessionRestart.node,

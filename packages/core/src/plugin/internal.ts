@@ -76,6 +76,8 @@ import { OpenCodeTools } from "../tool/plugin/opencode.js"
 import { HubTool } from "../tool/plugin/hub.js"
 import { OrchestraTool } from "../tool/plugin/orchestra.js"
 import { Orchestra } from "../orchestra.js"
+import { PeerTool } from "../tool/plugin/peer.js"
+import { Peer } from "../peer.js"
 import { QuestionTool } from "../tool/plugin/question.js"
 import { ReadToolFileSystem } from "../tool/read-filesystem.js"
 import { ReadTool } from "../tool/plugin/read.js"
@@ -134,6 +136,7 @@ const services = [
   Job.Service,
   KV.Service,
   Orchestra.Service,
+  Peer.Service,
   LLMClient.Service,
   Location.Service,
   ManagedPolicy.Service,
@@ -189,6 +192,7 @@ export const requirements = LayerNode.group([
   Job.node,
   KV.node,
   Orchestra.node,
+  Peer.node,
   llmClient,
   Location.node,
   ManagedPolicy.node,
@@ -251,6 +255,7 @@ const pre = [
   ReadTool.Plugin,
   HubTool.Plugin,
   OrchestraTool.Plugin,
+  PeerTool.Plugin,
   ShellTool.Plugin,
   SkillTool.Plugin,
   NoteTool.Plugin,

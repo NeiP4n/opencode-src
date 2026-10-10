@@ -2276,7 +2276,10 @@ function UserMessage(props: { message: SessionMessageUser }) {
   const [hover, setHover] = createSignal(false)
   const color = createMemo(() => local.agent.color(data.session.get(ctx.sessionID)?.agent ?? "build"))
   const delivery = createMemo(() => ctx.pendingDelivery(props.message.id))
-  const guest = createMemo(() => roomAuthor(props.message.metadata)?.guest.name)
+  const guest = createMemo(() => {
+    const author = roomAuthor(props.message.metadata)
+    return author && (author.ai ? `${author.guest.name}'s AI` : author.guest.name)
+  })
   const dialog = useDialog()
   const renderer = useRenderer()
   const promptRef = usePromptRef()

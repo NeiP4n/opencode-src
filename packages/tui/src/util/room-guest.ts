@@ -5,6 +5,18 @@ export function roomClient(room: Pick<JoinedRoom, "url" | "token">) {
   return OpenCode.make({ baseUrl: room.url, headers: { authorization: `Bearer ${room.token}` } })
 }
 
+// The joined room as this computer's server keeps it, so this computer's AI can work with
+// the AI there. Registering is idempotent; a server that cannot be reached is told next time.
+export function linkRoom(client: OpenCodeClient, room: JoinedRoom) {
+  return client.room.link
+    .save({ url: room.url, roomID: room.roomID, token: room.token, name: room.name, guest: room.guest })
+    .catch(() => undefined)
+}
+
+export function unlinkRoom(client: OpenCodeClient, room: Pick<JoinedRoom, "url" | "roomID">) {
+  return client.room.link.remove({ url: room.url, roomID: room.roomID }).catch(() => undefined)
+}
+
 // Tells the host this guest left, so it drops out of the host's participants. A host
 // that is gone cannot hear it; the room is forgotten here either way.
 export function tellHostLeft(room: Pick<JoinedRoom, "url" | "token" | "roomID">) {

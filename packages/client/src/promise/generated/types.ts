@@ -485,6 +485,8 @@ export type RoomInfo1 = {
   created: number | "Infinity" | "-Infinity" | "NaN"
 }
 
+export type RoomLink = { url: string; roomID: string; token: string; name: string; guest: string }
+
 export type RoomMemberView = {
   id: string
   name: string
@@ -7323,6 +7325,55 @@ export type RoomGuestSessionMessagesOutput = {
   cursor: { previous?: string | null; next?: string | null }
 }
 
+export type RoomLinkListOutput = { data: Array<RoomLink> }["data"]
+
+export type RoomLinkSaveInput = {
+  readonly url: {
+    readonly url: string
+    readonly roomID: string
+    readonly token: string
+    readonly name: string
+    readonly guest: string
+  }["url"]
+  readonly roomID: {
+    readonly url: string
+    readonly roomID: string
+    readonly token: string
+    readonly name: string
+    readonly guest: string
+  }["roomID"]
+  readonly token: {
+    readonly url: string
+    readonly roomID: string
+    readonly token: string
+    readonly name: string
+    readonly guest: string
+  }["token"]
+  readonly name: {
+    readonly url: string
+    readonly roomID: string
+    readonly token: string
+    readonly name: string
+    readonly guest: string
+  }["name"]
+  readonly guest: {
+    readonly url: string
+    readonly roomID: string
+    readonly token: string
+    readonly name: string
+    readonly guest: string
+  }["guest"]
+}
+
+export type RoomLinkSaveOutput = void
+
+export type RoomLinkRemoveInput = {
+  readonly url: { readonly url: string; readonly roomID: string }["url"]
+  readonly roomID: { readonly url: string; readonly roomID: string }["roomID"]
+}
+
+export type RoomLinkRemoveOutput = void
+
 export type RoomGuestLeaveInput = { readonly roomID: { readonly roomID: string }["roomID"] }
 
 export type RoomGuestLeaveOutput = void
@@ -7455,8 +7506,21 @@ export type RoomGuestNoteOutput = { data: NoteInfo | null }["data"]
 
 export type RoomGuestPromptInput = {
   readonly roomID: { readonly roomID: string }["roomID"]
-  readonly text: { readonly text: string; readonly sessionID?: string | undefined }["text"]
-  readonly sessionID?: { readonly text: string; readonly sessionID?: string | undefined }["sessionID"]
+  readonly text: {
+    readonly text: string
+    readonly sessionID?: string | undefined
+    readonly ai?: boolean | undefined
+  }["text"]
+  readonly sessionID?: {
+    readonly text: string
+    readonly sessionID?: string | undefined
+    readonly ai?: boolean | undefined
+  }["sessionID"]
+  readonly ai?: {
+    readonly text: string
+    readonly sessionID?: string | undefined
+    readonly ai?: boolean | undefined
+  }["ai"]
 }
 
 export type RoomGuestPromptOutput = { data: SessionInboxUser }["data"]

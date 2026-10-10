@@ -37,6 +37,15 @@ export function isRoomGuestURL(url: URL) {
   return GUEST_PATH.test(url.pathname)
 }
 
+// A room on another computer this computer joined, with the guest token its host issued.
+const RoomLink = Schema.Struct({
+  url: Schema.String,
+  roomID: Schema.String,
+  token: Schema.String,
+  name: Schema.String,
+  guest: Schema.String,
+}).annotate({ identifier: "Room.Link" })
+
 export const RoomGroup = HttpApiGroup.make("server.room")
   .add(
     HttpApiEndpoint.get("room.list", "/api/room", {
@@ -189,6 +198,41 @@ export const RoomGroup = HttpApiGroup.make("server.room")
     ),
   )
   .add(
+    HttpApiEndpoint.get("room.link.list", "/api/room/link", {
+      success: Schema.Struct({ data: Schema.Array(RoomLink) }),
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.link.list",
+        summary: "List joined rooms",
+        description: "Rooms on other computers this computer joined, which its AI can work with.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.put("room.link.save", "/api/room/link", {
+      payload: RoomLink,
+      success: HttpApiSchema.NoContent,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.link.save",
+        summary: "Remember a joined room",
+        description: "Keep a room this computer joined, with its guest token, so this computer's AI can reach it.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("room.link.remove", "/api/room/link/remove", {
+      payload: Schema.Struct({ url: Schema.String, roomID: Schema.String }),
+      success: HttpApiSchema.NoContent,
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.link.remove",
+        summary: "Forget a joined room",
+        description: "Forget a room this computer left; its AI no longer reaches it.",
+      }),
+    ),
+  )
+  .add(
     HttpApiEndpoint.delete("room.guest.leave", "/api/room/:roomID/guest", {
       params: { roomID: Room.ID },
       success: HttpApiSchema.NoContent,
@@ -197,7 +241,8 @@ export const RoomGroup = HttpApiGroup.make("server.room")
       OpenApi.annotations({
         identifier: "room.guest.leave",
         summary: "Leave the room",
-        description: "Stop being a member of the room; the guest's token stops working and the host no longer lists it.",
+        description:
+          "Stop being a member of the room; the guest's token stops working and the host no longer lists it.",
       }),
     ),
   )
@@ -456,7 +501,12 @@ export const RoomGroup = HttpApiGroup.make("server.room")
   .add(
     HttpApiEndpoint.post("room.guest.prompt", "/api/room/:roomID/guest/prompt", {
       params: { roomID: Room.ID },
-      payload: Schema.Struct({ text: Schema.String, sessionID: Session.ID.pipe(Schema.optional) }),
+      payload: Schema.Struct({
+        text: Schema.String,
+        sessionID: Session.ID.pipe(Schema.optional),
+        // Set when the guest's AI writes rather than the person, so the host shows it as such.
+        ai: Schema.Boolean.pipe(Schema.optional),
+      }),
       success: Schema.Struct({ data: SessionInbox.User }),
       error: [UnauthorizedError, ForbiddenError, RoomNotFoundError, SessionNotFoundError, InvalidRequestError],
     }).annotateMerge(

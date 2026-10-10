@@ -19,7 +19,7 @@ import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
 import { roomListChanged, roomListRevision, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
 import { DialogConnect, DialogHost, nextRole, ROLE_LABEL } from "./dialog-rooms"
-import { roomClient, tellHostLeft } from "../util/room-guest"
+import { roomClient, tellHostLeft, unlinkRoom } from "../util/room-guest"
 import { openProjectDialog } from "./dialog-project"
 import { useProjects } from "../context/projects"
 import { DialogPrompt } from "../ui/dialog-prompt"
@@ -178,6 +178,7 @@ export function ProjectTree(props: { width: number }) {
     setArmed()
     if (viewing(room)) route.navigate({ type: "home" })
     void tellHostLeft(room)
+    void unlinkRoom(client.api, room)
     void updateJoined((draft) => {
       draft.joined = draft.joined.filter((item) => !sameRoom(item, room))
     })

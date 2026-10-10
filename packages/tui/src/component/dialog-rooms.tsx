@@ -16,7 +16,7 @@ import { errorMessage } from "../util/error"
 import { useT } from "../util/i18n"
 import { roomListChanged, sameRoom, useDeviceKey, useJoinedRooms, type JoinedRoom } from "../util/room"
 import { Button } from "./devtools-registry"
-import { roomClient, tellHostLeft } from "../util/room-guest"
+import { roomClient, tellHostLeft, unlinkRoom } from "../util/room-guest"
 import { DISCOVERY_PORTS, readServer, scanRooms, type FoundRoom } from "@opencode/client/room-discovery"
 
 // Host: the rooms this computer shares. A room is one session other devices
@@ -314,6 +314,7 @@ export function DialogHost(props: { onClose?: () => void }) {
 // window opens; any room can also be reached by address, with the join code
 // unless its host lets guests in without one.
 export function DialogConnect(props: { onClose?: () => void }) {
+  const client = useClient()
   const dialog = useDialog()
   const route = useRoute()
   const theme = useTheme().surface("dialog")
@@ -393,6 +394,7 @@ export function DialogConnect(props: { onClose?: () => void }) {
     if (armed() !== key) return setArmed(key)
     setArmed()
     void tellHostLeft(room)
+    void unlinkRoom(client.api, room)
     void updateSaved((draft) => {
       draft.joined = draft.joined.filter((item) => !sameRoom(item, room))
     })

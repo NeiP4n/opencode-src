@@ -301,6 +301,11 @@ import type {
   RoomGuestGetOutput,
   RoomGuestSessionMessagesInput,
   RoomGuestSessionMessagesOutput,
+  RoomLinkListOutput,
+  RoomLinkSaveInput,
+  RoomLinkSaveOutput,
+  RoomLinkRemoveInput,
+  RoomLinkRemoveOutput,
   RoomGuestLeaveInput,
   RoomGuestLeaveOutput,
   RoomGuestSessionListInput,
@@ -1868,6 +1873,34 @@ const EndpointRoomGuestSessionMessages = (raw: RawClient["server.room"]) => (inp
     }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointRoomLinkList = (raw: RawClient["server.room"]) => () =>
+  preserveEffect<RoomLinkListOutput>()(
+    raw["room.link.list"]({}).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointRoomLinkSave = (raw: RawClient["server.room"]) => (input: RoomLinkSaveInput) =>
+  preserveEffect<RoomLinkSaveOutput>()(
+    raw["room.link.save"]({
+      payload: {
+        url: input["url"],
+        roomID: input["roomID"],
+        token: input["token"],
+        name: input["name"],
+        guest: input["guest"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointRoomLinkRemove = (raw: RawClient["server.room"]) => (input: RoomLinkRemoveInput) =>
+  preserveEffect<RoomLinkRemoveOutput>()(
+    raw["room.link.remove"]({ payload: { url: input["url"], roomID: input["roomID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
 const EndpointRoomGuestLeave = (raw: RawClient["server.room"]) => (input: RoomGuestLeaveInput) =>
   preserveEffect<RoomGuestLeaveOutput>()(
     raw["room.guest.leave"]({ params: { roomID: input["roomID"] } }).pipe(Effect.mapError(mapClientError)),
@@ -2018,7 +2051,7 @@ const EndpointRoomGuestPrompt = (raw: RawClient["server.room"]) => (input: RoomG
   preserveEffect<RoomGuestPromptOutput>()(
     raw["room.guest.prompt"]({
       params: { roomID: input["roomID"] },
-      payload: { text: input["text"], sessionID: input["sessionID"] },
+      payload: { text: input["text"], sessionID: input["sessionID"], ai: input["ai"] },
     }).pipe(
       Effect.mapError(mapClientError),
       Effect.map((value) => value.data),
@@ -2072,6 +2105,7 @@ const adaptGroupRoom = (raw: RawClient["server.room"]) => ({
     prompt: EndpointRoomGuestPrompt(raw),
     permission: { list: EndpointRoomGuestPermissionList(raw), reply: EndpointRoomGuestPermissionReply(raw) },
   },
+  link: { list: EndpointRoomLinkList(raw), save: EndpointRoomLinkSave(raw), remove: EndpointRoomLinkRemove(raw) },
   member: {
     list: EndpointRoomMemberList(raw),
     update: EndpointRoomMemberUpdate(raw),

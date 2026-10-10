@@ -8,6 +8,8 @@ const RoomMetadata = Schema.Struct({
   room: Schema.Struct({
     id: Schema.String,
     guest: Schema.Struct({ id: Schema.String, name: Schema.String }),
+    // Set when the guest's AI wrote it rather than the person.
+    ai: Schema.Boolean.pipe(Schema.optional),
   }),
 })
 const decodeRoomMetadata = Schema.decodeUnknownOption(RoomMetadata)

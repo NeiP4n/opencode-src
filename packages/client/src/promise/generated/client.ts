@@ -299,6 +299,11 @@ import type {
   RoomGuestGetOutput,
   RoomGuestSessionMessagesInput,
   RoomGuestSessionMessagesOutput,
+  RoomLinkListOutput,
+  RoomLinkSaveInput,
+  RoomLinkSaveOutput,
+  RoomLinkRemoveInput,
+  RoomLinkRemoveOutput,
   RoomGuestLeaveInput,
   RoomGuestLeaveOutput,
   RoomGuestSessionListInput,
@@ -2723,7 +2728,7 @@ export function make(options: ClientOptions) {
             {
               method: "POST",
               path: `/api/room/${encodeURIComponent(input.roomID)}/guest/prompt`,
-              body: { text: input["text"], sessionID: input["sessionID"] },
+              body: { text: input["text"], sessionID: input["sessionID"], ai: input["ai"] },
               successStatus: 200,
               declaredStatuses: [400, 401, 403, 404],
               empty: false,
@@ -2756,6 +2761,43 @@ export function make(options: ClientOptions) {
               requestOptions,
             ),
         },
+      },
+      link: {
+        list: (requestOptions?: RequestOptions) =>
+          request<{ readonly data: RoomLinkListOutput }>(
+            { method: "GET", path: `/api/room/link`, successStatus: 200, declaredStatuses: [400, 401], empty: false },
+            requestOptions,
+          ).then((value) => value.data),
+        save: (input: RoomLinkSaveInput, requestOptions?: RequestOptions) =>
+          request<RoomLinkSaveOutput>(
+            {
+              method: "PUT",
+              path: `/api/room/link`,
+              body: {
+                url: input["url"],
+                roomID: input["roomID"],
+                token: input["token"],
+                name: input["name"],
+                guest: input["guest"],
+              },
+              successStatus: 204,
+              declaredStatuses: [400, 401],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        remove: (input: RoomLinkRemoveInput, requestOptions?: RequestOptions) =>
+          request<RoomLinkRemoveOutput>(
+            {
+              method: "POST",
+              path: `/api/room/link/remove`,
+              body: { url: input["url"], roomID: input["roomID"] },
+              successStatus: 204,
+              declaredStatuses: [400, 401],
+              empty: true,
+            },
+            requestOptions,
+          ),
       },
       member: {
         list: (input: RoomMemberListInput, requestOptions?: RequestOptions) =>

@@ -2573,6 +2573,29 @@ export type RoomGuestSessionMessagesOperation<E = never> = (
   input: RoomGuestSessionMessagesInput,
 ) => Effect.Effect<RoomGuestSessionMessagesOutput, E>
 
+export type RoomLinkListOutput = ReadonlyArray<{
+  readonly url: string
+  readonly roomID: string
+  readonly token: string
+  readonly name: string
+  readonly guest: string
+}>
+export type RoomLinkListOperation<E = never> = () => Effect.Effect<RoomLinkListOutput, E>
+
+export type RoomLinkSaveInput = {
+  readonly url: string
+  readonly roomID: string
+  readonly token: string
+  readonly name: string
+  readonly guest: string
+}
+export type RoomLinkSaveOutput = void
+export type RoomLinkSaveOperation<E = never> = (input: RoomLinkSaveInput) => Effect.Effect<RoomLinkSaveOutput, E>
+
+export type RoomLinkRemoveInput = { readonly url: string; readonly roomID: string }
+export type RoomLinkRemoveOutput = void
+export type RoomLinkRemoveOperation<E = never> = (input: RoomLinkRemoveInput) => Effect.Effect<RoomLinkRemoveOutput, E>
+
 export type RoomGuestLeaveInput = { readonly roomID: Room.ID }
 export type RoomGuestLeaveOutput = void
 export type RoomGuestLeaveOperation<E = never> = (input: RoomGuestLeaveInput) => Effect.Effect<RoomGuestLeaveOutput, E>
@@ -3636,6 +3659,7 @@ export type RoomGuestPromptInput = {
   readonly roomID: Room.ID
   readonly text: string
   readonly sessionID?: Session.ID | undefined
+  readonly ai?: boolean | undefined
 }
 export type RoomGuestPromptOutput = SessionInbox.User
 export type RoomGuestPromptOperation<E = never> = (
@@ -3690,6 +3714,11 @@ export interface RoomApi<E = never> {
       readonly list: RoomGuestPermissionListOperation<E>
       readonly reply: RoomGuestPermissionReplyOperation<E>
     }
+  }
+  readonly link: {
+    readonly list: RoomLinkListOperation<E>
+    readonly save: RoomLinkSaveOperation<E>
+    readonly remove: RoomLinkRemoveOperation<E>
   }
   readonly member: {
     readonly list: RoomMemberListOperation<E>

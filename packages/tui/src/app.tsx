@@ -74,6 +74,7 @@ import { RoomChat } from "./component/room-chat"
 import { basicSymbolsNeeded, replaceMissingGlyphs } from "./ui/console-glyphs"
 import { DialogConnect, DialogHost } from "./component/dialog-rooms"
 import { sameRoom, useJoinedRooms } from "./util/room"
+import { linkRoom } from "./util/room-guest"
 import { openTeamEditor } from "./component/dialog-teams"
 import { ProjectsProvider } from "./context/projects"
 import { NotesProvider } from "./context/notes"
@@ -481,6 +482,8 @@ function App() {
   const keymap = Keymap.use()
   const event = useEvent()
   const client = useClient()
+  // Joined rooms live in client storage; the server learns them so this computer's AI can reach them.
+  createEffect(() => joinedRooms.joined.forEach((room) => void linkRoom(client.api, { ...room })))
   const toast = useToast()
   const updater = useUpdateNotification()
   const theme = useTheme()

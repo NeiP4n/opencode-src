@@ -2,6 +2,7 @@ import { Instance } from "@opencode/core/instance/service"
 import { NoteStore } from "@opencode/core/note"
 import { Permission } from "@opencode/core/permission"
 import { Room } from "@opencode/core/room"
+import { Peer } from "@opencode/core/peer"
 import { Session } from "@opencode/core/session"
 import { Model } from "@opencode/core/model"
 import { Agent } from "@opencode/core/agent"
@@ -79,6 +80,7 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
     const sessions = yield* Session.Service
     const instances = yield* Instance.Service
     const auth = yield* ServerAuth.Config
+    const peers = yield* Peer.Service
 
     // Guest routes skip the server credential; the room token is the only proof,
     // and it only opens the room it was issued for, while the host keeps its guest a member.
@@ -343,7 +345,9 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
                 sessionID: session.id,
                 text: ctx.payload.text,
                 // The server stamps the author from the token, so a guest cannot speak as someone else.
-                metadata: { room: { id: joined.room.id, guest: joined.guest } },
+                metadata: {
+                  room: { id: joined.room.id, guest: joined.guest, ...(ctx.payload.ai ? { ai: true } : {}) },
+                },
               })
               .pipe(Effect.catchTag("Session.NotFoundError", missingSession), Effect.orDie),
           }
@@ -377,6 +381,11 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
           }).pipe(instances.provide(session), locationErrors, Effect.catchTag("LocationNotFoundError", Effect.die))
           return HttpApiSchema.NoContent.make()
         }),
+      )
+      .handle("room.link.list", () => peers.links().pipe(Effect.map((data) => ({ data }))))
+      .handle("room.link.save", (ctx) => peers.saveLink(ctx.payload).pipe(Effect.as(HttpApiSchema.NoContent.make())))
+      .handle("room.link.remove", (ctx) =>
+        peers.removeLink(ctx.payload).pipe(Effect.as(HttpApiSchema.NoContent.make())),
       )
       .handle(
         "room.guest.leave",
