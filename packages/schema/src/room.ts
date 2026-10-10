@@ -18,9 +18,10 @@ export type ID = typeof ID.Type
 export const AiMessaging = Schema.Literals(["linked", "discovered"])
 export type AiMessaging = typeof AiMessaging.Type
 
-// What a guest may do in a room. Viewers read, members also post prompts, and
-// helpers also answer the host model's permission requests.
-export const Role = Schema.Literals(["viewer", "member", "helper"])
+// What a guest may do in a room. Viewers read, members also post prompts and start
+// sessions, helpers also answer the host model's permission requests, and cohosts also
+// pick the model and agent and run commands.
+export const Role = Schema.Literals(["viewer", "member", "helper", "cohost"])
 export type Role = typeof Role.Type
 
 export const Info = Schema.Struct({
@@ -33,6 +34,9 @@ export const Info = Schema.Struct({
   guestApprovals: Schema.Boolean,
   // The role a guest gets on joining; absent on rooms saved before roles existed.
   defaultRole: Role.pipe(Schema.optional),
+  // Set when the room shares a whole project: every session under this directory, and
+  // new ones guests start there. Without it the room shares sessionID alone.
+  directory: Schema.String.pipe(Schema.optional),
   // Whether guests may join without a code; absent on rooms saved before the option existed.
   open: Schema.Boolean.pipe(Schema.optional),
   created: Schema.Number,

@@ -2496,8 +2496,9 @@ export type RoomCreateInput = {
   readonly name?: string | undefined
   readonly ai?: "linked" | "discovered" | undefined
   readonly guestApprovals?: boolean | undefined
-  readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+  readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
   readonly open?: boolean | undefined
+  readonly directory?: string | undefined
 }
 export type RoomCreateOutput = Room.Info
 export type RoomCreateOperation<E = never> = (input: RoomCreateInput) => Effect.Effect<RoomCreateOutput, E>
@@ -2507,7 +2508,7 @@ export type RoomUpdateInput = {
   readonly name?: string | undefined
   readonly ai?: "linked" | "discovered" | undefined
   readonly guestApprovals?: boolean | undefined
-  readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+  readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
   readonly open?: boolean | undefined
 }
 export type RoomUpdateOutput = Room.Info
@@ -2536,11 +2537,11 @@ export type RoomJoinInput = {
 export type RoomJoinOutput = Room.Joined
 export type RoomJoinOperation<E = never> = (input: RoomJoinInput) => Effect.Effect<RoomJoinOutput, E>
 
-export type RoomGuestGetInput = { readonly roomID: Room.ID }
+export type RoomGuestGetInput = { readonly roomID: Room.ID; readonly sessionID?: Session.ID | undefined }
 export type RoomGuestGetOutput = {
   readonly room: Room.Info
   readonly guest: Room.Guest
-  readonly role: "viewer" | "member" | "helper"
+  readonly role: "viewer" | "member" | "helper" | "cohost"
   readonly session: Session.Info
 }
 export type RoomGuestGetOperation<E = never> = (input: RoomGuestGetInput) => Effect.Effect<RoomGuestGetOutput, E>
@@ -2562,6 +2563,7 @@ export type RoomGuestSessionMessagesInput = {
     | "assistant"
     | "compaction"
     | undefined
+  readonly sessionID?: Session.ID | undefined
 }
 export type RoomGuestSessionMessagesOutput = {
   readonly data: ReadonlyArray<SessionMessage.Info>
@@ -2571,6 +2573,67 @@ export type RoomGuestSessionMessagesOperation<E = never> = (
   input: RoomGuestSessionMessagesInput,
 ) => Effect.Effect<RoomGuestSessionMessagesOutput, E>
 
+export type RoomGuestSessionListInput = { readonly roomID: Room.ID }
+export type RoomGuestSessionListOutput = ReadonlyArray<Session.Info>
+export type RoomGuestSessionListOperation<E = never> = (
+  input: RoomGuestSessionListInput,
+) => Effect.Effect<RoomGuestSessionListOutput, E>
+
+export type RoomGuestSessionCreateInput = { readonly roomID: Room.ID; readonly title?: string | undefined }
+export type RoomGuestSessionCreateOutput = Session.Info
+export type RoomGuestSessionCreateOperation<E = never> = (
+  input: RoomGuestSessionCreateInput,
+) => Effect.Effect<RoomGuestSessionCreateOutput, E>
+
+export type RoomGuestModelListInput = { readonly roomID: Room.ID }
+export type RoomGuestModelListOutput = ReadonlyArray<Model.Info>
+export type RoomGuestModelListOperation<E = never> = (
+  input: RoomGuestModelListInput,
+) => Effect.Effect<RoomGuestModelListOutput, E>
+
+export type RoomGuestAgentListInput = { readonly roomID: Room.ID }
+export type RoomGuestAgentListOutput = ReadonlyArray<Agent.Info>
+export type RoomGuestAgentListOperation<E = never> = (
+  input: RoomGuestAgentListInput,
+) => Effect.Effect<RoomGuestAgentListOutput, E>
+
+export type RoomGuestCommandListInput = { readonly roomID: Room.ID }
+export type RoomGuestCommandListOutput = ReadonlyArray<Command.Info>
+export type RoomGuestCommandListOperation<E = never> = (
+  input: RoomGuestCommandListInput,
+) => Effect.Effect<RoomGuestCommandListOutput, E>
+
+export type RoomGuestSessionModelInput = {
+  readonly roomID: Room.ID
+  readonly sessionID: Session.ID
+  readonly model: Model.Ref
+}
+export type RoomGuestSessionModelOutput = void
+export type RoomGuestSessionModelOperation<E = never> = (
+  input: RoomGuestSessionModelInput,
+) => Effect.Effect<RoomGuestSessionModelOutput, E>
+
+export type RoomGuestSessionAgentInput = {
+  readonly roomID: Room.ID
+  readonly sessionID: Session.ID
+  readonly agent: Agent.ID
+}
+export type RoomGuestSessionAgentOutput = void
+export type RoomGuestSessionAgentOperation<E = never> = (
+  input: RoomGuestSessionAgentInput,
+) => Effect.Effect<RoomGuestSessionAgentOutput, E>
+
+export type RoomGuestSessionCommandInput = {
+  readonly roomID: Room.ID
+  readonly sessionID: Session.ID
+  readonly name: string
+  readonly text: string
+}
+export type RoomGuestSessionCommandOutput = void
+export type RoomGuestSessionCommandOperation<E = never> = (
+  input: RoomGuestSessionCommandInput,
+) => Effect.Effect<RoomGuestSessionCommandOutput, E>
+
 export type RoomMemberListInput = { readonly roomID: Room.ID }
 export type RoomMemberListOutput = ReadonlyArray<Room.MemberView>
 export type RoomMemberListOperation<E = never> = (input: RoomMemberListInput) => Effect.Effect<RoomMemberListOutput, E>
@@ -2578,7 +2641,7 @@ export type RoomMemberListOperation<E = never> = (input: RoomMemberListInput) =>
 export type RoomMemberUpdateInput = {
   readonly roomID: Room.ID
   readonly guestID: string
-  readonly role: "viewer" | "member" | "helper"
+  readonly role: "viewer" | "member" | "helper" | "cohost"
 }
 export type RoomMemberUpdateOutput = Room.Member
 export type RoomMemberUpdateOperation<E = never> = (
@@ -2605,6 +2668,7 @@ export type RoomBanRemoveOperation<E = never> = (input: RoomBanRemoveInput) => E
 
 export type RoomGuestLogInput = {
   readonly roomID: Room.ID
+  readonly sessionID?: Session.ID | undefined
   readonly after?: Event.Seq | undefined
   readonly follow?: boolean | undefined
 }
@@ -3550,7 +3614,7 @@ export type RoomGuestLogOutput =
   | EventLog.Synced
 export type RoomGuestLogOperation<E = never> = (input: RoomGuestLogInput) => Stream.Stream<RoomGuestLogOutput, E>
 
-export type RoomGuestMessagesInput = { readonly roomID: Room.ID }
+export type RoomGuestMessagesInput = { readonly roomID: Room.ID; readonly sessionID?: Session.ID | undefined }
 export type RoomGuestMessagesOutput = {
   readonly data: ReadonlyArray<Room.Message>
   readonly running: boolean
@@ -3560,17 +3624,21 @@ export type RoomGuestMessagesOperation<E = never> = (
   input: RoomGuestMessagesInput,
 ) => Effect.Effect<RoomGuestMessagesOutput, E>
 
-export type RoomGuestNoteInput = { readonly roomID: Room.ID }
+export type RoomGuestNoteInput = { readonly roomID: Room.ID; readonly sessionID?: Session.ID | undefined }
 export type RoomGuestNoteOutput = Note.Info | null
 export type RoomGuestNoteOperation<E = never> = (input: RoomGuestNoteInput) => Effect.Effect<RoomGuestNoteOutput, E>
 
-export type RoomGuestPromptInput = { readonly roomID: Room.ID; readonly text: string }
+export type RoomGuestPromptInput = {
+  readonly roomID: Room.ID
+  readonly text: string
+  readonly sessionID?: Session.ID | undefined
+}
 export type RoomGuestPromptOutput = SessionInbox.User
 export type RoomGuestPromptOperation<E = never> = (
   input: RoomGuestPromptInput,
 ) => Effect.Effect<RoomGuestPromptOutput, E>
 
-export type RoomGuestPermissionListInput = { readonly roomID: Room.ID }
+export type RoomGuestPermissionListInput = { readonly roomID: Room.ID; readonly sessionID?: Session.ID | undefined }
 export type RoomGuestPermissionListOutput = ReadonlyArray<Permission.Request>
 export type RoomGuestPermissionListOperation<E = never> = (
   input: RoomGuestPermissionListInput,
@@ -3581,6 +3649,7 @@ export type RoomGuestPermissionReplyInput = {
   readonly requestID: Permission.ID
   readonly decision: Permission.Reply
   readonly message?: string | undefined
+  readonly sessionID?: Session.ID | undefined
 }
 export type RoomGuestPermissionReplyOutput = void
 export type RoomGuestPermissionReplyOperation<E = never> = (
@@ -3597,7 +3666,17 @@ export interface RoomApi<E = never> {
   readonly join: RoomJoinOperation<E>
   readonly guest: {
     readonly get: RoomGuestGetOperation<E>
-    readonly session: { readonly messages: RoomGuestSessionMessagesOperation<E> }
+    readonly session: {
+      readonly messages: RoomGuestSessionMessagesOperation<E>
+      readonly list: RoomGuestSessionListOperation<E>
+      readonly create: RoomGuestSessionCreateOperation<E>
+      readonly model: RoomGuestSessionModelOperation<E>
+      readonly agent: RoomGuestSessionAgentOperation<E>
+      readonly command: RoomGuestSessionCommandOperation<E>
+    }
+    readonly model: { readonly list: RoomGuestModelListOperation<E> }
+    readonly agent: { readonly list: RoomGuestAgentListOperation<E> }
+    readonly command: { readonly list: RoomGuestCommandListOperation<E> }
     readonly log: RoomGuestLogOperation<E>
     readonly messages: RoomGuestMessagesOperation<E>
     readonly note: RoomGuestNoteOperation<E>

@@ -316,3 +316,87 @@ it.live("a helper answers permission requests; a member may not", () =>
     expect((yield* reply()).status).toBe(404)
   }).pipe(Effect.scoped),
 )
+
+it.live("a project room opens every session under its directory and lets members start new ones", () =>
+  Effect.gen(function* () {
+    const { call, session, directory } = yield* setup
+    const project = (yield* call("/api/room", {
+      method: "POST",
+      headers: host,
+      body: { sessionID: session.id, name: "Project", directory, open: true },
+    })).body.data
+    expect(project.directory).toBe(directory)
+    const other = (yield* call("/api/session", {
+      method: "POST",
+      headers: host,
+      body: { title: "Other", location: { directory } },
+    })).body.data
+    const outside = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir("opencode-room-outside-")))
+    const elsewhere = (yield* call("/api/session", {
+      method: "POST",
+      headers: host,
+      body: { title: "Elsewhere", location: { directory: outside.path } },
+    })).body.data
+
+    const joined = (yield* call("/api/room/join", { method: "POST", body: { roomID: project.id, name: "Phone" } })).body
+    const guest = { authorization: `Bearer ${joined.token}` }
+    const listed = (yield* call(`/api/room/${project.id}/guest/session`, { headers: guest })).body.data.map(
+      (item: { id: string }) => item.id,
+    )
+    expect(listed).toContain(session.id)
+    expect(listed).toContain(other.id)
+    expect(listed).not.toContain(elsewhere.id)
+
+    // another session of the project opens and takes prompts; one outside it reads as missing
+    expect(
+      (yield* call(`/api/room/${project.id}/guest?sessionID=${other.id}`, { headers: guest })).body.session.id,
+    ).toBe(other.id)
+    const prompt = yield* call(`/api/room/${project.id}/guest/prompt`, {
+      method: "POST",
+      headers: guest,
+      body: { text: "in the other one", sessionID: other.id },
+    })
+    expect(prompt.status).toBe(200)
+    expect((yield* call(`/api/room/${project.id}/guest?sessionID=${elsewhere.id}`, { headers: guest })).status).toBe(
+      404,
+    )
+    expect(
+      (yield* call(`/api/room/${project.id}/guest/session/message?sessionID=${elsewhere.id}`, { headers: guest }))
+        .status,
+    ).toBe(404)
+
+    const created = yield* call(`/api/room/${project.id}/guest/session`, {
+      method: "POST",
+      headers: guest,
+      body: { title: "From the phone" },
+    })
+    expect(created.status).toBe(200)
+    expect(created.body.data.location.directory).toBe(directory)
+  }).pipe(Effect.scoped),
+)
+
+it.live("only cohosts switch the model and agent or run commands; a single-session room starts no sessions", () =>
+  Effect.gen(function* () {
+    const { call, session, room, code } = yield* setup
+    const joined = (yield* call("/api/room/join", { method: "POST", body: { code, name: "Phone" } })).body
+    const guest = { authorization: `Bearer ${joined.token}` }
+    const agent = () =>
+      call(`/api/room/${room.id}/guest/session/${session.id}/agent`, {
+        method: "POST",
+        headers: guest,
+        body: { agent: "build" },
+      })
+    expect((yield* agent()).status).toBe(403)
+    expect((yield* call(`/api/room/${room.id}/guest/agent`, { headers: guest })).status).toBe(200)
+    expect(
+      (yield* call(`/api/room/${room.id}/guest/session`, { method: "POST", headers: guest, body: {} })).status,
+    ).toBe(400)
+
+    yield* call(`/api/room/${room.id}/member/${joined.guest.id}`, {
+      method: "PATCH",
+      headers: host,
+      body: { role: "cohost" },
+    })
+    expect((yield* agent()).status).toBe(204)
+  }).pipe(Effect.scoped),
+)

@@ -27,6 +27,7 @@ export const CreateInput = Schema.Struct({
   ai: Room.AiMessaging.pipe(Schema.optional),
   guestApprovals: Schema.Boolean.pipe(Schema.optional),
   defaultRole: Room.Role.pipe(Schema.optional),
+  directory: Schema.String.pipe(Schema.optional),
   open: Schema.Boolean.pipe(Schema.optional),
 }).annotate({ identifier: "Room.CreateInput" })
 export type CreateInput = typeof CreateInput.Type
@@ -122,6 +123,7 @@ const layer = Layer.effect(
           ai: input.ai ?? "linked",
           guestApprovals: input.guestApprovals ?? false,
           defaultRole: input.defaultRole ?? "member",
+          directory: input.directory,
           open: input.open ?? false,
           created: Date.now(),
         })

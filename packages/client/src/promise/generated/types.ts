@@ -463,7 +463,8 @@ export type RoomInfo = {
   name: string
   ai: "linked" | "discovered"
   guestApprovals: boolean
-  defaultRole?: "viewer" | "member" | "helper" | undefined
+  defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
+  directory?: string | undefined
   open?: boolean | undefined
   created: number
 }
@@ -478,7 +479,8 @@ export type RoomInfo1 = {
   name: string
   ai: "linked" | "discovered"
   guestApprovals: boolean
-  defaultRole?: "viewer" | "member" | "helper" | null
+  defaultRole?: "viewer" | "member" | "helper" | "cohost" | null
+  directory?: string | null
   open?: boolean | null
   created: number | "Infinity" | "-Infinity" | "NaN"
 }
@@ -486,7 +488,7 @@ export type RoomInfo1 = {
 export type RoomMemberView = {
   id: string
   name: string
-  role: "viewer" | "member" | "helper"
+  role: "viewer" | "member" | "helper" | "cohost"
   device?: string | undefined
   address?: string | undefined
   joined: number
@@ -497,7 +499,7 @@ export type RoomMemberView = {
 export type RoomMember = {
   id: string
   name: string
-  role: "viewer" | "member" | "helper"
+  role: "viewer" | "member" | "helper" | "cohost"
   device?: string | undefined
   address?: string | undefined
   joined: number
@@ -1799,7 +1801,12 @@ export type NoteFrontmatter = {
   updated: number
 }
 
-export type RoomJoined = { token: string; guest: RoomGuest; role: "viewer" | "member" | "helper"; room: RoomInfo }
+export type RoomJoined = {
+  token: string
+  guest: RoomGuest
+  role: "viewer" | "member" | "helper" | "cohost"
+  room: RoomInfo
+}
 
 export type OrchestraTemplate = {
   name: string
@@ -7063,49 +7070,64 @@ export type RoomCreateInput = {
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
+    readonly directory?: string | undefined
   }["sessionID"]
   readonly name?: {
     readonly sessionID: string
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
+    readonly directory?: string | undefined
   }["name"]
   readonly ai?: {
     readonly sessionID: string
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
+    readonly directory?: string | undefined
   }["ai"]
   readonly guestApprovals?: {
     readonly sessionID: string
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
+    readonly directory?: string | undefined
   }["guestApprovals"]
   readonly defaultRole?: {
     readonly sessionID: string
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
+    readonly directory?: string | undefined
   }["defaultRole"]
   readonly open?: {
     readonly sessionID: string
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
+    readonly directory?: string | undefined
   }["open"]
+  readonly directory?: {
+    readonly sessionID: string
+    readonly name?: string | undefined
+    readonly ai?: "linked" | "discovered" | undefined
+    readonly guestApprovals?: boolean | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
+    readonly open?: boolean | undefined
+    readonly directory?: string | undefined
+  }["directory"]
 }
 
 export type RoomCreateOutput = { data: RoomInfo }["data"]
@@ -7116,35 +7138,35 @@ export type RoomUpdateInput = {
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
   }["name"]
   readonly ai?: {
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
   }["ai"]
   readonly guestApprovals?: {
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
   }["guestApprovals"]
   readonly defaultRole?: {
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
   }["defaultRole"]
   readonly open?: {
     readonly name?: string | undefined
     readonly ai?: "linked" | "discovered" | undefined
     readonly guestApprovals?: boolean | undefined
-    readonly defaultRole?: "viewer" | "member" | "helper" | undefined
+    readonly defaultRole?: "viewer" | "member" | "helper" | "cohost" | undefined
     readonly open?: boolean | undefined
   }["open"]
 }
@@ -7190,12 +7212,15 @@ export type RoomJoinInput = {
 
 export type RoomJoinOutput = RoomJoined
 
-export type RoomGuestGetInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+export type RoomGuestGetInput = {
+  readonly roomID: { readonly roomID: string }["roomID"]
+  readonly sessionID?: { readonly sessionID?: string | undefined }["sessionID"]
+}
 
 export type RoomGuestGetOutput = {
   room: RoomInfo1
   guest: RoomGuest
-  role: "viewer" | "member" | "helper"
+  role: "viewer" | "member" | "helper" | "cohost"
   session: SessionInfo1
 }
 
@@ -7217,6 +7242,7 @@ export type RoomGuestSessionMessagesInput = {
       | "assistant"
       | "compaction"
       | undefined
+    readonly sessionID?: string | undefined
   }["limit"]
   readonly order?: {
     readonly limit?: number | undefined
@@ -7234,6 +7260,7 @@ export type RoomGuestSessionMessagesInput = {
       | "assistant"
       | "compaction"
       | undefined
+    readonly sessionID?: string | undefined
   }["order"]
   readonly cursor?: {
     readonly limit?: number | undefined
@@ -7251,6 +7278,7 @@ export type RoomGuestSessionMessagesInput = {
       | "assistant"
       | "compaction"
       | undefined
+    readonly sessionID?: string | undefined
   }["cursor"]
   readonly type?: {
     readonly limit?: number | undefined
@@ -7268,13 +7296,82 @@ export type RoomGuestSessionMessagesInput = {
       | "assistant"
       | "compaction"
       | undefined
+    readonly sessionID?: string | undefined
   }["type"]
+  readonly sessionID?: {
+    readonly limit?: number | undefined
+    readonly order?: "asc" | "desc" | undefined
+    readonly cursor?: string | undefined
+    readonly type?:
+      | "agent-switched"
+      | "model-switched"
+      | "location-switched"
+      | "user"
+      | "synthetic"
+      | "system"
+      | "skill"
+      | "shell"
+      | "assistant"
+      | "compaction"
+      | undefined
+    readonly sessionID?: string | undefined
+  }["sessionID"]
 }
 
 export type RoomGuestSessionMessagesOutput = {
   data: Array<SessionMessageInfo>
   cursor: { previous?: string | null; next?: string | null }
 }
+
+export type RoomGuestSessionListInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type RoomGuestSessionListOutput = { data: Array<SessionInfo1> }["data"]
+
+export type RoomGuestSessionCreateInput = {
+  readonly roomID: { readonly roomID: string }["roomID"]
+  readonly title?: { readonly title?: string | undefined }["title"]
+}
+
+export type RoomGuestSessionCreateOutput = { data: SessionInfo1 }["data"]
+
+export type RoomGuestModelListInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type RoomGuestModelListOutput = { data: Array<ModelInfo> }["data"]
+
+export type RoomGuestAgentListInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type RoomGuestAgentListOutput = { data: Array<AgentInfo> }["data"]
+
+export type RoomGuestCommandListInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type RoomGuestCommandListOutput = { data: Array<CommandInfo> }["data"]
+
+export type RoomGuestSessionModelInput = {
+  readonly roomID: { readonly roomID: string; readonly sessionID: string }["roomID"]
+  readonly sessionID: { readonly roomID: string; readonly sessionID: string }["sessionID"]
+  readonly model: {
+    readonly model: { readonly id: string; readonly providerID: string; readonly variant?: string }
+  }["model"]
+}
+
+export type RoomGuestSessionModelOutput = void
+
+export type RoomGuestSessionAgentInput = {
+  readonly roomID: { readonly roomID: string; readonly sessionID: string }["roomID"]
+  readonly sessionID: { readonly roomID: string; readonly sessionID: string }["sessionID"]
+  readonly agent: { readonly agent: string }["agent"]
+}
+
+export type RoomGuestSessionAgentOutput = void
+
+export type RoomGuestSessionCommandInput = {
+  readonly roomID: { readonly roomID: string; readonly sessionID: string }["roomID"]
+  readonly sessionID: { readonly roomID: string; readonly sessionID: string }["sessionID"]
+  readonly name: { readonly name: string; readonly text: string }["name"]
+  readonly text: { readonly name: string; readonly text: string }["text"]
+}
+
+export type RoomGuestSessionCommandOutput = void
 
 export type RoomMemberListInput = { readonly roomID: { readonly roomID: string }["roomID"] }
 
@@ -7283,7 +7380,7 @@ export type RoomMemberListOutput = { data: Array<RoomMemberView> }["data"]
 export type RoomMemberUpdateInput = {
   readonly roomID: { readonly roomID: string; readonly guestID: string }["roomID"]
   readonly guestID: { readonly roomID: string; readonly guestID: string }["guestID"]
-  readonly role: { readonly role: "viewer" | "member" | "helper" }["role"]
+  readonly role: { readonly role: "viewer" | "member" | "helper" | "cohost" }["role"]
 }
 
 export type RoomMemberUpdateOutput = { data: RoomMember }["data"]
@@ -7315,13 +7412,29 @@ export type RoomBanRemoveOutput = void
 
 export type RoomGuestLogInput = {
   readonly roomID: { readonly roomID: string }["roomID"]
-  readonly after?: { readonly after?: number | undefined; readonly follow?: boolean | undefined }["after"]
-  readonly follow?: { readonly after?: number | undefined; readonly follow?: boolean | undefined }["follow"]
+  readonly sessionID?: {
+    readonly sessionID?: string | undefined
+    readonly after?: number | undefined
+    readonly follow?: boolean | undefined
+  }["sessionID"]
+  readonly after?: {
+    readonly sessionID?: string | undefined
+    readonly after?: number | undefined
+    readonly follow?: boolean | undefined
+  }["after"]
+  readonly follow?: {
+    readonly sessionID?: string | undefined
+    readonly after?: number | undefined
+    readonly follow?: boolean | undefined
+  }["follow"]
 }
 
 export type RoomGuestLogOutput = RoomLogItem
 
-export type RoomGuestMessagesInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+export type RoomGuestMessagesInput = {
+  readonly roomID: { readonly roomID: string }["roomID"]
+  readonly sessionID?: { readonly sessionID?: string | undefined }["sessionID"]
+}
 
 export type RoomGuestMessagesOutput = {
   data: Array<RoomMessage>
@@ -7329,18 +7442,25 @@ export type RoomGuestMessagesOutput = {
   note?: { name: NoteSlug; title: string }
 }
 
-export type RoomGuestNoteInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+export type RoomGuestNoteInput = {
+  readonly roomID: { readonly roomID: string }["roomID"]
+  readonly sessionID?: { readonly sessionID?: string | undefined }["sessionID"]
+}
 
 export type RoomGuestNoteOutput = { data: NoteInfo | null }["data"]
 
 export type RoomGuestPromptInput = {
   readonly roomID: { readonly roomID: string }["roomID"]
-  readonly text: { readonly text: string }["text"]
+  readonly text: { readonly text: string; readonly sessionID?: string | undefined }["text"]
+  readonly sessionID?: { readonly text: string; readonly sessionID?: string | undefined }["sessionID"]
 }
 
 export type RoomGuestPromptOutput = { data: SessionInboxUser }["data"]
 
-export type RoomGuestPermissionListInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+export type RoomGuestPermissionListInput = {
+  readonly roomID: { readonly roomID: string }["roomID"]
+  readonly sessionID?: { readonly sessionID?: string | undefined }["sessionID"]
+}
 
 export type RoomGuestPermissionListOutput = { data: Array<PermissionRequest> }["data"]
 
@@ -7350,11 +7470,18 @@ export type RoomGuestPermissionReplyInput = {
   readonly decision: {
     readonly decision: "once" | "always" | "reject"
     readonly message?: string | undefined
+    readonly sessionID?: string | undefined
   }["decision"]
   readonly message?: {
     readonly decision: "once" | "always" | "reject"
     readonly message?: string | undefined
+    readonly sessionID?: string | undefined
   }["message"]
+  readonly sessionID?: {
+    readonly decision: "once" | "always" | "reject"
+    readonly message?: string | undefined
+    readonly sessionID?: string | undefined
+  }["sessionID"]
 }
 
 export type RoomGuestPermissionReplyOutput = void

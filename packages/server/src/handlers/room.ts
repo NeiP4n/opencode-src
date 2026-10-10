@@ -3,7 +3,14 @@ import { NoteStore } from "@opencode/core/note"
 import { Permission } from "@opencode/core/permission"
 import { Room } from "@opencode/core/room"
 import { Session } from "@opencode/core/session"
+import { Model } from "@opencode/core/model"
+import { Agent } from "@opencode/core/agent"
+import { Command } from "@opencode/core/command"
+import { AbsolutePath } from "@opencode/core/schema"
+import { Orchestra } from "@opencode/schema/orchestra"
 import {
+  CommandExecutionError,
+  CommandNotFoundError,
   ForbiddenError,
   InvalidRequestError,
   PermissionNotFoundError,
@@ -49,7 +56,10 @@ function chatMessage(message: SessionMessage.Info): Room.Message[] {
   return text ? [{ id: message.id, role: "assistant" as const, text, created }] : []
 }
 
-const RANK: Record<Room.Role, number> = { viewer: 0, member: 1, helper: 2 }
+const RANK: Record<Room.Role, number> = { viewer: 0, member: 1, helper: 2, cohost: 3 }
+
+// Sessions a project room lists; enough for a shared project, bounded for a busy host.
+const SESSION_LIMIT = 200
 
 // Loopback is left out: tunnels such as Porthole deliver every guest from it, so a ban on it would ban them all.
 function remoteAddress(request: HttpServerRequest.HttpServerRequest) {
@@ -85,16 +95,40 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
       return { room, guest: token.guest, member }
     })
 
-    // Viewers read; posting needs member and answering permission requests needs helper.
+    // Viewers read; posting needs member, answering permission requests needs helper, and
+    // switching models or agents and running commands needs cohost.
     const guestWho = Effect.fnUntraced(function* (roomID: Room.ID, needs: Exclude<Room.Role, "viewer">) {
       const joined = yield* guestOf(roomID)
       if (RANK[joined.member.role] < RANK[needs])
         return yield* new ForbiddenError({
           message:
-            needs === "helper" ? "The host answers permission requests in this room" : "You may only watch this room",
+            needs === "cohost"
+              ? "Only cohosts pick the model, the agent and commands in this room"
+              : needs === "helper"
+                ? "The host answers permission requests in this room"
+                : "You may only watch this room",
         })
       return joined
     })
+
+    // A session the room shares: its own, or for a project room any session under the
+    // project's directory. Others read as missing so a guest learns nothing of them.
+    const inRoom = Effect.fnUntraced(function* (room: Room.Info, sessionID?: Session.ID) {
+      const id = sessionID ?? room.sessionID
+      const session = yield* sessions.get(id).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+      if (id === room.sessionID) return session
+      if (room.directory !== undefined && Orchestra.contains(room.directory, session.location.directory)) return session
+      return yield* missingSession(new Session.NotFoundError({ sessionID: id }))
+    })
+
+    // Host-wide lists such as models and agents, read where the room's own session lives.
+    const atRoom = <A, E, R>(room: Room.Info, effect: Effect.Effect<A, E, R>) =>
+      Effect.gen(function* () {
+        const session = yield* sessions
+          .get(room.sessionID)
+          .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+        return yield* effect.pipe(instances.provide(session), locationErrors, Effect.orDie)
+      })
 
     const memberOf = Effect.fnUntraced(function* (roomID: Room.ID, guestID: string) {
       yield* rooms.get(roomID).pipe(Effect.catchTag("Room.NotFoundError", missingRoom))
@@ -246,7 +280,8 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
         "room.guest.session.messages",
         Effect.fn(function* (ctx) {
           const joined = yield* guestOf(ctx.params.roomID)
-          return yield* messagePage(sessions, joined.room.sessionID, ctx.query)
+          const session = yield* inRoom(joined.room, ctx.query.sessionID)
+          return yield* messagePage(sessions, session.id, ctx.query)
         }),
       )
       .handle(
@@ -257,9 +292,7 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
             room: joined.room,
             guest: joined.guest,
             role: joined.member.role,
-            session: yield* sessions
-              .get(joined.room.sessionID)
-              .pipe(Effect.catchTag("Session.NotFoundError", missingSession)),
+            session: yield* inRoom(joined.room, ctx.query.sessionID),
           }
         }),
       )
@@ -267,9 +300,9 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
         "room.guest.log",
         Effect.fn(function* (ctx) {
           const joined = yield* guestOf(ctx.params.roomID)
-          yield* sessions.get(joined.room.sessionID).pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          const session = yield* inRoom(joined.room, ctx.query.sessionID)
           return sessions
-            .log({ sessionID: joined.room.sessionID, after: ctx.query.after, follow: ctx.query.follow })
+            .log({ sessionID: session.id, after: ctx.query.after, follow: ctx.query.follow })
             .pipe(Stream.orDie)
         }),
       )
@@ -277,13 +310,14 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
         "room.guest.messages",
         Effect.fn(function* (ctx) {
           const joined = yield* guestOf(ctx.params.roomID)
+          const session = yield* inRoom(joined.room, ctx.query.sessionID)
           const messages = yield* sessions
-            .messages({ sessionID: joined.room.sessionID, limit: CHAT_LIMIT, order: "desc" })
+            .messages({ sessionID: session.id, limit: CHAT_LIMIT, order: "desc" })
             .pipe(Effect.catchTag("Session.NotFoundError", missingSession), Effect.orDie)
-          const note = yield* boundNote(joined.room.sessionID)
+          const note = yield* boundNote(session.id)
           return {
             data: messages.toReversed().flatMap(chatMessage),
-            running: (yield* sessions.active).has(joined.room.sessionID),
+            running: (yield* sessions.active).has(session.id),
             note: note && { name: note.name, title: note.frontmatter.title || note.name },
           }
         }),
@@ -292,19 +326,21 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
         "room.guest.note",
         Effect.fn(function* (ctx) {
           const joined = yield* guestOf(ctx.params.roomID)
-          return { data: (yield* boundNote(joined.room.sessionID)) ?? null }
+          const session = yield* inRoom(joined.room, ctx.query.sessionID)
+          return { data: (yield* boundNote(session.id)) ?? null }
         }),
       )
       .handle(
         "room.guest.prompt",
         Effect.fn(function* (ctx) {
           const joined = yield* guestWho(ctx.params.roomID, "member")
+          const session = yield* inRoom(joined.room, ctx.payload.sessionID)
           if (ctx.payload.text.trim() === "")
             return yield* new InvalidRequestError({ message: "Message is empty", field: "text" })
           return {
             data: yield* sessions
               .prompt({
-                sessionID: joined.room.sessionID,
+                sessionID: session.id,
                 text: ctx.payload.text,
                 // The server stamps the author from the token, so a guest cannot speak as someone else.
                 metadata: { room: { id: joined.room.id, guest: joined.guest } },
@@ -317,10 +353,12 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
         "room.guest.permission.list",
         Effect.fn(function* (ctx) {
           const joined = yield* guestOf(ctx.params.roomID)
-          const session = yield* sessionInfo(sessions, joined.room.sessionID)
-          const requests = yield* Permission.Service.use((permission) =>
-            permission.forSession(joined.room.sessionID),
-          ).pipe(instances.provide(session), locationErrors, Effect.orDie)
+          const session = yield* inRoom(joined.room, ctx.query.sessionID)
+          const requests = yield* Permission.Service.use((permission) => permission.forSession(session.id)).pipe(
+            instances.provide(session),
+            locationErrors,
+            Effect.orDie,
+          )
           return { data: requests }
         }),
       )
@@ -328,16 +366,119 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
         "room.guest.permission.reply",
         Effect.fn(function* (ctx) {
           const joined = yield* guestWho(ctx.params.roomID, "helper")
-          const session = yield* sessionInfo(sessions, joined.room.sessionID)
+          const session = yield* inRoom(joined.room, ctx.payload.sessionID)
           yield* Effect.gen(function* () {
             const permission = yield* Permission.Service
             const request = yield* permission.get(ctx.params.requestID)
-            if (!request || request.sessionID !== joined.room.sessionID)
-              return yield* missingRequest(ctx.params.requestID)
+            if (!request || request.sessionID !== session.id) return yield* missingRequest(ctx.params.requestID)
             yield* permission
               .reply({ requestID: ctx.params.requestID, reply: ctx.payload.decision, message: ctx.payload.message })
               .pipe(Effect.catchTag("Permission.NotFoundError", () => missingRequest(ctx.params.requestID)))
           }).pipe(instances.provide(session), locationErrors, Effect.catchTag("LocationNotFoundError", Effect.die))
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "room.guest.session.list",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestOf(ctx.params.roomID)
+          const directory = joined.room.directory
+          if (directory === undefined) return { data: [yield* sessions.get(joined.room.sessionID).pipe(Effect.orDie)] }
+          const page = yield* sessions.list({ parentID: null, limit: SESSION_LIMIT })
+          return {
+            data: page.data.filter((session) => Orchestra.contains(directory, session.location.directory)),
+          }
+        }),
+      )
+      .handle(
+        "room.guest.session.create",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestWho(ctx.params.roomID, "member")
+          if (joined.room.directory === undefined)
+            return yield* new InvalidRequestError({ message: "This room shares one session; the host starts others" })
+          return {
+            data: yield* sessions
+              .create({
+                title: ctx.payload.title?.trim() || undefined,
+                location: { directory: AbsolutePath.make(joined.room.directory) },
+              })
+              .pipe(Effect.orDie),
+          }
+        }),
+      )
+      .handle(
+        "room.guest.model.list",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestOf(ctx.params.roomID)
+          return {
+            data: yield* atRoom(
+              joined.room,
+              Model.Service.use((models) => models.available()),
+            ),
+          }
+        }),
+      )
+      .handle(
+        "room.guest.agent.list",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestOf(ctx.params.roomID)
+          return {
+            data: yield* atRoom(
+              joined.room,
+              Agent.Service.use((agents) => agents.list()),
+            ),
+          }
+        }),
+      )
+      .handle(
+        "room.guest.command.list",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestOf(ctx.params.roomID)
+          return {
+            data: yield* atRoom(
+              joined.room,
+              Command.Service.use((commands) => commands.list()),
+            ),
+          }
+        }),
+      )
+      .handle(
+        "room.guest.session.model",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestWho(ctx.params.roomID, "cohost")
+          const session = yield* inRoom(joined.room, ctx.params.sessionID)
+          yield* sessions
+            .switchModel({ sessionID: session.id, model: ctx.payload.model })
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "room.guest.session.agent",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestWho(ctx.params.roomID, "cohost")
+          const session = yield* inRoom(joined.room, ctx.params.sessionID)
+          yield* sessions
+            .switchAgent({ sessionID: session.id, agent: ctx.payload.agent })
+            .pipe(Effect.catchTag("Session.NotFoundError", missingSession))
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "room.guest.session.command",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestWho(ctx.params.roomID, "cohost")
+          const session = yield* inRoom(joined.room, ctx.params.sessionID)
+          yield* sessions.command({ sessionID: session.id, command: ctx.payload.name, text: ctx.payload.text }).pipe(
+            Effect.catchTag("Session.NotFoundError", missingSession),
+            Effect.catchTag("Command.NotFoundError", (error) =>
+              Effect.fail(new CommandNotFoundError({ command: error.command, message: error.message })),
+            ),
+            Effect.catchTag("Command.ExecutionError", (error) =>
+              Effect.fail(new CommandExecutionError({ command: error.command, message: error.message })),
+            ),
+            locationErrors,
+          )
           return HttpApiSchema.NoContent.make()
         }),
       )

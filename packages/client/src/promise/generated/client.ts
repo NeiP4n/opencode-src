@@ -299,6 +299,22 @@ import type {
   RoomGuestGetOutput,
   RoomGuestSessionMessagesInput,
   RoomGuestSessionMessagesOutput,
+  RoomGuestSessionListInput,
+  RoomGuestSessionListOutput,
+  RoomGuestSessionCreateInput,
+  RoomGuestSessionCreateOutput,
+  RoomGuestModelListInput,
+  RoomGuestModelListOutput,
+  RoomGuestAgentListInput,
+  RoomGuestAgentListOutput,
+  RoomGuestCommandListInput,
+  RoomGuestCommandListOutput,
+  RoomGuestSessionModelInput,
+  RoomGuestSessionModelOutput,
+  RoomGuestSessionAgentInput,
+  RoomGuestSessionAgentOutput,
+  RoomGuestSessionCommandInput,
+  RoomGuestSessionCommandOutput,
   RoomMemberListInput,
   RoomMemberListOutput,
   RoomMemberUpdateInput,
@@ -2457,6 +2473,7 @@ export function make(options: ClientOptions) {
               guestApprovals: input["guestApprovals"],
               defaultRole: input["defaultRole"],
               open: input["open"],
+              directory: input["directory"],
             },
             successStatus: 200,
             declaredStatuses: [400, 401, 404],
@@ -2527,6 +2544,7 @@ export function make(options: ClientOptions) {
             {
               method: "GET",
               path: `/api/room/${encodeURIComponent(input.roomID)}/guest`,
+              query: { sessionID: input["sessionID"] },
               successStatus: 200,
               declaredStatuses: [400, 401, 404],
               empty: false,
@@ -2539,20 +2557,124 @@ export function make(options: ClientOptions) {
               {
                 method: "GET",
                 path: `/api/room/${encodeURIComponent(input.roomID)}/guest/session/message`,
-                query: { limit: input["limit"], order: input["order"], cursor: input["cursor"], type: input["type"] },
+                query: {
+                  limit: input["limit"],
+                  order: input["order"],
+                  cursor: input["cursor"],
+                  type: input["type"],
+                  sessionID: input["sessionID"],
+                },
                 successStatus: 200,
                 declaredStatuses: [400, 401, 404, 500],
                 empty: false,
               },
               requestOptions,
             ),
+          list: (input: RoomGuestSessionListInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: RoomGuestSessionListOutput }>(
+              {
+                method: "GET",
+                path: `/api/room/${encodeURIComponent(input.roomID)}/guest/session`,
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
+          create: (input: RoomGuestSessionCreateInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: RoomGuestSessionCreateOutput }>(
+              {
+                method: "POST",
+                path: `/api/room/${encodeURIComponent(input.roomID)}/guest/session`,
+                body: { title: input["title"] },
+                successStatus: 200,
+                declaredStatuses: [400, 401, 403, 404],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
+          model: (input: RoomGuestSessionModelInput, requestOptions?: RequestOptions) =>
+            request<RoomGuestSessionModelOutput>(
+              {
+                method: "POST",
+                path: `/api/room/${encodeURIComponent(input.roomID)}/guest/session/${encodeURIComponent(input.sessionID)}/model`,
+                body: { model: input["model"] },
+                successStatus: 204,
+                declaredStatuses: [400, 401, 403, 404],
+                empty: true,
+              },
+              requestOptions,
+            ),
+          agent: (input: RoomGuestSessionAgentInput, requestOptions?: RequestOptions) =>
+            request<RoomGuestSessionAgentOutput>(
+              {
+                method: "POST",
+                path: `/api/room/${encodeURIComponent(input.roomID)}/guest/session/${encodeURIComponent(input.sessionID)}/agent`,
+                body: { agent: input["agent"] },
+                successStatus: 204,
+                declaredStatuses: [400, 401, 403, 404],
+                empty: true,
+              },
+              requestOptions,
+            ),
+          command: (input: RoomGuestSessionCommandInput, requestOptions?: RequestOptions) =>
+            request<RoomGuestSessionCommandOutput>(
+              {
+                method: "POST",
+                path: `/api/room/${encodeURIComponent(input.roomID)}/guest/session/${encodeURIComponent(input.sessionID)}/command`,
+                body: { name: input["name"], text: input["text"] },
+                successStatus: 204,
+                declaredStatuses: [400, 401, 403, 404, 500],
+                empty: true,
+              },
+              requestOptions,
+            ),
+        },
+        model: {
+          list: (input: RoomGuestModelListInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: RoomGuestModelListOutput }>(
+              {
+                method: "GET",
+                path: `/api/room/${encodeURIComponent(input.roomID)}/guest/model`,
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
+        },
+        agent: {
+          list: (input: RoomGuestAgentListInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: RoomGuestAgentListOutput }>(
+              {
+                method: "GET",
+                path: `/api/room/${encodeURIComponent(input.roomID)}/guest/agent`,
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
+        },
+        command: {
+          list: (input: RoomGuestCommandListInput, requestOptions?: RequestOptions) =>
+            request<{ readonly data: RoomGuestCommandListOutput }>(
+              {
+                method: "GET",
+                path: `/api/room/${encodeURIComponent(input.roomID)}/guest/command`,
+                successStatus: 200,
+                declaredStatuses: [400, 401, 404],
+                empty: false,
+              },
+              requestOptions,
+            ).then((value) => value.data),
         },
         log: (input: RoomGuestLogInput, requestOptions?: RequestOptions): AsyncIterable<RoomGuestLogOutput> =>
           sse<RoomGuestLogOutput>(
             {
               method: "GET",
               path: `/api/room/${encodeURIComponent(input.roomID)}/guest/log`,
-              query: { after: input["after"], follow: input["follow"] },
+              query: { sessionID: input["sessionID"], after: input["after"], follow: input["follow"] },
               successStatus: 200,
               declaredStatuses: [400, 401, 404],
               empty: false,
@@ -2564,6 +2686,7 @@ export function make(options: ClientOptions) {
             {
               method: "GET",
               path: `/api/room/${encodeURIComponent(input.roomID)}/guest/message`,
+              query: { sessionID: input["sessionID"] },
               successStatus: 200,
               declaredStatuses: [400, 401, 404],
               empty: false,
@@ -2575,6 +2698,7 @@ export function make(options: ClientOptions) {
             {
               method: "GET",
               path: `/api/room/${encodeURIComponent(input.roomID)}/guest/note`,
+              query: { sessionID: input["sessionID"] },
               successStatus: 200,
               declaredStatuses: [400, 401, 404],
               empty: false,
@@ -2586,7 +2710,7 @@ export function make(options: ClientOptions) {
             {
               method: "POST",
               path: `/api/room/${encodeURIComponent(input.roomID)}/guest/prompt`,
-              body: { text: input["text"] },
+              body: { text: input["text"], sessionID: input["sessionID"] },
               successStatus: 200,
               declaredStatuses: [400, 401, 403, 404],
               empty: false,
@@ -2599,6 +2723,7 @@ export function make(options: ClientOptions) {
               {
                 method: "GET",
                 path: `/api/room/${encodeURIComponent(input.roomID)}/guest/permission`,
+                query: { sessionID: input["sessionID"] },
                 successStatus: 200,
                 declaredStatuses: [400, 401, 404],
                 empty: false,
@@ -2610,7 +2735,7 @@ export function make(options: ClientOptions) {
               {
                 method: "POST",
                 path: `/api/room/${encodeURIComponent(input.roomID)}/guest/permission/${encodeURIComponent(input.requestID)}/reply`,
-                body: { decision: input["decision"], message: input["message"] },
+                body: { decision: input["decision"], message: input["message"], sessionID: input["sessionID"] },
                 successStatus: 204,
                 declaredStatuses: [400, 401, 403, 404],
                 empty: true,

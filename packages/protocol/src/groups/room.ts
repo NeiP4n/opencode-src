@@ -6,11 +6,17 @@ import { EventLog } from "@opencode/schema/event-log"
 import { Event } from "@opencode/schema/event"
 import { Note } from "@opencode/schema/note"
 import { Permission } from "@opencode/schema/permission"
+import { Model } from "@opencode/schema/model"
+import { Agent } from "@opencode/schema/agent"
+import { Command } from "@opencode/schema/command"
 import { optional } from "@opencode/schema/schema"
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import {
+  CommandExecutionError,
+  CommandNotFoundError,
   ForbiddenError,
+  LocationNotFoundError,
   InvalidCursorError,
   InvalidRequestError,
   PermissionNotFoundError,
@@ -52,6 +58,8 @@ export const RoomGroup = HttpApiGroup.make("server.room")
         guestApprovals: Schema.Boolean.pipe(Schema.optional),
         defaultRole: Room.Role.pipe(Schema.optional),
         open: Schema.Boolean.pipe(Schema.optional),
+        // Share the whole project under this directory, not just the session.
+        directory: Schema.String.pipe(Schema.optional),
       }),
       success: Schema.Struct({ data: Room.Info }),
       error: SessionNotFoundError,
@@ -147,6 +155,8 @@ export const RoomGroup = HttpApiGroup.make("server.room")
   .add(
     HttpApiEndpoint.get("room.guest.get", "/api/room/:roomID/guest", {
       params: { roomID: Room.ID },
+      // A session of the room; the room's own session when omitted.
+      query: { sessionID: Session.ID.pipe(Schema.optional) },
       success: Schema.Struct({ room: Room.Info, guest: Room.Guest, role: Room.Role, session: Session.Info }),
       error: [UnauthorizedError, RoomNotFoundError, SessionNotFoundError],
     }).annotateMerge(
@@ -160,7 +170,7 @@ export const RoomGroup = HttpApiGroup.make("server.room")
   .add(
     HttpApiEndpoint.get("room.guest.session.messages", "/api/room/:roomID/guest/session/message", {
       params: { roomID: Room.ID },
-      query: SessionMessagesQuery,
+      query: Schema.Struct({ ...SessionMessagesQuery.fields, sessionID: Session.ID.pipe(Schema.optional) }),
       success: Schema.Struct({
         data: Schema.Array(PublicSessionMessage),
         cursor: Schema.Struct({
@@ -175,6 +185,122 @@ export const RoomGroup = HttpApiGroup.make("server.room")
         summary: "Read the shared session",
         description:
           "The shared session's full messages, tool calls included, paged like the session message list, so guests see the session as the host does.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("room.guest.session.list", "/api/room/:roomID/guest/session", {
+      params: { roomID: Room.ID },
+      success: Schema.Struct({ data: Schema.Array(Session.Info) }),
+      error: [UnauthorizedError, RoomNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.session.list",
+        summary: "List the room's sessions",
+        description: "The sessions a guest may open: every top-level session of a project room, or the shared one.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("room.guest.session.create", "/api/room/:roomID/guest/session", {
+      params: { roomID: Room.ID },
+      payload: Schema.Struct({ title: Schema.String.pipe(Schema.optional) }),
+      success: Schema.Struct({ data: Session.Info }),
+      error: [UnauthorizedError, ForbiddenError, RoomNotFoundError, InvalidRequestError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.session.create",
+        summary: "Start a session in the room",
+        description: "Start a new session in a project room's directory. Viewers may not.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("room.guest.model.list", "/api/room/:roomID/guest/model", {
+      params: { roomID: Room.ID },
+      success: Schema.Struct({ data: Schema.Array(Model.Info) }),
+      error: [UnauthorizedError, RoomNotFoundError, SessionNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.model.list",
+        summary: "List the host's models",
+        description: "The models the host can run in this room's sessions.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("room.guest.agent.list", "/api/room/:roomID/guest/agent", {
+      params: { roomID: Room.ID },
+      success: Schema.Struct({ data: Schema.Array(Agent.Info) }),
+      error: [UnauthorizedError, RoomNotFoundError, SessionNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.agent.list",
+        summary: "List the host's agents",
+        description: "The agents the host can run in this room's sessions.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("room.guest.command.list", "/api/room/:roomID/guest/command", {
+      params: { roomID: Room.ID },
+      success: Schema.Struct({ data: Schema.Array(Command.Info) }),
+      error: [UnauthorizedError, RoomNotFoundError, SessionNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.command.list",
+        summary: "List the host's commands",
+        description: "The commands a cohost may run in this room's sessions.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("room.guest.session.model", "/api/room/:roomID/guest/session/:sessionID/model", {
+      params: { roomID: Room.ID, sessionID: Session.ID },
+      payload: Schema.Struct({ model: Model.Ref }),
+      success: HttpApiSchema.NoContent,
+      error: [UnauthorizedError, ForbiddenError, RoomNotFoundError, SessionNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.session.model",
+        summary: "Switch a room session's model",
+        description: "Switch the model of one of the room's sessions; cohosts only.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("room.guest.session.agent", "/api/room/:roomID/guest/session/:sessionID/agent", {
+      params: { roomID: Room.ID, sessionID: Session.ID },
+      payload: Schema.Struct({ agent: Agent.ID }),
+      success: HttpApiSchema.NoContent,
+      error: [UnauthorizedError, ForbiddenError, RoomNotFoundError, SessionNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.session.agent",
+        summary: "Switch a room session's agent",
+        description: "Switch the agent of one of the room's sessions; cohosts only.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("room.guest.session.command", "/api/room/:roomID/guest/session/:sessionID/command", {
+      params: { roomID: Room.ID, sessionID: Session.ID },
+      payload: Schema.Struct({ name: Schema.String, text: Schema.String }),
+      success: HttpApiSchema.NoContent,
+      error: [
+        UnauthorizedError,
+        ForbiddenError,
+        RoomNotFoundError,
+        SessionNotFoundError,
+        CommandNotFoundError,
+        CommandExecutionError,
+        LocationNotFoundError,
+      ],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.session.command",
+        summary: "Run a command in a room session",
+        description: "Run one of the host's commands, such as compact, in one of the room's sessions; cohosts only.",
       }),
     ),
   )
@@ -261,6 +387,7 @@ export const RoomGroup = HttpApiGroup.make("server.room")
     HttpApiEndpoint.get("room.guest.log", "/api/room/:roomID/guest/log", {
       params: { roomID: Room.ID },
       query: {
+        sessionID: Session.ID.pipe(Schema.optional),
         after: Schema.NumberFromString.pipe(Schema.decodeTo(Event.Seq), Schema.optional),
         follow: BooleanFromString.pipe(Schema.optional),
       },
@@ -279,6 +406,8 @@ export const RoomGroup = HttpApiGroup.make("server.room")
   .add(
     HttpApiEndpoint.get("room.guest.messages", "/api/room/:roomID/guest/message", {
       params: { roomID: Room.ID },
+      // A session of the room; the room's own session when omitted.
+      query: { sessionID: Session.ID.pipe(Schema.optional) },
       success: Schema.Struct({
         data: Schema.Array(Room.Message),
         running: Schema.Boolean,
@@ -298,6 +427,8 @@ export const RoomGroup = HttpApiGroup.make("server.room")
   .add(
     HttpApiEndpoint.get("room.guest.note", "/api/room/:roomID/guest/note", {
       params: { roomID: Room.ID },
+      // A session of the room; the room's own session when omitted.
+      query: { sessionID: Session.ID.pipe(Schema.optional) },
       success: Schema.Struct({ data: Schema.NullOr(Note.Info) }),
       error: [UnauthorizedError, RoomNotFoundError, SessionNotFoundError],
     }).annotateMerge(
@@ -312,7 +443,7 @@ export const RoomGroup = HttpApiGroup.make("server.room")
   .add(
     HttpApiEndpoint.post("room.guest.prompt", "/api/room/:roomID/guest/prompt", {
       params: { roomID: Room.ID },
-      payload: Schema.Struct({ text: Schema.String }),
+      payload: Schema.Struct({ text: Schema.String, sessionID: Session.ID.pipe(Schema.optional) }),
       success: Schema.Struct({ data: SessionInbox.User }),
       error: [UnauthorizedError, ForbiddenError, RoomNotFoundError, SessionNotFoundError, InvalidRequestError],
     }).annotateMerge(
@@ -327,6 +458,8 @@ export const RoomGroup = HttpApiGroup.make("server.room")
   .add(
     HttpApiEndpoint.get("room.guest.permission.list", "/api/room/:roomID/guest/permission", {
       params: { roomID: Room.ID },
+      // A session of the room; the room's own session when omitted.
+      query: { sessionID: Session.ID.pipe(Schema.optional) },
       success: Schema.Struct({ data: Schema.Array(Permission.Request) }),
       error: [UnauthorizedError, RoomNotFoundError, SessionNotFoundError],
     }).annotateMerge(
@@ -340,7 +473,12 @@ export const RoomGroup = HttpApiGroup.make("server.room")
   .add(
     HttpApiEndpoint.post("room.guest.permission.reply", "/api/room/:roomID/guest/permission/:requestID/reply", {
       params: { roomID: Room.ID, requestID: Permission.ID },
-      payload: Schema.Struct({ decision: Permission.Reply, message: Schema.String.pipe(Schema.optional) }),
+      payload: Schema.Struct({
+        decision: Permission.Reply,
+        message: Schema.String.pipe(Schema.optional),
+        // The session that asked; the room's own session when omitted.
+        sessionID: Session.ID.pipe(Schema.optional),
+      }),
       success: HttpApiSchema.NoContent,
       error: [UnauthorizedError, ForbiddenError, RoomNotFoundError, SessionNotFoundError, PermissionNotFoundError],
     }).annotateMerge(
