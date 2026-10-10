@@ -34,6 +34,7 @@ import { Plugin } from "@opencode/core/plugin"
 import { PluginSupervisor } from "@opencode/core/plugin/supervisor"
 import { Shell } from "@opencode/core/shell"
 import { ShellSelect } from "@opencode/core/shell/select"
+import { AppProcess } from "@opencode/util/process"
 import { ID } from "@opencode/schema/shell"
 import { ShellTool } from "@opencode/core/tool/plugin/shell"
 import { ToolOutput } from "@opencode/core/tool-output"
@@ -138,6 +139,7 @@ const shellPluginSupervisor = makeLocationNode({
     Job.node,
     Shell.node,
     ShellSelect.node,
+    AppProcess.node,
     Tool.node,
   ],
 })
@@ -1321,6 +1323,7 @@ describe("ShellTool", () => {
             Job.node,
             Shell.node,
             ShellSelect.node,
+            AppProcess.node,
             Tool.node,
           ],
         })
@@ -1422,6 +1425,33 @@ describe("ShellTool", () => {
       { timeout: 15_000 },
     )
   }
+
+  const nushell = isWindows || !Bun.which("nu") || !Bun.which("bash") ? it.live.skip : it.live
+  nushell("runs a command Nushell rejects in bash and keeps valid Nushell in nu", () =>
+    Effect.acquireUseRelease(
+      Effect.promise(() => tmpdir()),
+      (tmp) => {
+        reset()
+        return withSession(tmp.path, (registry) =>
+          Effect.gen(function* () {
+            const selection = yield* ShellSelect.Service
+            yield* selection.transform((editor) => editor.configure("nu"))
+            const posix = yield* executeTool(registry, call({ command: "echo one && echo two" }, "call-nu-posix"))
+            expect(posix.status).toBe("completed")
+            expect(posix.metadata).toMatchObject({ exit: 0, shell: "bash" })
+            expect(posix.content?.[0]).toEqual({
+              type: "text",
+              text: "(Ran in bash: not valid Nushell — The '&&' operator is not supported in Nushell)\none\ntwo\n",
+            })
+            const native = yield* executeTool(registry, call({ command: "[1 2 3] | length" }, "call-nu-native"))
+            expect(native.metadata).toMatchObject({ exit: 0, shell: "nu" })
+            expect(native.content?.[0]).toEqual({ type: "text", text: "3\n" })
+          }),
+        )
+      },
+      (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]().then(() => undefined)),
+    ),
+  )
 
   it.live("keeps non-zero exits useful", () =>
     Effect.acquireUseRelease(

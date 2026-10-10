@@ -5,7 +5,12 @@ import type { Context } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
 import type { ShellCreateBefore } from "@opencode/plugin/effect/shell"
 import type { Tool } from "@opencode/schema/tool"
-import { Deferred, Effect, Schema, Scope } from "effect"
+import { rm, writeFile } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
+import { Deferred, Effect, Option, Schema, Scope } from "effect"
+import { ChildProcess } from "effect/unstable/process"
+import { AppProcess } from "@opencode/util/process"
 import { Config } from "../../config.js"
 import { Environment } from "../../environment/index.js"
 import { Job } from "../../job.js"
@@ -20,6 +25,7 @@ import { ShellSelect } from "../../shell/select.js"
 import { ShellResult } from "../../shell/result.js"
 import { rewrite as hubRewrite } from "../../hub/match.js"
 import { HubHost } from "../../hub/host.js"
+import { which } from "../../util/which.js"
 
 export const name = "shell"
 export const DEFAULT_TIMEOUT_MS = 2 * 60 * 1_000
@@ -41,6 +47,7 @@ const description = (shell?: string) =>
     ...(shell === "nu"
       ? [
           "Write Nushell syntax, not POSIX: `;` or `and` instead of `&&`, `$env.NAME` instead of `$NAME`, `| save file` instead of `> file`, `^cmd` to force an external program.",
+          "A command that is not valid Nushell runs in bash instead, so a POSIX command still works the first time; the result says so.",
         ]
       : []),
     "Quote file paths containing spaces or special characters.",
@@ -123,6 +130,7 @@ export const Plugin = {
     const compatibleShell = shellSelect.resolve({ priority: "compat" })
     const permission = yield* Permission.Service
     const config = yield* Config.Service
+    const processes = yield* AppProcess.Service
 
     const prepare = Effect.fn("ShellTool.prepare")(function* (invocation: ShellCreateBefore, context: Tool.Context) {
       // Hub fast path: a recognized hand-written shape is transparently
@@ -217,7 +225,9 @@ export const Plugin = {
             Effect.gen(function* () {
               const timeout = input.background === true ? (input.timeout ?? 0) : (input.timeout ?? DEFAULT_TIMEOUT_MS)
               let finalTimeout = timeout
-              const shellPath = yield* compatibleShell
+              const configured = yield* compatibleShell
+              const posix = yield* posixFallback(processes, configured, input.command)
+              const shellPath = posix?.shell ?? configured
               const used = ShellSelect.name(shellPath)
               const info = yield* shell.create(
                 {
@@ -243,11 +253,12 @@ export const Plugin = {
                 const result = yield* shell.result(info)
                 if (!result.capture) return yield* new Shell.NotFoundError({ id: info.id })
                 const output = ShellResult.output(result)
+                const ran = output.timeout
+                  ? `${output.output}\n\nCommand exceeded timeout of ${finalTimeout} ms. Retry with a larger timeout if the command is expected to take longer.`
+                  : output.output
                 return {
                   ...output,
-                  output: output.timeout
-                    ? `${output.output}\n\nCommand exceeded timeout of ${finalTimeout} ms. Retry with a larger timeout if the command is expected to take longer.`
-                    : output.output,
+                  output: posix ? `(Ran in bash: not valid Nushell — ${posix.reason})\n${ran}` : ran,
                   status: "completed" as const,
                   shell: used,
                 }
@@ -311,3 +322,37 @@ export const Plugin = {
     yield* ctx.session.hook("generate", hook)
   }),
 }
+
+// Models write POSIX shell from habit. Nushell parses a whole command before running any of
+// it, so a command it rejects has done nothing yet and runs unchanged in bash: the call works
+// the first time instead of costing a step on a parser error. Any failure to check keeps nu.
+const posixFallback = (processes: AppProcess.Interface, shell: string, command: string) =>
+  Effect.gen(function* () {
+    if (ShellSelect.name(shell) !== "nu") return undefined
+    const bash = which("bash")
+    if (!bash) return undefined
+    // nu reads the source to check from a file; spawned stdin is not one it can open.
+    const file = yield* Effect.acquireRelease(
+      Effect.promise(async () => {
+        const target = path.join(os.tmpdir(), `opencode-nu-check-${crypto.randomUUID()}.nu`)
+        await writeFile(target, command)
+        return target
+      }),
+      (target) => Effect.promise(() => rm(target, { force: true })),
+    )
+    const result = yield* processes.run(
+      ChildProcess.make(shell, ["--no-config-file", "--ide-check", "5", file], { extendEnv: true, stdin: "ignore" }),
+      { timeout: "5 seconds" },
+    )
+    const reason = result.stdout
+      .toString("utf8")
+      .split("\n")
+      .flatMap((line) => Option.toArray(decodeDiagnostic(line)))
+      .find((diagnostic) => diagnostic.severity === "Error")?.message
+    return reason ? { shell: bash, reason } : undefined
+  }).pipe(Effect.scoped, Effect.orElseSucceed(() => undefined))
+
+const decodeDiagnostic = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ severity: Schema.String, message: Schema.String })),
+)
+
