@@ -27,7 +27,7 @@ export function DialogHost(props: { onClose?: () => void }) {
   const toast = useToast()
   const t = useT()
   const [rooms, { refetch }] = createResource(() => client.api.room.list())
-  const [server] = createResource(() => client.api.server.info())
+  const [server, { refetch: reread }] = createResource(() => client.api.server.info())
   const [codes, setCodes] = createSignal<Readonly<Record<string, RoomJoinCode & { until: number }>>>({})
   const [armed, setArmed] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
@@ -77,6 +77,20 @@ export function DialogHost(props: { onClose?: () => void }) {
     })
   }
 
+  // One click for `service set hostname 0.0.0.0` and `service restart`; the client reconnects
+  // to the replacement service, which then reports its network addresses.
+  const openToNetwork = (open: () => Promise<void>) => {
+    setBusy(true)
+    toast.show({ variant: "info", message: t("Restarting the service for the network…"), duration: 30000 })
+    void open()
+      .then(() => {
+        toast.show({ variant: "success", message: t("The service now listens on the network") })
+        void reread()
+      })
+      .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
+      .finally(() => setBusy(false))
+  }
+
   const close = (room: RoomInfo) => {
     if (armed() !== room.id) return setArmed(room.id)
     void run(() => client.api.room.remove({ roomID: room.id }))
@@ -96,12 +110,32 @@ export function DialogHost(props: { onClose?: () => void }) {
         when={addresses().length > 0}
         fallback={
           <Show when={server.state === "ready"}>
-            <text fg={theme.text.feedback.warning.base} wrapMode="word">
-              {t(
-                "This server only listens on this machine, so other devices cannot connect yet. Run `{command} service set hostname 0.0.0.0` and `{command} service restart`.",
-                { command: process.env.OPENCODE_COMMAND || "opencode" },
+            <Show
+              when={client.openToNetwork}
+              fallback={
+                <text fg={theme.text.feedback.warning.base} wrapMode="word">
+                  {t(
+                    "This server only listens on this machine, so other devices cannot connect yet. Run `{command} service set hostname 0.0.0.0` and `{command} service restart`.",
+                    { command: process.env.OPENCODE_COMMAND || "opencode" },
+                  )}
+                </text>
+              }
+            >
+              {(open) => (
+                <box>
+                  <text fg={theme.text.feedback.warning.base} wrapMode="word">
+                    {t(
+                      "This server only listens on this machine, so other devices cannot connect yet. Opening it to the network restarts the service once; running sessions are interrupted.",
+                    )}
+                  </text>
+                  <box flexDirection="row">
+                    <Button variant="primary" disabled={busy()} onClick={() => openToNetwork(open())}>
+                      {t("Open to the network")}
+                    </Button>
+                  </box>
+                </box>
               )}
-            </text>
+            </Show>
           </Show>
         }
       >

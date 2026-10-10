@@ -3,6 +3,7 @@ import { ClientError, isUnauthorizedError, OpenCode } from "@opencode/client/pro
 import { OPENCODE_VERSION } from "../version"
 import { Effect, Redacted } from "effect"
 import { Env } from "../env"
+import { Global } from "@opencode/util/global"
 import { ServiceConfig } from "./service-config"
 import { Standalone } from "./standalone"
 
@@ -46,16 +47,25 @@ export const resolve = Effect.fn("cli.server-connection.resolve")(function* (arg
   const options = yield* ServiceConfig.options({ checkVersion: mismatch !== "ignore" })
   return {
     endpoint: yield* resolveManaged({ ...options, onStart: args.onStart }, mismatch),
-    service: managedService(options),
+    service: managedService(options, yield* Global.Service),
   } satisfies Resolved
 })
 
-function managedService(options: EnsureOptions) {
+function managedService(options: EnsureOptions, global: Global.Interface) {
   const reconnectOptions = { ...options, version: undefined }
   return {
     reconnect: () => Service.ensure(reconnectOptions),
     restart: () =>
       Effect.gen(function* () {
+        yield* Service.stop({ file: options.file, pty: "handoff" })
+        yield* Service.ensure(reconnectOptions)
+      }),
+    // `service set hostname 0.0.0.0` then `service restart`. The client reconnects on its own
+    // and may start the service between the setting's stop and its write, so the restart
+    // after the write is what guarantees a service reading the new hostname.
+    openToNetwork: () =>
+      Effect.gen(function* () {
+        yield* ServiceConfig.set("hostname", "0.0.0.0").pipe(Effect.provideService(Global.Service, global))
         yield* Service.stop({ file: options.file, pty: "handoff" })
         yield* Service.ensure(reconnectOptions)
       }),

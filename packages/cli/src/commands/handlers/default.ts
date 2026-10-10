@@ -105,6 +105,7 @@ export default Runtime.handler(Commands, (input) =>
           ? {
               reconnect: (signal) => runServicePromise(service.reconnect(), { signal }),
               restart: () => runServicePromise(service.restart()),
+              openToNetwork: () => runServicePromise(service.openToNetwork()),
             }
           : undefined,
       },

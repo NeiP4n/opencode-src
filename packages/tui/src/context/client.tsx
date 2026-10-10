@@ -8,6 +8,7 @@ import { useLog } from "./log"
 type ManagedService = {
   reconnect: (signal: AbortSignal) => Promise<{ api: OpenCodeClient; url?: string }>
   restart: () => Promise<void>
+  openToNetwork?: () => Promise<void>
 }
 
 type ClientEventMap = { [Type in OpenCodeEvent["type"]]: Extract<OpenCodeEvent, { type: Type }> }
@@ -56,6 +57,7 @@ export const { use: useClient, provider: ClientProvider } = createSimpleContext(
       },
       connection,
       restart: service?.restart,
+      openToNetwork: service?.openToNetwork,
     }
   },
 })

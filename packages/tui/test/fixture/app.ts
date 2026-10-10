@@ -15,6 +15,8 @@ export async function createAppFixture(
     config?: Config.Info
     args?: TuiInput["args"]
     fetch?: FetchHandler
+    // A managed background service; given the fixture server's endpoint to reconnect to.
+    service?: (endpoint: { url: string }) => NonNullable<TuiInput["server"]["service"]>
   } = {},
 ) {
   const { run } = await import("../../src/app")
@@ -35,7 +37,10 @@ export async function createAppFixture(
   const task = Effect.runPromise(
     run({
       app: { name: "test", version: "test", channel: "test" },
-      server: { endpoint: { url: server.url.toString() } },
+      server: {
+        endpoint: { url: server.url.toString() },
+        service: input.service?.({ url: server.url.toString() }),
+      },
       config: {
         get: async () => config,
         update: async (update) => {

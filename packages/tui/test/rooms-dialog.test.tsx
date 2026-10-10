@@ -21,8 +21,13 @@ const URLS = [
   "http://26.10.0.2:4096",
 ]
 
-async function render(state: string, urls = URLS) {
+async function render(
+  state: string,
+  urls = URLS,
+  service?: NonNullable<Parameters<typeof createAppFixture>[0]>["service"],
+) {
   return createAppFixture({
+    service,
     width: 130,
     height: 40,
     state,
@@ -254,4 +259,27 @@ test("Host still shows virtual adapter addresses when nothing else listens, with
   await setup.mockMouse.click(entry.x + 2, entry.y)
   const frame = await setup.waitForFrame((frame) => frame.includes("172.20.3.4:4096"))
   expect(frame).toContain("Only virtual adapters")
+})
+
+test("Host opens a loopback-only service to the network with one click", async () => {
+  await using state = await tmpdir()
+  const urls = ["http://127.0.0.1:4096"]
+  let opened = 0
+  await using setup = await render(state.path, urls, (endpoint) => ({
+    reconnect: async () => endpoint,
+    restart: async () => {},
+    openToNetwork: async () => {
+      opened += 1
+      urls.push("http://192.168.1.5:4096")
+    },
+  }))
+  const bar = await setup.waitForFrame((frame) => frame.includes("+ Host"))
+  const entry = cell(bar, "+ Host")
+  await setup.mockMouse.click(entry.x + 2, entry.y)
+  const frame = await setup.waitForFrame((frame) => frame.includes("Open to the network"))
+  expect(frame).not.toContain("service set hostname")
+  const button = cell(frame, "Open to the network")
+  await setup.mockMouse.click(button.x + 2, button.y)
+  await setup.waitForFrame((frame) => frame.includes("192.168.1.5:4096"))
+  expect(opened).toBe(1)
 })

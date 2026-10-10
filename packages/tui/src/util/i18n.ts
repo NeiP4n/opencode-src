@@ -96,6 +96,11 @@ const ru: Record<string, string> = {
   // Host
   "This server only listens on this machine, so other devices cannot connect yet. Run `{command} service set hostname 0.0.0.0` and `{command} service restart`.":
     "Сервер слушает только этот компьютер, другие устройства пока не подключатся. Выполни `{command} service set hostname 0.0.0.0` и `{command} service restart`.",
+  "This server only listens on this machine, so other devices cannot connect yet. Opening it to the network restarts the service once; running sessions are interrupted.":
+    "Сервер слушает только этот компьютер, другие устройства пока не подключатся. Открытие для сети один раз перезапустит службу; идущие сессии прервутся.",
+  "Open to the network": "Открыть для сети",
+  "Restarting the service for the network…": "Перезапускаю службу для сети…",
+  "The service now listens on the network": "Служба теперь доступна в сети",
   "Could not read this server's addresses: {error}": "Не удалось узнать адреса сервера: {error}",
   "Only virtual adapters (Docker, WSL, VPN) were found; other devices may not reach these addresses.":
     "Нашлись только виртуальные адаптеры (Docker, WSL, VPN); другие устройства могут не достучаться по этим адресам.",

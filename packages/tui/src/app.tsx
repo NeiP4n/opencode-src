@@ -191,6 +191,7 @@ export type TuiInput = {
     service?: {
       reconnect: (signal: AbortSignal) => Promise<Endpoint>
       restart: () => Promise<void>
+      openToNetwork?: () => Promise<void>
     }
   }
   args: Args
@@ -233,6 +234,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
           return { api: OpenCode.make(next), url: endpoint.url }
         },
         restart: managed.restart,
+        openToNetwork: managed.openToNetwork,
       }
     : undefined
   const exit = { epilogue: undefined as string | undefined, reason: undefined as unknown }
