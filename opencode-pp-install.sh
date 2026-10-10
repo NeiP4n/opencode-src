@@ -98,7 +98,7 @@ mkdir -p "$BIN"
 cat >"$BIN/opencode-pp" <<WRAPPER
 #!/bin/sh
 # Opencode++ $VERSION, installed by opencode-pp-install.sh.
-exec "$(command -v bun)" --preload="$DIR/packages/cli/node_modules/@opentui/solid/scripts/preload.js" "$DIR/packages/cli/src/index.ts" "\$@"
+OPENCODE_COMMAND=opencode-pp exec "$(command -v bun)" --preload="$DIR/packages/cli/node_modules/@opentui/solid/scripts/preload.js" "$DIR/packages/cli/src/index.ts" "\$@"
 WRAPPER
 chmod +x "$BIN/opencode-pp"
 # Earlier versions of this installer took the name `opencode`; give it back, but only our own wrapper.

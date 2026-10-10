@@ -94,8 +94,11 @@ const ru: Record<string, string> = {
   Install: "Установить",
   "No experiments available": "Экспериментов нет",
   // Host
-  "This server only listens on this machine, so other devices cannot connect yet. Run `opencode service set hostname 0.0.0.0` and restart the service.":
-    "Сервер слушает только этот компьютер, другие устройства пока не подключатся. Выполни `opencode service set hostname 0.0.0.0` и перезапусти службу.",
+  "This server only listens on this machine, so other devices cannot connect yet. Run `{command} service set hostname 0.0.0.0` and `{command} service restart`.":
+    "Сервер слушает только этот компьютер, другие устройства пока не подключатся. Выполни `{command} service set hostname 0.0.0.0` и `{command} service restart`.",
+  "Could not read this server's addresses: {error}": "Не удалось узнать адреса сервера: {error}",
+  "Only virtual adapters (Docker, WSL, VPN) were found; other devices may not reach these addresses.":
+    "Нашлись только виртуальные адаптеры (Docker, WSL, VPN); другие устройства могут не достучаться по этим адресам.",
   "Open a session to host it as a room.": "Открой сессию, чтобы сделать из неё комнату.",
   "Host this session": "Открыть комнату для этой сессии",
   Room: "Комната",

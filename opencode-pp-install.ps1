@@ -89,6 +89,7 @@ Set-Content -Path (Join-Path $Bin "opencode-pp.cmd") -Encoding ASCII -Value @"
 setlocal
 for /f "tokens=2 delims=:" %%c in ('chcp') do set /a OPENCODE_PP_CP=%%c
 chcp 65001 >nul
+set OPENCODE_COMMAND=opencode-pp
 "$Bun" --preload="$Cli\node_modules\@opentui\solid\scripts\preload.js" "$Cli\src\index.ts" %*
 set OPENCODE_PP_EXIT=%ERRORLEVEL%
 if defined OPENCODE_PP_CP chcp %OPENCODE_PP_CP% >nul

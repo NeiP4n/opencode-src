@@ -13,7 +13,15 @@ function cell(frame: string, needle: string) {
   return { x: lines[y].indexOf(needle), y }
 }
 
-async function render(state: string) {
+const URLS = [
+  "http://127.0.0.1:4096",
+  "http://192.168.1.5:4096",
+  "http://172.17.0.1:4096",
+  "http://198.18.0.1:4096",
+  "http://26.10.0.2:4096",
+]
+
+async function render(state: string, urls = URLS) {
   return createAppFixture({
     width: 130,
     height: 40,
@@ -25,13 +33,7 @@ async function render(state: string) {
         return json({
           version: "test",
           pid: 1,
-          urls: [
-            "http://127.0.0.1:4096",
-            "http://192.168.1.5:4096",
-            "http://172.17.0.1:4096",
-            "http://198.18.0.1:4096",
-            "http://26.10.0.2:4096",
-          ],
+          urls,
           paths: { tmp: "/tmp" },
         })
       if (url.pathname === "/api/room") return json({ data: [room] })
@@ -231,4 +233,25 @@ test("the classic Windows console gets drawable stand-ins for the panel's symbol
   } finally {
     delete process.env.OPENCODE_BASIC_SYMBOLS
   }
+})
+
+test("Host says how to open the server to the network when it only listens on this computer", async () => {
+  await using state = await tmpdir()
+  await using setup = await render(state.path, ["http://127.0.0.1:4096"])
+  const bar = await setup.waitForFrame((frame) => frame.includes("+ Host"))
+  const entry = cell(bar, "+ Host")
+  await setup.mockMouse.click(entry.x + 2, entry.y)
+  const frame = await setup.waitForFrame((frame) => frame.includes("only listens on this machine"))
+  expect(frame).toContain("service set hostname 0.0.0.0")
+  expect(frame).not.toContain("127.0.0.1:4096")
+})
+
+test("Host still shows virtual adapter addresses when nothing else listens, with a warning", async () => {
+  await using state = await tmpdir()
+  await using setup = await render(state.path, ["http://127.0.0.1:4096", "http://172.20.3.4:4096"])
+  const bar = await setup.waitForFrame((frame) => frame.includes("+ Host"))
+  const entry = cell(bar, "+ Host")
+  await setup.mockMouse.click(entry.x + 2, entry.y)
+  const frame = await setup.waitForFrame((frame) => frame.includes("172.20.3.4:4096"))
+  expect(frame).toContain("Only virtual adapters")
 })

@@ -41,12 +41,15 @@ export function DialogHost(props: { onClose?: () => void }) {
   const sessionID = () => (route.data.type === "session" ? route.data.sessionID : undefined)
   const shared = () => rooms()?.some((room) => room.sessionID === sessionID()) ?? false
   // Guests need an address they can reach. Loopback only works on this machine, and
-  // container bridges (172.16/12) and TUN adapters (198.18/15) are not the network
-  // other devices are on.
-  const addresses = () =>
-    (server()?.urls ?? [])
+  // container bridges (172.16/12), TUN adapters (198.18/15) and link-local addresses are
+  // usually not the network other devices are on; they are shown only when nothing else is.
+  const listening = () =>
+    (server.state === "ready" ? server().urls : [])
       .map((url) => new URL(url).host)
-      .filter((host) => !/^(localhost|127\.|169\.254\.|\[::1\]|172\.(1[6-9]|2\d|3[01])\.|198\.1[89]\.)/.test(host))
+      .filter((host) => !/^(localhost|127\.|\[::1\])/.test(host))
+  const virtual = (host: string) => /^(169\.254\.|172\.(1[6-9]|2\d|3[01])\.|198\.1[89]\.)/.test(host)
+  const preferred = () => listening().filter((host) => !virtual(host))
+  const addresses = () => (preferred().length > 0 ? preferred() : listening())
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true)
@@ -82,14 +85,24 @@ export function DialogHost(props: { onClose?: () => void }) {
   return (
     <box paddingLeft={2} paddingRight={2} paddingBottom={1} gap={1}>
       <Header title={t("Host")} onClose={props.onClose} />
+      <Show when={server.error}>
+        {(error) => (
+          <text fg={theme.text.feedback.error.base} wrapMode="word">
+            {t("Could not read this server's addresses: {error}", { error: errorMessage(error()) })}
+          </text>
+        )}
+      </Show>
       <Show
         when={addresses().length > 0}
         fallback={
-          <text fg={theme.text.feedback.warning.base} wrapMode="word">
-            {t(
-              "This server only listens on this machine, so other devices cannot connect yet. Run `opencode service set hostname 0.0.0.0` and restart the service.",
-            )}
-          </text>
+          <Show when={server.state === "ready"}>
+            <text fg={theme.text.feedback.warning.base} wrapMode="word">
+              {t(
+                "This server only listens on this machine, so other devices cannot connect yet. Run `{command} service set hostname 0.0.0.0` and `{command} service restart`.",
+                { command: process.env.OPENCODE_COMMAND || "opencode" },
+              )}
+            </text>
+          </Show>
         }
       >
         <Labeled label={t("Address")}>
@@ -103,6 +116,11 @@ export function DialogHost(props: { onClose?: () => void }) {
             </For>
           </box>
         </Labeled>
+        <Show when={preferred().length === 0}>
+          <text fg={theme.text.feedback.warning.base} wrapMode="word">
+            {t("Only virtual adapters (Docker, WSL, VPN) were found; other devices may not reach these addresses.")}
+          </text>
+        </Show>
         <FirewallHelp ports={[...new Set(addresses().map((address) => Number(address.split(":").at(-1))))]} />
       </Show>
       <Show
