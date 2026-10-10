@@ -74,7 +74,7 @@ export interface Interface {
   readonly remove: (id: ProjectID) => Effect.Effect<void, ProjectNotFoundError>
   // The project's main session, created in the project's directory on first use.
   readonly main: (id: ProjectID) => Effect.Effect<SessionSchema.Info, ProjectNotFoundError>
-  // Top-level sessions opened in the project's directory or below it, main session excluded.
+  // Top-level sessions opened in the project's directory or below it, every project's main session excluded.
   readonly sessions: (id: ProjectID) => Effect.Effect<ReadonlyArray<SessionSchema.Info>, ProjectNotFoundError>
   // The project whose main session this is, if any.
   readonly mainOf: (sessionID: SessionID) => Effect.Effect<Project | undefined>
@@ -283,6 +283,7 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
           created: Date.now(),
         })
         if (!template) return project
+        const team = yield* roles()
         // Sessions list newest first, so opening the last member first shows the team in template order.
         yield* Effect.forEach(
           template.members.toReversed(),
@@ -292,6 +293,7 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
                 location: { directory: AbsolutePath.make(resolved) },
                 title: member.title,
                 agent: member.agent,
+                model: modelOf(team.find((role) => role.agent === member.agent)),
               })
               .pipe(
                 Effect.orDie,
@@ -330,8 +332,12 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service | FSUtil.S
       sessions: Effect.fn("Orchestra.sessions")(function* (id) {
         const project = yield* get(id)
         const recent = (yield* sessions.list({ parentID: null, limit: SCAN_LIMIT, order: "desc" })).data
+        // Another project in the same directory has its own orchestrator; it never joins this team.
         return recent.filter(
-          (session) => session.id !== project.main && Orchestra.contains(project.directory, session.location.directory),
+          (session) =>
+            session.id !== project.main &&
+            session.agent !== Orchestra.agent &&
+            Orchestra.contains(project.directory, session.location.directory),
         )
       }),
       mainOf: Effect.fn("Orchestra.mainOf")(function* (sessionID) {
@@ -433,6 +439,12 @@ function merge<A extends { id: string }, B extends { id: string; created: number
       .toSorted((a, b) => a.created - b.created)
       .map((item) => ({ ...item, origin: "custom" as const })),
   ]
+}
+
+// The runner only reads a session's own model, so a role's model is set on the
+// sessions opened for it; the TUI applies agent models only to prompts it sends.
+export function modelOf(role: Role | undefined) {
+  return role?.model ? Model.Ref.parse(role.model) : undefined
 }
 
 function originOf(builtin: readonly { id: string }[], id: string): Orchestra.Origin {

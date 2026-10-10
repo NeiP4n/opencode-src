@@ -27,6 +27,7 @@ import { AbsolutePath } from "@opencode/core/schema"
 import { location } from "./fixture/location"
 import { TeamPlugin } from "@opencode/core/plugin/team"
 import { agentHost, host } from "./plugin/host"
+import type { PermissionEvaluation } from "@opencode/plugin/effect/permission"
 
 const model = Model.Ref.make({ id: Model.ID.make("member"), providerID: Provider.ID.make("test") })
 const tokens = { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }
@@ -151,6 +152,12 @@ describe("Orchestra team", () => {
       expect(report).toContain("Developer: answer")
       expect(yield* orchestra.pending(developer.id)).toBeUndefined()
 
+      // a second project in the same directory brings its own orchestrator, which joins neither team
+      const neighbour = yield* orchestra.create({ name: "Neighbour", directory: tmp.path, template: "docs" })
+      const ownIDs = (yield* orchestra.sessions(project.id)).map((session) => session.id)
+      expect(ownIDs).not.toContain(neighbour.main)
+      expect((yield* orchestra.sessions(neighbour.id)).map((session) => session.id)).not.toContain(main)
+
       // a run the operator started themselves is not reported
       const sessions = yield* Session.Service
       yield* sessions.prompt({ sessionID: developer.id, text: "operator's own question" })
@@ -218,7 +225,10 @@ describe("Orchestra team", () => {
       expect(template.members).toEqual([{ agent: auditor.agent, title: "Code Auditor", category: "Team" }])
 
       const project = yield* orchestra.create({ name: "Audit", directory: tmp.path, template: "audit" })
-      expect((yield* orchestra.sessions(project.id)).map((session) => session.agent)).toEqual([auditor.agent])
+      const [member] = yield* orchestra.sessions(project.id)
+      expect(member.agent).toBe(auditor.agent)
+      // the runner reads only the session's model, so the role's model is set on its session
+      expect(member.model).toMatchObject({ providerID: "test", id: "member" })
 
       // a custom role a team uses cannot be removed; removing an edited built-in restores it
       const blocked = yield* orchestra.removeRole("code-auditor").pipe(Effect.flip)
@@ -246,7 +256,31 @@ describe("Orchestra team", () => {
     Effect.gen(function* () {
       const orchestra = yield* Orchestra.Service
       const agents = yield* Agent.Service
-      yield* TeamPlugin.Plugin.effect(host({ agent: agentHost(agents) }))
+      const hooks: Array<(event: PermissionEvaluation) => Effect.Effect<void>> = []
+      yield* TeamPlugin.Plugin.effect(
+        host({
+          agent: agentHost(agents),
+          permission: {
+            hook: (_, callback) => Effect.sync(() => hooks.push(callback)).pipe(Effect.as({ dispose: Effect.void })),
+            list: () => Effect.die("unused permission.list"),
+            get: () => Effect.die("unused permission.get"),
+            reply: () => Effect.die("unused permission.reply"),
+          },
+        }),
+      )
+      // What the permission service passes to plugins once every agent and config rule allowed the edit.
+      const evaluate = (agent: Agent.ID, action: string) =>
+        Effect.gen(function* () {
+          const event: PermissionEvaluation = {
+            sessionID: Session.ID.create(),
+            agent,
+            action,
+            resources: ["/project/file.txt"],
+            effect: "allow",
+          }
+          yield* Effect.forEach(hooks, (hook) => hook(event), { discard: true })
+          return event.effect
+        })
       expect(String((yield* agents.get(Orchestra.role("developer")))?.name)).toBe("Developer")
 
       const role = yield* orchestra.saveRole(undefined, {
@@ -265,6 +299,11 @@ describe("Orchestra team", () => {
       expect(agent.system).toEndWith("Translate to Russian.")
       expect(agent.model).toEqual(model)
       expect(agent.permissions).toContainEqual({ action: "edit", resource: "*", effect: "deny" })
+      // a global `edit: allow` from config cannot reopen a read-only role
+      expect(yield* evaluate(role.agent, "edit")).toBe("deny")
+      expect(yield* evaluate(role.agent, "read")).toBe("allow")
+      expect(yield* evaluate(Orchestra.role("developer"), "edit")).toBe("allow")
+      expect(yield* evaluate(Orchestra.agent, "edit")).toBe("deny")
 
       yield* orchestra.removeRole(role.id)
       yield* agents.get(role.agent).pipe(

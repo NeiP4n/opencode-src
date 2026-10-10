@@ -6,7 +6,7 @@ import { Effect, Stream } from "effect"
 import { Agent } from "../agent.js"
 import { Orchestra } from "../orchestra.js"
 
-const TEAM = `You are one session of a project's AI team. Tasks usually come from the project's Orchestrator session, which leads the team; treat them like requests from the operator. Do exactly the task you are given and stay inside its limits. Your final message is sent back to the Orchestrator as your report, so end every task with it: first line done / partly done / not done, then what changed (files), how you checked it (command and real result), and anything left or risky. Keep it short; details stay in this session.`
+const TEAM = `You are one session of a project's AI team. Tasks usually come from the project's Orchestrator session, which leads the team; treat them like requests from the operator. Do exactly the task you are given and stay inside its limits. Your final message is sent back to the Orchestrator as your report, so end every task with it: first line done / partly done / not done, then what changed (files), how you checked it (command and real result), and anything left or risky. Keep it short; details stay in this session. Every step is a slow model call, so work in few steps: make independent tool calls together in one step, run a check once unless its result is in doubt, and do not investigate questions outside the task; name them in the report instead.`
 
 // Registers every team role, built-in or the operator's own, as a "team-" agent.
 // The operator edits roles at runtime, so the agents are rebuilt on every change.
@@ -36,5 +36,22 @@ export const Plugin = define({
           if (role.readOnly) item.permissions.push({ action: "edit", resource: "*", effect: "deny" })
         })
     })
+    // Config permissions are appended after plugin ones and the last match wins, so a
+    // global `edit: allow` would undo the rule above and the Orchestrator's own deny. Both
+    // are deliberate, so they are enforced after every rule has been evaluated.
+    yield* ctx.permission.hook("evaluate", (event) =>
+      Effect.sync(() => {
+        if (event.action !== "edit") return
+        if (event.agent === Orchestra.agent) {
+          event.effect = "deny"
+          event.message = "The Orchestrator does not edit files; send the change to a team session"
+          return
+        }
+        const role = team.roles.find((item) => item.readOnly && item.agent === event.agent)
+        if (!role) return
+        event.effect = "deny"
+        event.message = `${role.name} is a read-only team role`
+      }),
+    )
   }),
 })

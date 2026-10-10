@@ -153,7 +153,8 @@ export const Plugin = {
                 }
                 case "create": {
                   const roles = yield* orchestra.roles()
-                  if (input.role && !roles.some((role) => role.id === input.role))
+                  const role = roles.find((item) => item.id === input.role)
+                  if (input.role && !role)
                     return yield* new ToolFailure({
                       message: `Unknown role ${input.role}. Roles: ${roles.map((role) => role.id).join(", ")}`,
                     })
@@ -161,7 +162,8 @@ export const Plugin = {
                     .create({
                       location: { directory: AbsolutePath.make(project.directory) },
                       title: input.title?.trim() || undefined,
-                      agent: input.role ? Orchestra.role(input.role) : undefined,
+                      agent: role?.agent,
+                      model: Orchestra.modelOf(role),
                     })
                     .pipe(Effect.mapError((error) => new ToolFailure({ message: "Could not create a session", error })))
                   yield* orchestra.setAccess(created.id, "full")
