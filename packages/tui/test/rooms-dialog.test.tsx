@@ -292,7 +292,8 @@ test("a joined room opens in the main area like a session and stays in the left 
     expect(joined).toMatch(/Role +Member/)
     expect(joined).toContain("The host or a cohost picks")
     // A separate section below the projects: hosted sessions and joined rooms, each marked as multiplayer.
-    expect(joined).toMatch(/⇄ Multiplayer +\+ Host \+ Connect/)
+    expect(joined).toContain("⇄ Multiplayer")
+    expect(joined).toContain("+ Host + Connect")
     expect(joined).toMatch(/⇄ Lab +×/)
     expect(joined).toContain(`⇄ Far lab · 127.0.0.1:${host.port}`)
 

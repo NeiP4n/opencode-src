@@ -8,7 +8,7 @@ import { TextAttributes } from "@opentui/core"
 import "../../component/title-shimmer"
 
 import { getScrollAcceleration } from "../../util/scroll"
-import { SESSION_SIDEBAR_WIDTH } from "../../ui/layout"
+import { useCompactLayout } from "../../ui/compact-layout"
 
 export function Sidebar(props: { sessionID: string }) {
   const data = useData()
@@ -16,17 +16,18 @@ export function Sidebar(props: { sessionID: string }) {
   const config = useConfig().data
   const session = createMemo(() => data.session.get(props.sessionID))
   const scrollAcceleration = createMemo(() => getScrollAcceleration(config))
+  const layout = useCompactLayout()
 
   return (
     <Show when={session()}>
       <box
         backgroundColor={theme.background.raised.base}
-        width={SESSION_SIDEBAR_WIDTH}
+        width={layout.sidebarWidth()}
         height="100%"
         paddingTop={1}
         paddingBottom={1}
-        paddingLeft={2}
-        paddingRight={2}
+        paddingLeft={layout.compact() ? 1 : 2}
+        paddingRight={layout.compact() ? 1 : 2}
         position="relative"
       >
         <box flexShrink={0} paddingRight={2} paddingBottom={1}>

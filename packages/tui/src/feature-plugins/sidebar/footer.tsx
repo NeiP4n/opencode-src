@@ -5,7 +5,7 @@ import { FilePath } from "../../ui/file-path"
 import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
 import { usePromptMove } from "../../component/prompt/move"
 import { hasConnectedProvider } from "../../util/connected-provider"
-import { SESSION_SIDEBAR_WIDTH } from "../../ui/layout"
+import { useCompactLayout } from "../../ui/compact-layout"
 import { useT } from "../../util/i18n"
 
 export function SidebarOnboarding(props: { context: Plugin.Context; sessionID: string }) {
@@ -81,6 +81,7 @@ export function SidebarOnboarding(props: { context: Plugin.Context; sessionID: s
 
 function SidebarFooter(props: { context: Plugin.Context; sessionID: string }) {
   const session = createMemo(() => props.context.data.session.get(props.sessionID))
+  const layout = useCompactLayout()
   const move = usePromptMove({
     projectID: () => session()?.projectID,
     sessionID: () => props.sessionID,
@@ -108,7 +109,7 @@ function SidebarFooter(props: { context: Plugin.Context; sessionID: string }) {
           >
             <FilePath
               value={value()}
-              maxWidth={SESSION_SIDEBAR_WIDTH - 4}
+              maxWidth={layout.sidebarWidth() - (layout.compact() ? 2 : 4)}
               fg={actions.hovered() ? props.context.theme.text.base : props.context.theme.text.muted}
             />
           </box>

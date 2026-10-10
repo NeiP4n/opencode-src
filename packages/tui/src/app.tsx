@@ -79,8 +79,14 @@ import { openTeamEditor } from "./component/dialog-teams"
 import { ProjectsProvider } from "./context/projects"
 import { NotesProvider } from "./context/notes"
 import { NotesCommands } from "./component/notes-commands"
-import { clampSessionTabsWidth, sessionTabsFitVertically, SESSION_SIDEBAR_WIDTH } from "./ui/layout"
+import {
+  clampSessionTabsWidth,
+  sessionTabsFitVertically,
+  SESSION_SIDEBAR_WIDTH,
+  SESSION_TABS_COMPACT_LAYOUT_WIDTH,
+} from "./ui/layout"
 import { createPaneResize } from "./ui/pane-resize"
+import { useCompactLayout } from "./ui/compact-layout"
 import { PaneResizeHandle } from "./ui/pane-resize-handle"
 import { ThemeErrorToast } from "./component/theme-error-toast"
 import { createThemeSource, ThemeProvider, useTheme, useThemes } from "./context/theme"
@@ -516,18 +522,25 @@ function App() {
       .environment({ sessionID: session.id, variables: terminalEnvironment.variables })
       .catch(toast.error)
   })
-  const [layout, updateLayout] = useStorage().store<{ verticalTabsWidth?: number }>("layout", {
-    initial: { verticalTabsWidth: SESSION_SIDEBAR_WIDTH },
-  })
+  const [layout, updateLayout] = useStorage().store<{ verticalTabsWidth?: number; compactTabsWidth?: number }>(
+    "layout",
+    {
+      initial: { verticalTabsWidth: SESSION_SIDEBAR_WIDTH },
+    },
+  )
+  // The compact layout remembers its own project panel width so switching back restores the full one.
+  const compact = useCompactLayout().compact
+  const defaultTabsWidth = () => (compact() ? SESSION_TABS_COMPACT_LAYOUT_WIDTH : SESSION_SIDEBAR_WIDTH)
   const tabsResize = createPaneResize({
-    value: () => layout.verticalTabsWidth ?? SESSION_SIDEBAR_WIDTH,
-    defaultValue: () => SESSION_SIDEBAR_WIDTH,
+    value: () => (compact() ? layout.compactTabsWidth : layout.verticalTabsWidth) ?? defaultTabsWidth(),
+    defaultValue: defaultTabsWidth,
     clamp: (width) => clampSessionTabsWidth(width, dimensions().width),
     fromMouse: (event) => event.x + 1,
     contains: (event, width) => event.x >= width - 1 && event.x <= width,
     onCommit: (width) => {
       void updateLayout((draft) => {
-        draft.verticalTabsWidth = width
+        if (compact()) draft.compactTabsWidth = width
+        else draft.verticalTabsWidth = width
       }).catch((error) => console.error("Failed to persist TUI layout", error))
     },
   })

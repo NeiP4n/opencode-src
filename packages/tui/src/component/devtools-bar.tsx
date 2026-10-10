@@ -481,7 +481,23 @@ export function DevToolsBar() {
       <box flexGrow={1} minWidth={0}>
         <TimeToFirstDraw visible={timing()} width="100%" fg={theme.text.muted} label="Time to first draw" />
       </box>
-      {/* Right edge. A popup here sat over the side panels, which took its clicks; the item switches the language itself. */}
+      {/* Right edge. A popup here sat over the side panels, which took its clicks; these items switch their setting themselves. */}
+      <BarItem
+        active={false}
+        onClick={() =>
+          void config
+            .update((draft) => {
+              const order = ["auto", "compact", "full"] as const
+              draft.layout = order[(order.indexOf(config.data.layout ?? "auto") + 1) % order.length]
+            })
+            .catch(toast.error)
+        }
+      >
+        <text fg={theme.text.muted}>{t("Layout")}</text>
+        <text fg={theme.text.action.primary.base}>
+          {" " + t({ auto: "Auto", compact: "Compact", full: "Full" }[config.data.layout ?? "auto"])}
+        </text>
+      </BarItem>
       <BarItem
         active={false}
         onClick={() =>

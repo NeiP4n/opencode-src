@@ -31,12 +31,24 @@ const team = {
   ],
 }
 
-function render(state: string, calls: Call[], projects: (typeof project)[]) {
+function render(
+  state: string,
+  calls: Call[],
+  projects: (typeof project)[],
+  listed = worker,
+  layout: "compact" | "full" = "full",
+  options: { width?: number; sidebar?: "auto" | "hide" } = {},
+) {
   return createAppFixture({
-    width: 120,
+    width: options.width ?? 120,
     state,
     args: { sessionID: worker.id },
-    config: { animations: false, session: { sidebar: "hide" }, debug: { devtools: true } },
+    config: {
+      animations: false,
+      session: { sidebar: options.sidebar ?? "hide" },
+      debug: { devtools: true },
+      layout,
+    },
     fetch: async (url, request) => {
       if (url.pathname.startsWith("/api/orchestra"))
         calls.push({
@@ -47,19 +59,20 @@ function render(state: string, calls: Call[], projects: (typeof project)[]) {
       if (url.pathname === "/api/location") return json(location)
       if (url.pathname === "/api/orchestra/project" && request.method === "POST")
         return json({ ...project, id: "prj_new", name: "Created" })
+      if (url.pathname === "/api/orchestra/owner") return json({})
       if (url.pathname === "/api/orchestra/project") return json(projects)
       if (url.pathname === "/api/orchestra/template") return json([team])
       if (url.pathname === `/api/orchestra/project/${project.id}/session`)
-        return json({ data: [worker], access: { [worker.id]: "write" }, category: { [worker.id]: "Build" } })
+        return json({ data: [listed], access: { [worker.id]: "write" }, category: { [worker.id]: "Build" } })
       if (url.pathname === `/api/orchestra/project/${project.id}/main`) return json(main)
       if (url.pathname.startsWith("/api/orchestra/access/")) return new Response(null, { status: 204 })
       if (url.pathname.startsWith("/api/orchestra/category/")) return new Response(null, { status: 204 })
-      if (url.pathname === "/api/session") return json({ data: [worker], cursor: {} })
+      if (url.pathname === "/api/session") return json({ data: [listed], cursor: {} })
       if (url.pathname === `/api/session/${worker.id}` && request.method === "DELETE") {
         calls.push({ method: "DELETE", path: url.pathname })
         return new Response(null, { status: 204 })
       }
-      if (url.pathname === `/api/session/${worker.id}`) return json({ data: worker })
+      if (url.pathname === `/api/session/${worker.id}`) return json({ data: listed })
       if (url.pathname === `/api/session/${main.id}`) return json({ data: main })
       if (/^\/api\/session\/[^/]+\/(message|inbox|permission)$/.test(url.pathname))
         return json({ data: [], cursor: {} })
@@ -206,4 +219,42 @@ test("a session is moved to another category from the tree", async () => {
     category: "Quality",
   })
   await setup.waitForFrame((frame) => frame.split("\n").some((line) => line.trim() === "Quality"))
+})
+
+test("a long session title in the narrow compact panel stays on one row", async () => {
+  await using state = await tmpdir()
+  const calls: Call[] = []
+  const title = "Opencode++: a long breakdown of what the council of models advised"
+  await using setup = await render(state.path, calls, [project], { ...worker, title }, "compact")
+
+  // the title truncates while the status and delete controls keep their place on the same row
+  const rows = (frame: string) => {
+    const lines = frame.split("\n")
+    const row = lines.findIndex((line) => line.includes("○ Openco"))
+    return { row, title: lines[row] ?? "", next: lines[row + 1] ?? "" }
+  }
+  const frame = rows(
+    await setup.waitForFrame(
+      (frame) => /○ Openco.+advised ×/.test(rows(frame).title) && rows(frame).next.includes("+ New session"),
+    ),
+  )
+  expect(frame.title).not.toContain("[write]")
+
+  // hovering the row brings back the category and access controls, still on one row
+  await setup.mockMouse.moveTo(frame.title.indexOf("Openco"), frame.row)
+  const hovered = rows(await setup.waitForFrame((frame) => rows(frame).title.includes("[write]")))
+  expect(hovered.title).toMatch(/○ Openco.+ # \[write\] ×/)
+  expect(hovered.next).toContain("+ New session")
+})
+
+test("the compact layout docks both side panels beside the chat on a laptop-sized terminal", async () => {
+  await using state = await tmpdir()
+  const calls: Call[] = []
+  await using setup = await render(state.path, calls, [project], worker, "compact", { width: 140, sidebar: "auto" })
+
+  // the project panel on the left and the session sidebar on the right share one row with the chat
+  const top = (frame: string) => frame.split("\n").find((line) => line.includes("Projects")) ?? ""
+  const row = top(await setup.waitForFrame((frame) => top(frame).includes("Worker task")))
+  // the sidebar is the compact width, at the right edge
+  expect(row.indexOf("Worker task")).toBeGreaterThanOrEqual(140 - 32)
 })

@@ -21,7 +21,8 @@ import { useTheme } from "../context/theme"
 import { useDialog } from "../ui/dialog"
 import { Session } from "../routes/session"
 import { Sidebar } from "../routes/session/sidebar"
-import { clampSessionPaneWidth, SESSION_SIDEBAR_WIDTH } from "../ui/layout"
+import { clampSessionPaneWidth, defaultSessionPaneWidth, sessionSidebarDocks } from "../ui/layout"
+import { useCompactLayout } from "../ui/compact-layout"
 import { createPaneResize } from "../ui/pane-resize"
 import { PaneResizeHandle } from "../ui/pane-resize-handle"
 import { useToast } from "../ui/toast"
@@ -43,19 +44,28 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
   const notes = useNotes()
   const theme = useTheme()
   const availableWidth = () => Math.max(0, dimensions().width - props.verticalTabsWidth)
-  const defaultPaneWidth = () => Math.max(1, Math.floor(panels.width() / 2))
-  const [layout, updateLayout] = useStorage().store<{ paneWidth?: number; terminalWidth?: number }>("layout", {
+  const compactLayout = useCompactLayout()
+  const defaultPaneWidth = () => defaultSessionPaneWidth(panels.width(), compactLayout.compact())
+  const [layout, updateLayout] = useStorage().store<{
+    paneWidth?: number
+    terminalWidth?: number
+    compactPaneWidth?: number
+  }>("layout", {
     initial: {},
   })
+  // The compact layout remembers its own panel width so switching back restores the full one.
   const paneResize = createPaneResize({
-    value: () => layout.paneWidth ?? layout.terminalWidth ?? defaultPaneWidth(),
+    value: () =>
+      (compactLayout.compact() ? layout.compactPaneWidth : (layout.paneWidth ?? layout.terminalWidth)) ??
+      defaultPaneWidth(),
     defaultValue: defaultPaneWidth,
     clamp: (width) => clampSessionPaneWidth(width, panels.width()),
     fromMouse: (event) => dimensions().width - event.x - 1,
     contains: (event, width) => event.x >= dimensions().width - width - 1 && event.x <= dimensions().width - width,
     onCommit: (width) => {
       void updateLayout((draft) => {
-        draft.paneWidth = width
+        if (compactLayout.compact()) draft.compactPaneWidth = width
+        else draft.paneWidth = width
       }).catch((error) => console.error("Failed to persist TUI layout", error))
     },
   })
@@ -112,7 +122,7 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
       }
     }),
   )
-  const wide = createMemo(() => dimensions().width - props.verticalTabsWidth > 120)
+  const wide = createMemo(() => sessionSidebarDocks(availableWidth(), compactLayout.compact()))
   const sidebarVisible = createMemo(() => {
     if (data.session.get(props.sessionID)?.parentID) return false
     if (sidebarOpen()) return true
@@ -373,7 +383,11 @@ export function SessionFrame(props: { sessionID: string; verticalTabsWidth: numb
           ref={(value: BoxRenderable) => (rightNode = value)}
           flexShrink={0}
           width={
-            fullscreen() ? availableWidth() : rightPane() === "sidebar" ? SESSION_SIDEBAR_WIDTH : paneResize.size()
+            fullscreen()
+              ? availableWidth()
+              : rightPane() === "sidebar"
+                ? compactLayout.sidebarWidth()
+                : paneResize.size()
           }
           minWidth={0}
           minHeight={0}

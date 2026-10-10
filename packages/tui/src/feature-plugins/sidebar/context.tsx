@@ -2,7 +2,7 @@ import { Plugin } from "@opencode/plugin/tui"
 import { createMemo, Show } from "solid-js"
 import { contextUsage } from "../../util/session"
 import { Locale } from "../../util/locale"
-import { SESSION_SIDEBAR_WIDTH } from "../../ui/layout"
+import { useCompactLayout } from "../../ui/compact-layout"
 import { useT } from "../../util/i18n"
 
 const money = new Intl.NumberFormat("en-US", {
@@ -10,12 +10,12 @@ const money = new Intl.NumberFormat("en-US", {
   currency: "USD",
 })
 
-// Sidebar padding (2 + 2) plus the column reserved for the scrollbar.
-const BAR_WIDTH = SESSION_SIDEBAR_WIDTH - 5
-
 export function SidebarContext(props: { context: Plugin.Context; sessionID: string }) {
   const theme = props.context.theme
   const t = useT()
+  const layout = useCompactLayout()
+  // The sidebar's side padding (2 + 2, or 1 + 1 when compact) plus the column reserved for the scrollbar.
+  const barWidth = () => layout.sidebarWidth() - (layout.compact() ? 3 : 5)
   const msg = createMemo(() => props.context.data.session.message.list(props.sessionID))
   const session = createMemo(() => props.context.data.session.get(props.sessionID))
   const cost = createMemo(() => props.context.data.session.cost(props.sessionID))
@@ -37,15 +37,17 @@ export function SidebarContext(props: { context: Plugin.Context; sessionID: stri
           <text fg={theme.text.base}>
             <b>{t("Context")}</b>
           </text>
-          <Show when={state()?.percent}>{(percent) => <text fg={level(percent())}>{t("{percent}% used", { percent: percent() })}</text>}</Show>
+          <Show when={state()?.percent}>
+            {(percent) => <text fg={level(percent())}>{t("{percent}% used", { percent: percent() })}</text>}
+          </Show>
         </box>
         <Show when={state()?.percent}>
           {(percent) => {
-            const filled = () => Math.min(BAR_WIDTH, Math.round((percent() / 100) * BAR_WIDTH))
+            const filled = () => Math.min(barWidth(), Math.round((percent() / 100) * barWidth()))
             return (
               <text wrapMode="none">
                 <span style={{ fg: level(percent()) }}>{"█".repeat(filled())}</span>
-                <span style={{ fg: theme.text.muted }}>{"░".repeat(BAR_WIDTH - filled())}</span>
+                <span style={{ fg: theme.text.muted }}>{"░".repeat(barWidth() - filled())}</span>
               </text>
             )
           }}

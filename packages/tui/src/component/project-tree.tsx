@@ -62,6 +62,9 @@ export function ProjectTree(props: { width: number }) {
   const [removed, setRemoved] = createStore<Record<string, boolean>>({})
 
   const current = () => (route.data.type === "session" ? data.session.get(route.data.sessionID) : undefined)
+  // A narrow panel keeps session titles readable by showing the category and access controls
+  // only on the hovered session.
+  const narrow = () => props.width < 36
   const shared = createMemo(() => new Set((rooms.latest ?? []).map((room) => room.sessionID)))
   const owner = (directory: string) =>
     // The deepest project wins when one project directory sits inside another.
@@ -138,8 +141,8 @@ export function ProjectTree(props: { width: number }) {
   const categorize = (sessionID: string) =>
     dialog.replace(() => (
       <DialogPrompt
-        title="Session category"
-        placeholder="Planning, Build, Quality… (empty removes it)"
+        title={t("Session category")}
+        placeholder={t("Planning, Build, Quality… (empty removes it)")}
         value={category[sessionID] ?? ""}
         onCancel={() => dialog.clear()}
         onConfirm={(value) => {
@@ -218,7 +221,7 @@ export function ProjectTree(props: { width: number }) {
     const rest = sessions.filter((session) => !category[session.id])
     return [
       ...names.map((name) => ({ name, sessions: sessions.filter((session) => category[session.id] === name) })),
-      ...(rest.length > 0 ? [{ name: names.length > 0 ? "Other" : "", sessions: rest }] : []),
+      ...(rest.length > 0 ? [{ name: names.length > 0 ? t("Other") : "", sessions: rest }] : []),
     ]
   }
 
@@ -253,13 +256,16 @@ export function ProjectTree(props: { width: number }) {
           {(project) => (
             <box>
               <Row id={project.id} hover={hover} setHover={setHover} onClick={() => toggle(project.id)}>
-                <text fg={theme.text.muted}>{expanded[project.id] ? "▾ " : "▸ "}</text>
+                <text flexShrink={0} fg={theme.text.muted}>
+                  {expanded[project.id] ? "▾ " : "▸ "}
+                </text>
                 <box flexGrow={1} minWidth={0}>
                   <text fg={theme.text.base} attributes={TextAttributes.BOLD} wrapMode="none" truncate>
                     {project.name}
                   </text>
                 </box>
                 <box
+                  flexShrink={0}
                   onMouseUp={(event) => {
                     event.stopPropagation()
                     edit(project)
@@ -276,9 +282,11 @@ export function ProjectTree(props: { width: number }) {
                   selected={project.main !== undefined && project.main === current()?.id}
                   onClick={() => void openMain(project)}
                 >
-                  <text fg={theme.text.action.primary.base}>{"  ★ "}</text>
-                  <text fg={theme.text.base} wrapMode="none">
-                    Orchestrator
+                  <text flexShrink={0} fg={theme.text.action.primary.base}>
+                    {"  ★ "}
+                  </text>
+                  <text fg={theme.text.base} wrapMode="none" truncate>
+                    {t("Orchestrator")}
                   </text>
                 </Row>
                 <For each={groupsOf(project)}>
@@ -301,6 +309,7 @@ export function ProjectTree(props: { width: number }) {
                             onClick={() => route.navigate({ type: "session", sessionID: session.id })}
                           >
                             <text
+                              flexShrink={0}
                               fg={
                                 data.session.status(session.id) === "running"
                                   ? theme.text.feedback.success.base
@@ -311,30 +320,35 @@ export function ProjectTree(props: { width: number }) {
                             </text>
                             <box flexGrow={1} minWidth={0}>
                               <text fg={theme.text.base} wrapMode="none" truncate>
-                                {`${shared().has(session.id) ? "⇄ " : ""}${session.title || "Untitled"}`}
+                                {`${shared().has(session.id) ? "⇄ " : ""}${session.title || t("Untitled")}`}
                               </text>
                             </box>
+                            <Show when={!narrow() || hover() === session.id}>
+                              <box
+                                flexShrink={0}
+                                onMouseUp={(event) => {
+                                  event.stopPropagation()
+                                  categorize(session.id)
+                                }}
+                              >
+                                <text fg={hover() === session.id ? theme.text.action.primary.base : theme.text.muted}>
+                                  {" # "}
+                                </text>
+                              </box>
+                              <box
+                                flexShrink={0}
+                                onMouseUp={(event) => {
+                                  event.stopPropagation()
+                                  cycle(session.id)
+                                }}
+                              >
+                                <text
+                                  fg={theme.text.formfield.base}
+                                >{`[${access[session.id] ?? Orchestra.defaultAccess}]`}</text>
+                              </box>
+                            </Show>
                             <box
-                              onMouseUp={(event) => {
-                                event.stopPropagation()
-                                categorize(session.id)
-                              }}
-                            >
-                              <text fg={hover() === session.id ? theme.text.action.primary.base : theme.text.muted}>
-                                #{" "}
-                              </text>
-                            </box>
-                            <box
-                              onMouseUp={(event) => {
-                                event.stopPropagation()
-                                cycle(session.id)
-                              }}
-                            >
-                              <text
-                                fg={theme.text.formfield.base}
-                              >{`[${access[session.id] ?? Orchestra.defaultAccess}]`}</text>
-                            </box>
-                            <box
+                              flexShrink={0}
                               onMouseOut={() => setArmed()}
                               onMouseUp={(event) => {
                                 event.stopPropagation()
@@ -342,7 +356,7 @@ export function ProjectTree(props: { width: number }) {
                               }}
                             >
                               <text fg={armed() === session.id ? theme.text.feedback.error.base : theme.text.muted}>
-                                {armed() === session.id ? " delete?" : " ×"}
+                                {armed() === session.id ? ` ${t("delete?")}` : " ×"}
                               </text>
                             </box>
                           </Row>
@@ -355,7 +369,9 @@ export function ProjectTree(props: { width: number }) {
                   id={`${project.id}:new`}
                   hover={hover}
                   setHover={setHover}
-                  onClick={() => route.navigate({ type: "home", location: { directory: project.directory } })}
+                  onClick={() =>
+                    route.navigate({ type: "home", location: { directory: project.directory }, project: project.id })
+                  }
                 >
                   <text fg={theme.text.muted}>{"  " + t("+ New session")}</text>
                 </Row>
@@ -365,7 +381,7 @@ export function ProjectTree(props: { width: number }) {
         </For>
         <box paddingTop={projects().length > 0 ? 1 : 0}>
           <box flexDirection="row" paddingLeft={1} paddingRight={1}>
-            <text fg={theme.text.action.secondary.base} attributes={TextAttributes.BOLD}>
+            <text flexShrink={0} fg={theme.text.action.secondary.base} attributes={TextAttributes.BOLD}>
               {"⇄ "}
             </text>
             <box flexGrow={1} minWidth={0}>
@@ -373,26 +389,16 @@ export function ProjectTree(props: { width: number }) {
                 {t("Multiplayer")}
               </text>
             </box>
-            <For
-              each={[
-                { id: "multiplayer:host", label: t("+ Host"), window: DialogHost },
-                { id: "multiplayer:connect", label: t("+ Connect"), window: DialogConnect },
-              ]}
-            >
-              {(action) => (
-                <box
-                  paddingLeft={1}
-                  onMouseOver={() => setHover(action.id)}
-                  onMouseOut={() => setHover(undefined)}
-                  onMouseUp={() => openRooms(action.window)}
-                >
-                  <text fg={hover() === action.id ? theme.text.action.primary.hovered : theme.text.action.primary.base}>
-                    {action.label}
-                  </text>
-                </box>
-              )}
-            </For>
+            <Show when={!narrow()}>
+              <MultiplayerActions hover={hover} setHover={setHover} onOpen={openRooms} />
+            </Show>
           </box>
+          {/* A narrow panel has no room beside the heading, so Host and Connect go under it. */}
+          <Show when={narrow()}>
+            <box flexDirection="row" paddingLeft={3} paddingRight={1}>
+              <MultiplayerActions hover={hover} setHover={setHover} onOpen={openRooms} />
+            </box>
+          </Show>
           <RoomPeople rooms={rooms.latest ?? []} hover={hover} setHover={setHover} />
           <For each={rooms.latest ?? []}>
             {(room) => (
@@ -403,13 +409,16 @@ export function ProjectTree(props: { width: number }) {
                 selected={room.sessionID === current()?.id}
                 onClick={() => route.navigate({ type: "session", sessionID: room.sessionID })}
               >
-                <text fg={theme.text.action.secondary.base}>{"  ⇄ "}</text>
+                <text flexShrink={0} fg={theme.text.action.secondary.base}>
+                  {"  ⇄ "}
+                </text>
                 <box flexGrow={1} minWidth={0}>
                   <text fg={theme.text.base} wrapMode="none" truncate>
                     {room.name}
                   </text>
                 </box>
                 <box
+                  flexShrink={0}
                   onMouseOut={() => setArmed()}
                   onMouseUp={(event) => {
                     event.stopPropagation()
@@ -439,7 +448,9 @@ export function ProjectTree(props: { width: number }) {
                   selected={viewing(room) && route.data.type === "room" && !route.data.sessionID}
                   onClick={() => openRoom(room)}
                 >
-                  <text fg={theme.text.action.secondary.base}>{"  ⇄ "}</text>
+                  <text flexShrink={0} fg={theme.text.action.secondary.base}>
+                    {"  ⇄ "}
+                  </text>
                   <box flexGrow={1} minWidth={0}>
                     <text fg={theme.text.base} wrapMode="none" truncate>
                       {room.name}
@@ -447,6 +458,7 @@ export function ProjectTree(props: { width: number }) {
                     </text>
                   </box>
                   <box
+                    flexShrink={0}
                     onMouseOut={() => setArmed()}
                     onMouseUp={(event) => {
                       event.stopPropagation()
@@ -484,6 +496,37 @@ export function ProjectTree(props: { width: number }) {
         </box>
       </scrollbox>
     </box>
+  )
+}
+
+function MultiplayerActions(props: {
+  hover: () => string | undefined
+  setHover: (id: string | undefined) => void
+  onOpen: (window: typeof DialogHost) => void
+}) {
+  const theme = useTheme()
+  const t = useT()
+  return (
+    <For
+      each={[
+        { id: "multiplayer:host", label: t("+ Host"), window: DialogHost },
+        { id: "multiplayer:connect", label: t("+ Connect"), window: DialogConnect },
+      ]}
+    >
+      {(action) => (
+        <box
+          flexShrink={0}
+          paddingLeft={1}
+          onMouseOver={() => props.setHover(action.id)}
+          onMouseOut={() => props.setHover(undefined)}
+          onMouseUp={() => props.onOpen(action.window)}
+        >
+          <text fg={props.hover() === action.id ? theme.text.action.primary.hovered : theme.text.action.primary.base}>
+            {action.label}
+          </text>
+        </box>
+      )}
+    </For>
   )
 }
 
@@ -612,7 +655,9 @@ function RoomSessions(props: {
             selected={props.current === session.id}
             onClick={() => props.onOpen(session.id)}
           >
-            <text fg={theme.text.muted}>{"      ○ "}</text>
+            <text flexShrink={0} fg={theme.text.muted}>
+              {"      ○ "}
+            </text>
             <box flexGrow={1} minWidth={0}>
               <text fg={theme.text.base} wrapMode="none" truncate>
                 {session.title || t("Untitled")}

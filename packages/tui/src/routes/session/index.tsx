@@ -80,6 +80,8 @@ import { DialogExportOptions } from "../../ui/dialog-export-options"
 import { DialogExportResult } from "../../ui/dialog-export-result"
 import { sessionEpilogue } from "../../util/presentation"
 import { useConfig } from "../../config"
+import { sessionSidebarDocks } from "../../ui/layout"
+import { useCompactLayout } from "../../ui/compact-layout"
 import { useClipboard } from "../../context/clipboard"
 import { nextThinkingMode, type ThinkingMode } from "../../context/thinking"
 import { getScrollAcceleration } from "../../util/scroll"
@@ -165,6 +167,7 @@ export function Session(props: {
   const args = useArgs()
   const configState = useConfig()
   const config = configState.data
+  const compactLayout = useCompactLayout()
   const theme = useTheme()
   const promptRef = usePromptRef()
   const session = createMemo(() => data.session.get(route.sessionID))
@@ -247,7 +250,10 @@ export function Session(props: {
 
   Keymap.createLayer(() => ({
     priority: 10,
-    enabled: () => props.sidebarVisible && dimensions().width - props.verticalTabsWidth <= 120 && !disabled(),
+    enabled: () =>
+      props.sidebarVisible &&
+      !sessionSidebarDocks(dimensions().width - props.verticalTabsWidth, compactLayout.compact()) &&
+      !disabled(),
     commands: [{ bind: "escape,ctrl+c", title: "Close sidebar", group: "Session", run: props.onToggleSidebar }],
   }))
   const contentWidth = createMemo(() => (props.width ?? dimensions().width - props.verticalTabsWidth) - 4)
