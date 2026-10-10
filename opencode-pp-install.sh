@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs Opencode++ for Linux and macOS with one command:
 #
-#   curl -fsSL https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/NeiP4n/opencode-plus-plus/lan-rooms/opencode-pp-install.sh | sh
 #
 # Missing git, curl or unzip come from the system package manager (it may ask
 # for your sudo password), Bun from bun.sh. The newest release is checked out
@@ -10,7 +10,7 @@
 # the `opencode` command. Running this again updates.
 set -eu
 
-REPO="${OPENCODE_PP_REPO:-https://github.com/NeiP4n/opencode-src.git}"
+REPO="${OPENCODE_PP_REPO:-https://github.com/NeiP4n/opencode-plus-plus.git}"
 DIR="${OPENCODE_PP_DIR:-$HOME/.local/share/opencode-pp}"
 BIN="${OPENCODE_PP_BIN:-$HOME/.local/bin}"
 BRANCH="${OPENCODE_PP_BRANCH:-lan-rooms}"

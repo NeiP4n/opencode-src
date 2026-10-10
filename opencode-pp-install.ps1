@@ -1,6 +1,6 @@
 # Installs Opencode++ for Windows with one command. In PowerShell:
 #
-#   irm https://raw.githubusercontent.com/NeiP4n/opencode-src/lan-rooms/opencode-pp-install.ps1 | iex
+#   irm https://raw.githubusercontent.com/NeiP4n/opencode-plus-plus/lan-rooms/opencode-pp-install.ps1 | iex
 #
 # Missing Git comes from winget, Bun from bun.sh. The newest release is checked
 # out into %LOCALAPPDATA%\opencode-pp and the `opencode-pp` command is added to your
@@ -8,7 +8,7 @@
 # `opencode` command. Running this again updates.
 $ErrorActionPreference = "Stop"
 
-$Repo = if ($env:OPENCODE_PP_REPO) { $env:OPENCODE_PP_REPO } else { "https://github.com/NeiP4n/opencode-src.git" }
+$Repo = if ($env:OPENCODE_PP_REPO) { $env:OPENCODE_PP_REPO } else { "https://github.com/NeiP4n/opencode-plus-plus.git" }
 $Dir = if ($env:OPENCODE_PP_DIR) { $env:OPENCODE_PP_DIR } else { Join-Path $env:LOCALAPPDATA "opencode-pp" }
 $Bin = Join-Path $Dir "bin"
 $Branch = if ($env:OPENCODE_PP_BRANCH) { $env:OPENCODE_PP_BRANCH } else { "lan-rooms" }
