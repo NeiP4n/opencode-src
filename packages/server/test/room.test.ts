@@ -400,3 +400,15 @@ it.live("only cohosts switch the model and agent or run commands; a single-sessi
     expect((yield* agent()).status).toBe(204)
   }).pipe(Effect.scoped),
 )
+
+it.live("a guest who leaves drops out of the host's members and its token stops working", () =>
+  Effect.gen(function* () {
+    const { call, room, code } = yield* setup
+    const joined = (yield* call("/api/room/join", { method: "POST", body: { code, name: "Phone" } })).body
+    const guest = { authorization: `Bearer ${joined.token}` }
+    expect((yield* call(`/api/room/${room.id}/member`, { headers: host })).body.data).toHaveLength(1)
+    expect((yield* call(`/api/room/${room.id}/guest`, { method: "DELETE", headers: guest })).status).toBe(204)
+    expect((yield* call(`/api/room/${room.id}/member`, { headers: host })).body.data).toEqual([])
+    expect((yield* call(`/api/room/${room.id}/guest`, { headers: guest })).status).toBe(401)
+  }).pipe(Effect.scoped),
+)

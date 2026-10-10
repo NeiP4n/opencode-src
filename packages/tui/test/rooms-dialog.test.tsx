@@ -450,10 +450,12 @@ function followLog(aggregateID: string, seq: number) {
 test("a joined room its host closed shows why and can be left without a crash", async () => {
   await using state = await tmpdir()
   const remote = { ...room, id: "room_gone", sessionID: "ses_gone", name: "Gone lab", open: true }
+  const left: string[] = []
   const host = Bun.serve({
     port: 0,
     fetch(request) {
       const url = new URL(request.url)
+      if (request.method === "DELETE") left.push(url.pathname)
       if (url.pathname === "/api/room/public") return json({ host: "studio", rooms: [remote] })
       if (url.pathname === "/api/room/join" && request.method === "POST")
         return json({ token: "token", guest: { id: "guest_1", name: "Bo" }, role: "member", room: remote })
@@ -487,6 +489,9 @@ test("a joined room its host closed shows why and can be left without a crash", 
     const sure = cell(setup.captureCharFrame(), "leave?")
     await setup.mockMouse.click(sure.x + 1, sure.y)
     await setup.waitForFrame((frame) => !frame.includes("Gone lab"))
+    // leaving tells the host, even one that no longer answers
+    await setup.waitFor(() => left.length > 0)
+    expect(left).toEqual([`/api/room/${remote.id}/guest`])
   } finally {
     await host.stop()
   }

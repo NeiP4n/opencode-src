@@ -379,6 +379,14 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
         }),
       )
       .handle(
+        "room.guest.leave",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestOf(ctx.params.roomID)
+          yield* rooms.removeMember(joined.room.id, joined.member.id)
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
         "room.guest.session.list",
         Effect.fn(function* (ctx) {
           const joined = yield* guestOf(ctx.params.roomID)

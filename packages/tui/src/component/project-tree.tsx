@@ -19,7 +19,7 @@ import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
 import { roomListChanged, roomListRevision, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
 import { DialogConnect, DialogHost, nextRole, ROLE_LABEL } from "./dialog-rooms"
-import { roomClient } from "../util/room-guest"
+import { roomClient, tellHostLeft } from "../util/room-guest"
 import { openProjectDialog } from "./dialog-project"
 import { useProjects } from "../context/projects"
 import { DialogPrompt } from "../ui/dialog-prompt"
@@ -172,11 +172,12 @@ export function ProjectTree(props: { width: number }) {
     route.navigate({ type: "room", url: room.url, roomID: room.roomID, sessionID })
   const viewing = (room: JoinedRoom) => route.data.type === "room" && sameRoom(route.data, room)
 
-  // Leaving only forgets the token here; the host keeps the room and its chat.
+  // Leaving tells the host and forgets the token here; the host keeps the room and its chat.
   const leave = (room: JoinedRoom) => {
     if (armed() !== roomKey(room)) return setArmed(roomKey(room))
     setArmed()
     if (viewing(room)) route.navigate({ type: "home" })
+    void tellHostLeft(room)
     void updateJoined((draft) => {
       draft.joined = draft.joined.filter((item) => !sameRoom(item, room))
     })

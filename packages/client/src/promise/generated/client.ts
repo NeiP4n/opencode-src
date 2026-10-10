@@ -299,6 +299,8 @@ import type {
   RoomGuestGetOutput,
   RoomGuestSessionMessagesInput,
   RoomGuestSessionMessagesOutput,
+  RoomGuestLeaveInput,
+  RoomGuestLeaveOutput,
   RoomGuestSessionListInput,
   RoomGuestSessionListOutput,
   RoomGuestSessionCreateInput,
@@ -2630,6 +2632,17 @@ export function make(options: ClientOptions) {
               requestOptions,
             ),
         },
+        leave: (input: RoomGuestLeaveInput, requestOptions?: RequestOptions) =>
+          request<RoomGuestLeaveOutput>(
+            {
+              method: "DELETE",
+              path: `/api/room/${encodeURIComponent(input.roomID)}/guest`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404],
+              empty: true,
+            },
+            requestOptions,
+          ),
         model: {
           list: (input: RoomGuestModelListInput, requestOptions?: RequestOptions) =>
             request<{ readonly data: RoomGuestModelListOutput }>(

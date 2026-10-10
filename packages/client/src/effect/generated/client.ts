@@ -301,6 +301,8 @@ import type {
   RoomGuestGetOutput,
   RoomGuestSessionMessagesInput,
   RoomGuestSessionMessagesOutput,
+  RoomGuestLeaveInput,
+  RoomGuestLeaveOutput,
   RoomGuestSessionListInput,
   RoomGuestSessionListOutput,
   RoomGuestSessionCreateInput,
@@ -1866,6 +1868,11 @@ const EndpointRoomGuestSessionMessages = (raw: RawClient["server.room"]) => (inp
     }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointRoomGuestLeave = (raw: RawClient["server.room"]) => (input: RoomGuestLeaveInput) =>
+  preserveEffect<RoomGuestLeaveOutput>()(
+    raw["room.guest.leave"]({ params: { roomID: input["roomID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointRoomGuestSessionList = (raw: RawClient["server.room"]) => (input: RoomGuestSessionListInput) =>
   preserveEffect<RoomGuestSessionListOutput>()(
     raw["room.guest.session.list"]({ params: { roomID: input["roomID"] } }).pipe(
@@ -2055,6 +2062,7 @@ const adaptGroupRoom = (raw: RawClient["server.room"]) => ({
       agent: EndpointRoomGuestSessionAgent(raw),
       command: EndpointRoomGuestSessionCommand(raw),
     },
+    leave: EndpointRoomGuestLeave(raw),
     model: { list: EndpointRoomGuestModelList(raw) },
     agent: { list: EndpointRoomGuestAgentList(raw) },
     command: { list: EndpointRoomGuestCommandList(raw) },

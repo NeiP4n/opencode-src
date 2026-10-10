@@ -7323,6 +7323,10 @@ export type RoomGuestSessionMessagesOutput = {
   cursor: { previous?: string | null; next?: string | null }
 }
 
+export type RoomGuestLeaveInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type RoomGuestLeaveOutput = void
+
 export type RoomGuestSessionListInput = { readonly roomID: { readonly roomID: string }["roomID"] }
 
 export type RoomGuestSessionListOutput = { data: Array<SessionInfo1> }["data"]

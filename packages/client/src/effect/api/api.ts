@@ -2573,6 +2573,10 @@ export type RoomGuestSessionMessagesOperation<E = never> = (
   input: RoomGuestSessionMessagesInput,
 ) => Effect.Effect<RoomGuestSessionMessagesOutput, E>
 
+export type RoomGuestLeaveInput = { readonly roomID: Room.ID }
+export type RoomGuestLeaveOutput = void
+export type RoomGuestLeaveOperation<E = never> = (input: RoomGuestLeaveInput) => Effect.Effect<RoomGuestLeaveOutput, E>
+
 export type RoomGuestSessionListInput = { readonly roomID: Room.ID }
 export type RoomGuestSessionListOutput = ReadonlyArray<Session.Info>
 export type RoomGuestSessionListOperation<E = never> = (
@@ -3674,6 +3678,7 @@ export interface RoomApi<E = never> {
       readonly agent: RoomGuestSessionAgentOperation<E>
       readonly command: RoomGuestSessionCommandOperation<E>
     }
+    readonly leave: RoomGuestLeaveOperation<E>
     readonly model: { readonly list: RoomGuestModelListOperation<E> }
     readonly agent: { readonly list: RoomGuestAgentListOperation<E> }
     readonly command: { readonly list: RoomGuestCommandListOperation<E> }

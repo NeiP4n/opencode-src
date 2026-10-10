@@ -189,6 +189,19 @@ export const RoomGroup = HttpApiGroup.make("server.room")
     ),
   )
   .add(
+    HttpApiEndpoint.delete("room.guest.leave", "/api/room/:roomID/guest", {
+      params: { roomID: Room.ID },
+      success: HttpApiSchema.NoContent,
+      error: [UnauthorizedError, RoomNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.leave",
+        summary: "Leave the room",
+        description: "Stop being a member of the room; the guest's token stops working and the host no longer lists it.",
+      }),
+    ),
+  )
+  .add(
     HttpApiEndpoint.get("room.guest.session.list", "/api/room/:roomID/guest/session", {
       params: { roomID: Room.ID },
       success: Schema.Struct({ data: Schema.Array(Session.Info) }),

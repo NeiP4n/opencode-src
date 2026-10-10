@@ -5,6 +5,14 @@ export function roomClient(room: Pick<JoinedRoom, "url" | "token">) {
   return OpenCode.make({ baseUrl: room.url, headers: { authorization: `Bearer ${room.token}` } })
 }
 
+// Tells the host this guest left, so it drops out of the host's participants. A host
+// that is gone cannot hear it; the room is forgotten here either way.
+export function tellHostLeft(room: Pick<JoinedRoom, "url" | "token" | "roomID">) {
+  return roomClient(room)
+    .room.guest.leave({ roomID: room.roomID })
+    .catch(() => undefined)
+}
+
 // The shared session as a guest reaches it: the slice of the client API the
 // session transcript and the data layer use, answered by the room's guest
 // routes. Everything else belongs to the host and rejects, so a component that
