@@ -51,7 +51,20 @@ export type JoinedRoom = {
 // Joined rooms live in client storage under one key, so the Connect window, the
 // left panel and the room view all read and change the same live list.
 export function useJoinedRooms() {
-  return useStorage().store<{ joined: JoinedRoom[] }>("rooms", { initial: { joined: [] } })
+  return useStorage().store<{ joined: JoinedRoom[]; device?: string }>("rooms", { initial: { joined: [] } })
+}
+
+// A random key this client keeps across joins, so a host's ban outlasts a new name.
+export function useDeviceKey() {
+  const [rooms, update] = useJoinedRooms()
+  return async () => {
+    if (rooms.device) return rooms.device
+    const device = crypto.randomUUID()
+    await update((draft) => {
+      draft.device = device
+    })
+    return device
+  }
 }
 
 export function sameRoom(a: Pick<JoinedRoom, "url" | "roomID">, b: Pick<JoinedRoom, "url" | "roomID">) {

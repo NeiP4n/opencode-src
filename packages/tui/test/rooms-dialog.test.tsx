@@ -42,6 +42,7 @@ async function render(
           paths: { tmp: "/tmp" },
         })
       if (url.pathname === "/api/room") return json({ data: [room] })
+      if (url.pathname === `/api/room/${room.id}/member`) return json({ data: [] })
       if (url.pathname === `/api/room/${room.id}/code` && request.method === "POST")
         return json({ code: "ABCD-EFGH", expires_in: 600 })
     },
@@ -117,6 +118,7 @@ async function renderSession(state: string, input: { rooms: () => unknown[]; onC
         return json({ data: room })
       }
       if (url.pathname === "/api/room") return json({ data: input.rooms() })
+      if (url.pathname === `/api/room/${room.id}/member`) return json({ data: [] })
       if (url.pathname === `/api/room/${room.id}/code` && request.method === "POST")
         return json({ code: "ABCD-EFGH", expires_in: 600 })
       if (url.pathname === `/api/session/${room.sessionID}`) return json({ data: session })
@@ -146,8 +148,8 @@ test("a hosted session names guest authors and shows a multiplayer indicator tha
   const indicator = cell(frame, "⇄ Multiplayer · Lab")
   await setup.mockMouse.click(indicator.x + 2, indicator.y)
   const host = await setup.waitForFrame((frame) => frame.includes("Get join code"))
-  expect(host).toContain("Only me")
-  expect(host).toContain("Who may allow or deny the AI")
+  expect(host).toContain("New guests")
+  expect(host).toContain("[ Member ]")
   expect(host).toContain("Linked rooms only")
 })
 
@@ -184,21 +186,72 @@ test("the Language bar item switches the bar and room windows to Russian and bac
   expect(dialog).toContain("Комнаты в этой сети")
 })
 
-test("a joined room opens in the main area and stays in the left panel under Multiplayer", async () => {
+test("a joined room opens in the main area like a session and stays in the left panel under Multiplayer", async () => {
   await using state = await tmpdir()
   const remote = { ...room, id: "room_far", sessionID: "ses_far", name: "Far lab", open: true }
+  const shared = { ...session, id: remote.sessionID, title: "Far lab" }
+  const messages = [
+    {
+      id: "msg_1",
+      type: "user",
+      text: "Hello from far",
+      time: { created: 0 },
+      metadata: { room: { id: remote.id, guest: { id: "guest_0", name: "Ann" } } },
+    },
+    {
+      id: "msg_2",
+      type: "assistant",
+      agent: "build",
+      model: { providerID: "test", id: "test" },
+      content: [
+        {
+          type: "tool",
+          id: "tool_1",
+          name: "shell",
+          state: {
+            status: "completed",
+            input: { command: "echo from the host" },
+            content: [{ type: "text", text: "ok" }],
+            metadata: { shell: "bash", exit: 0 },
+          },
+          time: { created: 1, completed: 2 },
+        },
+        { type: "text", id: "text_1", text: "Done on the host." },
+      ],
+      time: { created: 1, completed: 2 },
+    },
+  ]
+  const prompts: unknown[] = []
   const host = Bun.serve({
     port: 0,
-    fetch(request) {
+    idleTimeout: 0,
+    async fetch(request) {
       const url = new URL(request.url)
+      const guest = `/api/room/${remote.id}/guest`
       if (url.pathname === "/api/room/public") return json({ host: "studio", rooms: [remote] })
       if (url.pathname === "/api/room/join" && request.method === "POST")
-        return json({ token: "token", guest: { id: "guest_1", name: "Bo" }, room: remote })
-      if (url.pathname === `/api/room/${remote.id}/guest/message`)
+        return json({ token: "token", guest: { id: "guest_1", name: "Bo" }, role: "member", room: remote })
+      if (url.pathname === guest)
+        return json({ room: remote, guest: { id: "guest_1", name: "Bo" }, role: "member", session: shared })
+      if (url.pathname === `${guest}/session/message`) return json({ data: messages.toReversed(), cursor: {} })
+      if (url.pathname === `${guest}/message`)
+        return json({ data: [], running: false, note: { name: "release-plan", title: "Release plan" } })
+      if (url.pathname === `${guest}/note`)
         return json({
-          data: [{ id: "msg_1", role: "user", author: "Ann", text: "Hello from far", created: 0 }],
-          running: false,
+          data: {
+            name: "release-plan",
+            frontmatter: { title: "Release plan", status: "active", tags: [], created: 0, updated: 0 },
+            body: "Ship the notes canvas.",
+            mtime: 1,
+          },
         })
+      if (url.pathname === `${guest}/permission`) return json({ data: [] })
+      if (url.pathname === `${guest}/prompt` && request.method === "POST") {
+        prompts.push(await request.json())
+        return json({ data: {} })
+      }
+      // The log replays history up to log.synced, then follows; this host has nothing new to say.
+      if (url.pathname === `${guest}/log`) return followLog(shared.id, 2)
       return new Response(null, { status: 404 })
     },
   })
@@ -213,14 +266,31 @@ test("a joined room opens in the main area and stays in the left panel under Mul
     await setup.mockInput.typeText(`127.0.0.1:${host.port}`)
     setup.mockInput.pressEnter()
 
+    // the host's transcript as the session view draws it: the prompt, the tool call and the answer
     const joined = await setup.waitForFrame(
-      (frame) => frame.includes("Hello from far") && !frame.includes("Join by address"),
+      (frame) =>
+        frame.includes("echo from the host") &&
+        frame.includes("Done on the host.") &&
+        !frame.includes("Join by address"),
     )
-    expect(joined).toContain("⇄ Multiplayer · Far lab · host studio")
+    expect(joined).toContain("Hello from far")
+    expect(joined).toContain("⇄ Multiplayer · Far lab · host 127.0.0.1")
+    expect(joined).toContain("[Member]")
     // A separate section below the projects: hosted sessions and joined rooms, each marked as multiplayer.
     expect(joined).toMatch(/⇄ Multiplayer +\+ Host \+ Connect/)
-    expect(joined).toMatch(/⇄ Lab +hosting/)
+    expect(joined).toMatch(/⇄ Lab +people: 0/)
     expect(joined).toContain(`⇄ Far lab · 127.0.0.1:${host.port}`)
+
+    await setup.mockInput.typeText("next step please")
+    setup.mockInput.pressEnter()
+    await setup.waitFor(() => prompts.length > 0)
+    expect(prompts).toEqual([{ text: "next step please" }])
+
+    // the note the room writes into opens in place of the transcript
+    const chip = await setup.waitForFrame((frame) => frame.includes("Note: Release plan"))
+    const read = cell(chip, "Read note")
+    await setup.mockMouse.click(read.x + 1, read.y)
+    await setup.waitForFrame((frame) => frame.includes("Ship the notes canvas.") && frame.includes("Back to chat"))
   } finally {
     await host.stop()
   }
@@ -283,3 +353,71 @@ test("Host opens a loopback-only service to the network with one click", async (
   await setup.waitForFrame((frame) => frame.includes("192.168.1.5:4096"))
   expect(opened).toBe(1)
 })
+
+test("the People window lists guests, steps their role and removes or bans them", async () => {
+  await using state = await tmpdir()
+  const calls: { method: string; path: string; body?: unknown }[] = []
+  const members = [
+    { id: "guest_1", name: "Ann", role: "member", joined: 0, online: true, address: "192.168.1.7" },
+    { id: "guest_2", name: "Sam", role: "viewer", joined: 1, online: false },
+  ]
+  await using setup = await createAppFixture({
+    width: 130,
+    height: 40,
+    state: state.path,
+    config: { animations: false, debug: { devtools: true } },
+    fetch: async (url, request) => {
+      if (url.pathname === "/api/location") return json(location)
+      if (url.pathname === "/api/room") return json({ data: [room] })
+      if (url.pathname.startsWith(`/api/room/${room.id}/`) && request.method !== "GET")
+        calls.push({
+          method: request.method,
+          path: url.pathname,
+          body: request.method === "PATCH" ? await request.json() : undefined,
+        })
+      if (url.pathname === `/api/room/${room.id}/member` && request.method === "GET") return json({ data: members })
+      if (url.pathname === `/api/room/${room.id}/ban`) return json({ data: [] })
+      if (url.pathname.startsWith(`/api/room/${room.id}/member/`) && request.method === "PATCH")
+        return json({ data: members[0] })
+      if (url.pathname.startsWith(`/api/room/${room.id}/member/`)) return new Response(null, { status: 204 })
+    },
+  })
+  // the hosted room's row counts who is connected and opens the window
+  const tree = await setup.waitForFrame((frame) => frame.includes("people: 1"))
+  const people = cell(tree, "people: 1")
+  await setup.mockMouse.click(people.x + 2, people.y)
+  const frame = await setup.waitForFrame((frame) => frame.includes("People · Lab") && frame.includes("Sam"))
+  expect(frame).toMatch(/● Ann · online · 192\.168\.1\.7/)
+  expect(frame).toMatch(/○ Sam · away/)
+
+  const role = cell(frame, "[ Member ]")
+  await setup.mockMouse.click(role.x + 2, role.y)
+  await setup.waitFor(() => calls.some((call) => call.method === "PATCH"))
+  expect(calls.find((call) => call.method === "PATCH")).toEqual({
+    method: "PATCH",
+    path: `/api/room/${room.id}/member/guest_1`,
+    body: { role: "helper" },
+  })
+
+  // removing asks twice; the last Kick on screen is Sam's
+  const kick = cell(setup.captureCharFrame(), "[ Kick ]")
+  await setup.mockMouse.click(kick.x + 2, kick.y)
+  await setup.waitForFrame((frame) => frame.includes("Kick?"))
+  expect(calls.some((call) => call.method === "DELETE")).toBe(false)
+  const sure = cell(setup.captureCharFrame(), "Kick?")
+  await setup.mockMouse.click(sure.x + 1, sure.y)
+  await setup.waitFor(() => calls.some((call) => call.method === "DELETE"))
+  expect(calls.find((call) => call.method === "DELETE")?.path).toBe(`/api/room/${room.id}/member/guest_2`)
+})
+
+// The room log as a following server sends it: the replay ends at log.synced and the stream stays open.
+function followLog(aggregateID: string, seq: number) {
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(
+        new TextEncoder().encode(`data: ${JSON.stringify({ type: "log.synced", aggregateID, seq })}\n\n`),
+      )
+    },
+  })
+  return new Response(stream, { headers: { "content-type": "text/event-stream" } })
+}

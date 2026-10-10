@@ -10,13 +10,15 @@ export type { FormWithLocation } from "@opencode/client/solid"
 
 export const { use: useData, provider: DataProvider } = createSimpleContext({
   name: "Data",
-  init: (props: { directory: string }) => {
+  // onError replaces logging refresh failures, for data layers whose server answers only part of the API.
+  init: (props: { directory: string; onError?: (error: unknown) => void }) => {
     const client = useClient()
     const data = createData({
       api: () => client.api,
       event: client.event,
       connection: client.connection,
       directory: props.directory,
+      onError: props.onError,
     })
     data satisfies Plugin.Context["data"]
     const [generatingTitles, setGeneratingTitles] = createStore<Record<string, boolean | undefined>>({})

@@ -1,5 +1,5 @@
 import { TextAttributes } from "@opentui/core"
-import { createEffect, createMemo, createResource, createSignal, For, on, Show } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { OrchestraAccess, OrchestraProject } from "@opencode/client/promise"
 import { Orchestra } from "@opencode/schema/orchestra"
@@ -11,7 +11,7 @@ import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
 import { roomListRevision, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
-import { DialogConnect, DialogHost } from "./dialog-rooms"
+import { DialogConnect, DialogHost, DialogPeople } from "./dialog-rooms"
 import { openProjectDialog } from "./dialog-project"
 import { useProjects } from "../context/projects"
 import { DialogPrompt } from "../ui/dialog-prompt"
@@ -44,6 +44,22 @@ export function ProjectTree(props: { width: number }) {
   const notes = useNotes()
   const [rooms] = createResource(roomListRevision, () => client.api.room.list().catch(() => []))
   const [joined, updateJoined] = useJoinedRooms()
+  // Guests connected to each hosted room, re-read every few seconds while the panel shows.
+  const [online, setOnline] = createSignal<Record<string, number>>({})
+  const countOnline = () =>
+    void Promise.all(
+      (rooms.latest ?? []).map((room) =>
+        client.api.room.member
+          .list({ roomID: room.id })
+          .then((members) => [room.id, members.filter((member) => member.online).length] as const)
+          .catch(() => [room.id, 0] as const),
+      ),
+    ).then((counts) => setOnline(Object.fromEntries(counts)))
+  createEffect(on(() => rooms.latest, countOnline))
+  onMount(() => {
+    const timer = setInterval(countOnline, 5000)
+    onCleanup(() => clearInterval(timer))
+  })
   const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
   const [access, setAccess] = createStore<Record<string, OrchestraAccess>>({})
   const [category, setCategory] = createStore<Record<string, string | undefined>>({})
@@ -387,7 +403,21 @@ export function ProjectTree(props: { width: number }) {
                     {room.name}
                   </text>
                 </box>
-                <text fg={theme.text.muted}>{` ${t("hosting")}`}</text>
+                <box
+                  onMouseUp={(event) => {
+                    event.stopPropagation()
+                    dialog.replace(
+                      () => <DialogPeople roomID={room.id} name={room.name} onClose={() => dialog.clear()} />,
+                      undefined,
+                      { size: "large" },
+                    )
+                    dialog.setCentered(true)
+                  }}
+                >
+                  <text fg={hover() === `hosted:${room.id}` ? theme.text.action.primary.base : theme.text.muted}>
+                    {` ${t("people: {count}", { count: online()[room.id] ?? 0 })}`}
+                  </text>
+                </box>
               </Row>
             )}
           </For>

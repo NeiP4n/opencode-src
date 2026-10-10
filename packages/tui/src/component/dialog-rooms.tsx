@@ -1,7 +1,7 @@
 import { TextAttributes, type InputRenderable } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
 import { createResource, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js"
-import type { RoomInfo, RoomJoinCode } from "@opencode/client/promise"
+import type { RoomInfo, RoomJoinCode, RoomMemberView } from "@opencode/client/promise"
 import { hostname } from "node:os"
 import { useConfig } from "../config"
 import { useClient } from "../context/client"
@@ -12,14 +12,15 @@ import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
 import { useT } from "../util/i18n"
-import { roomListChanged, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
+import { roomListChanged, sameRoom, useDeviceKey, useJoinedRooms, type JoinedRoom } from "../util/room"
 import { Button } from "./devtools-registry"
-import { roomClient } from "./room-chat"
+import { roomClient } from "../util/room-guest"
 import { DISCOVERY_PORTS, readServer, scanRooms, type FoundRoom } from "@opencode/client/room-discovery"
 
 // Host: the rooms this computer shares. A room is one session other devices
 // join with a short code; only this computer's AI answers in it.
 export function DialogHost(props: { onClose?: () => void }) {
+  const dialog = useDialog()
   const client = useClient()
   const data = useData()
   const route = useRoute()
@@ -212,17 +213,28 @@ export function DialogHost(props: { onClose?: () => void }) {
                 {room.open ? t("Without a code") : t("With a code")}
               </Button>
             </Setting>
-            <Setting
-              label={t("Approvals")}
-              help={t("Who may allow or deny the AI when it asks to edit files or run commands.")}
-            >
+            <Setting label={t("New guests")} help={t(ROLE_HELP)}>
               <Button
                 disabled={busy()}
                 onClick={() =>
-                  void run(() => client.api.room.update({ roomID: room.id, guestApprovals: !room.guestApprovals }))
+                  void run(() => client.api.room.update({ roomID: room.id, defaultRole: nextRole(joinRole(room)) }))
                 }
               >
-                {room.guestApprovals ? t("Me and guests") : t("Only me")}
+                {t(ROLE_LABEL[joinRole(room)])}
+              </Button>
+            </Setting>
+            <Setting label={t("People")} help={t("Who joined, their roles; remove or ban a guest.")}>
+              <Button
+                onClick={() => {
+                  dialog.replace(
+                    () => <DialogPeople roomID={room.id} name={room.name} onClose={() => dialog.clear()} />,
+                    undefined,
+                    { size: "large" },
+                  )
+                  dialog.setCentered(true)
+                }}
+              >
+                {t("Open")}
               </Button>
             </Setting>
             <Setting
@@ -280,6 +292,7 @@ export function DialogConnect(props: { onClose?: () => void }) {
   const dimensions = useTerminalDimensions()
   const t = useT()
   const [saved, updateSaved] = useJoinedRooms()
+  const deviceKey = useDeviceKey()
   const [found, { refetch: rescan, mutate: setFound }] = createResource(() => scanRooms())
   const [armed, setArmed] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
@@ -289,8 +302,10 @@ export function DialogConnect(props: { onClose?: () => void }) {
   const enter = (url: string, request: { code?: string; roomID?: string }) => {
     setBusy(true)
     setJoinError()
-    void roomClient({ url, token: "" })
-      .room.join({ ...request, name: fields.name?.value.trim() || hostname() })
+    void deviceKey()
+      .then((device) =>
+        roomClient({ url, token: "" }).room.join({ ...request, name: fields.name?.value.trim() || hostname(), device }),
+      )
       .then(async (joined) => {
         const room = { url, roomID: joined.room.id }
         await updateSaved((draft) => {
@@ -472,6 +487,129 @@ export function DialogConnect(props: { onClose?: () => void }) {
           )}
         </For>
       </scrollbox>
+    </box>
+  )
+}
+
+type RoomRole = RoomMemberView["role"]
+
+export const ROLE_LABEL = { viewer: "Viewer", member: "Member", helper: "Helper" } as const
+const ROLE_HELP = "Viewers only watch, members also write, helpers also allow or deny the AI's requests."
+const ROLES = ["viewer", "member", "helper"] as const
+
+export function nextRole(role: RoomRole) {
+  return ROLES[(ROLES.indexOf(role) + 1) % ROLES.length]
+}
+
+// Rooms saved before roles existed: guests who could answer approvals join as helpers.
+function joinRole(room: RoomInfo): RoomRole {
+  return room.defaultRole ?? (room.guestApprovals ? "helper" : "member")
+}
+
+// The people of one hosted room: who is connected, what each may do, and the guests
+// kept out. Clicking a role steps through the roles; removing and banning ask twice.
+export function DialogPeople(props: { roomID: string; name: string; onClose?: () => void }) {
+  const client = useClient()
+  const theme = useTheme().surface("dialog")
+  const toast = useToast()
+  const t = useT()
+  const [members, { refetch: rereadMembers, mutate: setMembers }] = createResource(() =>
+    client.api.room.member.list({ roomID: props.roomID }),
+  )
+  const [bans, { refetch: rereadBans }] = createResource(() => client.api.room.ban.list({ roomID: props.roomID }))
+  const [armed, setArmed] = createSignal<string>()
+  // Guests report in every couple of seconds; reading as often keeps "online" honest.
+  onMount(() => {
+    const timer = setInterval(() => void rereadMembers(), 2000)
+    onCleanup(() => clearInterval(timer))
+  })
+
+  const act = (action: () => Promise<unknown>) =>
+    void action()
+      .then(() => Promise.all([rereadMembers(), rereadBans()]))
+      .catch((error: unknown) => toast.show({ message: errorMessage(error), variant: "error" }))
+
+  const cycle = (member: RoomMemberView) => {
+    const role = nextRole(member.role)
+    setMembers((list) => list?.map((item) => (item.id === member.id ? { ...item, role } : item)))
+    act(() => client.api.room.member.update({ roomID: props.roomID, guestID: member.id, role }))
+  }
+
+  // The first click arms the button and the second acts.
+  const confirm = (key: string, action: () => Promise<unknown>) => {
+    if (armed() !== key) return setArmed(key)
+    setArmed()
+    act(action)
+  }
+
+  return (
+    <box paddingLeft={2} paddingRight={2} paddingBottom={1} gap={1}>
+      <Header title={`${t("People")} · ${props.name}`} onClose={props.onClose} />
+      <text fg={theme.text.muted} wrapMode="word">
+        {t(ROLE_HELP)}
+      </text>
+      <Show
+        when={(members.latest ?? []).length > 0}
+        fallback={<text fg={theme.text.muted}>{t("No guests have joined yet.")}</text>}
+      >
+        <For each={members.latest ?? []}>
+          {(member) => (
+            <box flexDirection="row" gap={1}>
+              <text fg={member.online ? theme.text.feedback.success.base : theme.text.muted} flexShrink={0}>
+                {member.online ? "●" : "○"}
+              </text>
+              <box flexGrow={1} minWidth={0}>
+                <text fg={theme.text.base} wrapMode="none" truncate>
+                  {member.name}
+                  <span style={{ fg: theme.text.muted }}>
+                    {` · ${member.online ? t("online") : t("away")}${member.address ? ` · ${member.address}` : ""}`}
+                  </span>
+                </text>
+              </box>
+              <Button onClick={() => cycle(member)}>{t(ROLE_LABEL[member.role])}</Button>
+              <Button
+                onLeave={() => setArmed()}
+                onClick={() =>
+                  confirm(`kick:${member.id}`, () =>
+                    client.api.room.member.remove({ roomID: props.roomID, guestID: member.id }),
+                  )
+                }
+              >
+                {armed() === `kick:${member.id}` ? t("Kick?") : t("Kick")}
+              </Button>
+              <Button
+                variant={armed() === `ban:${member.id}` ? "primary" : undefined}
+                onLeave={() => setArmed()}
+                onClick={() =>
+                  confirm(`ban:${member.id}`, () =>
+                    client.api.room.member.ban({ roomID: props.roomID, guestID: member.id }),
+                  )
+                }
+              >
+                {armed() === `ban:${member.id}` ? t("Ban?") : t("Ban")}
+              </Button>
+            </box>
+          )}
+        </For>
+      </Show>
+      <Show when={(bans.latest ?? []).length > 0}>
+        <Section title={t("Banned")} />
+        <For each={bans.latest ?? []}>
+          {(ban) => (
+            <box flexDirection="row" gap={1}>
+              <box flexGrow={1} minWidth={0}>
+                <text fg={theme.text.base} wrapMode="none" truncate>
+                  {ban.name}
+                  <span style={{ fg: theme.text.muted }}>{ban.address ? ` · ${ban.address}` : ""}</span>
+                </text>
+              </box>
+              <Button onClick={() => act(() => client.api.room.ban.remove({ roomID: props.roomID, banID: ban.id }))}>
+                {t("Unban")}
+              </Button>
+            </box>
+          )}
+        </For>
+      </Show>
     </box>
   )
 }

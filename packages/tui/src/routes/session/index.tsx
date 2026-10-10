@@ -1529,6 +1529,72 @@ export function Session(props: {
   )
 }
 
+// The transcript of a session that lives on another server, such as a room shared by
+// another host: the same rows and parts the session view draws, read from whichever
+// data layer encloses it. It neither prompts nor edits; those stay with the host.
+export function SessionTranscript(props: { sessionID: string; width: number }) {
+  const data = useData()
+  const config = useConfig().data
+  const dimensions = useTerminalDimensions()
+  const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
+  const messages = () => data.session.message.list(props.sessionID)
+  const messageIndexes = createMemo(() => new Map(messages().map((message, index) => [message.id, index])))
+  const legacy = createMemo(() => legacyTurns(messages()))
+  const rows = createSessionRows(() => props.sessionID)
+  const boundaries = createMemo(() => messageBoundaryIDs(rows, messages()))
+  const verbosity = () => config.session?.verbosity ?? defaultVerbosity
+  return (
+    <context.Provider
+      value={{
+        anchors: createTimelineAnchors(),
+        groupExpanded: (groupID, kind) =>
+          expanded[groupID] ?? (verbosity() === "high" && (kind === "exploration" || kind === "instructions")),
+        setGroupExpanded: (groupID, value) => setExpanded(groupID, value),
+        get width() {
+          return props.width
+        },
+        terminal: {
+          get width() {
+            return dimensions().width
+          },
+          get height() {
+            return dimensions().height
+          },
+        },
+        sessionID: props.sessionID,
+        thinkingMode: () => config.session?.thinking ?? "hide",
+        markdownMode: () => config.session?.markdown ?? "rendered",
+        groupExploration: () => config.session?.grouping !== "none",
+        diffWrapMode: () => config.diffs?.wrap ?? "word",
+        models: () => [],
+        messageIndex: (messageID) => messageIndexes().get(messageID),
+        legacyTurns: legacy,
+        config,
+        mutatePending: async () => false,
+        pendingDelivery: () => undefined,
+      }}
+    >
+      <scrollbox
+        stickyScroll
+        stickyStart="bottom"
+        flexGrow={1}
+        minHeight={0}
+        scrollAcceleration={getScrollAcceleration(config)}
+      >
+        <For each={rows}>
+          {(row, index) => (
+            <SessionRowView
+              row={row}
+              message={(messageID) => data.session.message.get(props.sessionID, messageID)}
+              boundaryID={boundaries()[index()]}
+            />
+          )}
+        </For>
+      </scrollbox>
+    </context.Provider>
+  )
+}
+
 type SessionRowViewProps = {
   row: SessionRow
   message: (messageID: string) => SessionMessageInfo | undefined
