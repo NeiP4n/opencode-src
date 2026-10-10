@@ -421,3 +421,48 @@ function followLog(aggregateID: string, seq: number) {
   })
   return new Response(stream, { headers: { "content-type": "text/event-stream" } })
 }
+
+test("a joined room its host closed shows why and can be left without a crash", async () => {
+  await using state = await tmpdir()
+  const remote = { ...room, id: "room_gone", sessionID: "ses_gone", name: "Gone lab", open: true }
+  const host = Bun.serve({
+    port: 0,
+    fetch(request) {
+      const url = new URL(request.url)
+      if (url.pathname === "/api/room/public") return json({ host: "studio", rooms: [remote] })
+      if (url.pathname === "/api/room/join" && request.method === "POST")
+        return json({ token: "token", guest: { id: "guest_1", name: "Bo" }, role: "member", room: remote })
+      // the host closed the room after this guest joined
+      return json(
+        { _tag: "RoomNotFoundError", roomID: remote.id, message: `Room not found: ${remote.id}` },
+        { status: 404 },
+      )
+    },
+  })
+  try {
+    await using setup = await render(state.path)
+    const bar = await setup.waitForFrame((frame) => frame.includes("+ Connect"))
+    const entry = cell(bar, "+ Connect")
+    await setup.mockMouse.click(entry.x, entry.y)
+    const dialog = await setup.waitForFrame((frame) => frame.includes("Join by address"))
+    const address = cell(dialog, "e.g. 192.168.1.5")
+    await setup.mockMouse.click(address.x, address.y)
+    await setup.mockInput.typeText(`127.0.0.1:${host.port}`)
+    setup.mockInput.pressEnter()
+
+    const gone = await setup.waitForFrame((frame) => frame.includes("Room not found"))
+    expect(gone).toContain("⇄ Gone lab")
+    // a few polls later the app still runs
+    await Bun.sleep(4500)
+    expect(setup.captureCharFrame()).toContain("Room not found")
+
+    const leave = cell(setup.captureCharFrame(), "×")
+    await setup.mockMouse.click(leave.x, leave.y)
+    await setup.waitForFrame((frame) => frame.includes("leave?"))
+    const sure = cell(setup.captureCharFrame(), "leave?")
+    await setup.mockMouse.click(sure.x + 1, sure.y)
+    await setup.waitForFrame((frame) => !frame.includes("Gone lab"))
+  } finally {
+    await host.stop()
+  }
+})

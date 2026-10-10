@@ -1,6 +1,7 @@
 import type { TextareaRenderable } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
-import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { Predicate } from "effect"
 import type { NoteInfo, PermissionRequest } from "@opencode/client"
 import { useConfig } from "../config"
 import { ClientProvider } from "../context/client"
@@ -25,15 +26,28 @@ const ROLE = { viewer: "Viewer", member: "Member", helper: "Helper" } as const
 export function RoomChat(props: { room: JoinedRoom }) {
   const remote = roomClient(props.room)
   const roomID = props.room.roomID
-  const [joined, { refetch }] = createResource(() => remote.room.guest.get({ roomID }))
+  // Kept in signals, not a resource: a resource read after a failed fetch throws, and a
+  // host that closed the room or removed this guest answers every poll with an error.
+  const [joined, setJoined] = createSignal<Awaited<ReturnType<typeof remote.room.guest.get>>>()
+  const [error, setError] = createSignal<unknown>()
   const [permissions, setPermissions] = createSignal<readonly PermissionRequest[]>([])
   const [note, setNote] = createSignal<{ name: string; title: string }>()
   // The poll replaces the answer every few seconds; only a different session remounts the view.
-  const sessionID = createMemo(() => joined.latest?.session.id)
+  const sessionID = createMemo(() => joined()?.session.id)
 
   onMount(() => {
     const poll = () => {
-      void refetch()
+      void remote.room.guest
+        .get({ roomID })
+        .then((state) => {
+          setJoined(state)
+          setError()
+        })
+        .catch((cause: unknown) => {
+          setError(cause)
+          // A closed room or a removed guest stays shut; a network hiccup keeps the last view.
+          if (shut(cause)) setJoined()
+        })
       void remote.room.guest.permission
         .list({ roomID })
         .then(setPermissions)
@@ -49,16 +63,16 @@ export function RoomChat(props: { room: JoinedRoom }) {
   })
 
   return (
-    <Show when={sessionID()} fallback={<RoomProblem room={props.room} error={joined.error} />} keyed>
+    <Show when={sessionID()} fallback={<RoomProblem room={props.room} error={error()} />} keyed>
       {(id) => (
         <ClientProvider api={guestApi(props.room)}>
-          <DataProvider directory={joined.latest?.session.location.directory ?? ""} onError={ignoreGuestUnavailable}>
+          <DataProvider directory={joined()?.session.location.directory ?? ""} onError={ignoreGuestUnavailable}>
             <RoomView
               room={props.room}
               sessionID={id}
-              role={joined.latest?.role ?? "viewer"}
+              role={joined()?.role ?? "viewer"}
               host={new URL(props.room.url).host}
-              error={joined.error ? errorMessage(joined.error) : undefined}
+              error={error() ? errorMessage(error()) : undefined}
               permissions={permissions()}
               note={note()}
               onAnswered={(id) => setPermissions((list) => list.filter((item) => item.id !== id))}
@@ -67,6 +81,12 @@ export function RoomChat(props: { room: JoinedRoom }) {
         </ClientProvider>
       )}
     </Show>
+  )
+}
+
+function shut(error: unknown) {
+  return (
+    Predicate.hasProperty(error, "_tag") && (error._tag === "RoomNotFoundError" || error._tag === "UnauthorizedError")
   )
 }
 

@@ -40,7 +40,9 @@ export function DialogHost(props: { onClose?: () => void }) {
   })
 
   const sessionID = () => (route.data.type === "session" ? route.data.sessionID : undefined)
-  const shared = () => rooms()?.some((room) => room.sessionID === sessionID()) ?? false
+  // A resource read after a failed fetch throws; the toast already reported the failure.
+  const hosted = () => (rooms.error ? undefined : rooms()) ?? []
+  const shared = () => hosted().some((room) => room.sessionID === sessionID())
   // Guests need an address they can reach. Loopback only works on this machine, and
   // container bridges (172.16/12), TUN adapters (198.18/15) and link-local addresses are
   // usually not the network other devices are on; they are shown only when nothing else is.
@@ -170,7 +172,7 @@ export function DialogHost(props: { onClose?: () => void }) {
           </box>
         </Show>
       </Show>
-      <For each={rooms() ?? []}>
+      <For each={hosted()}>
         {(room) => (
           <box>
             <Labeled label={t("Room")}>
@@ -518,6 +520,9 @@ export function DialogPeople(props: { roomID: string; name: string; onClose?: ()
   )
   const [bans, { refetch: rereadBans }] = createResource(() => client.api.room.ban.list({ roomID: props.roomID }))
   const [armed, setArmed] = createSignal<string>()
+  // A resource read after a failed fetch throws, so failures show as text and the lists as empty.
+  const listed = () => (members.error ? undefined : members.latest) ?? []
+  const banned = () => (bans.error ? undefined : bans.latest) ?? []
   // Guests report in every couple of seconds; reading as often keeps "online" honest.
   onMount(() => {
     const timer = setInterval(() => void rereadMembers(), 2000)
@@ -548,11 +553,15 @@ export function DialogPeople(props: { roomID: string; name: string; onClose?: ()
       <text fg={theme.text.muted} wrapMode="word">
         {t(ROLE_HELP)}
       </text>
-      <Show
-        when={(members.latest ?? []).length > 0}
-        fallback={<text fg={theme.text.muted}>{t("No guests have joined yet.")}</text>}
-      >
-        <For each={members.latest ?? []}>
+      <Show when={members.error ?? bans.error}>
+        {(error) => (
+          <text fg={theme.text.feedback.error.base} wrapMode="word">
+            {errorMessage(error())}
+          </text>
+        )}
+      </Show>
+      <Show when={listed().length > 0} fallback={<text fg={theme.text.muted}>{t("No guests have joined yet.")}</text>}>
+        <For each={listed()}>
           {(member) => (
             <box flexDirection="row" gap={1}>
               <text fg={member.online ? theme.text.feedback.success.base : theme.text.muted} flexShrink={0}>
@@ -592,9 +601,9 @@ export function DialogPeople(props: { roomID: string; name: string; onClose?: ()
           )}
         </For>
       </Show>
-      <Show when={(bans.latest ?? []).length > 0}>
+      <Show when={banned().length > 0}>
         <Section title={t("Banned")} />
-        <For each={bans.latest ?? []}>
+        <For each={banned()}>
           {(ban) => (
             <box flexDirection="row" gap={1}>
               <box flexGrow={1} minWidth={0}>
