@@ -85,6 +85,31 @@ const read = (target: string) => Effect.promise(() => fs.readFile(target, "utf8"
 const retime = (target: string, mtime: number) =>
   Effect.promise(() => fs.utimes(target, new Date(mtime), new Date(mtime)))
 
+/** The store floors the file mtime into whole milliseconds, exactly like `Date.getTime`. */
+const fileMtime = (target: string) =>
+  Effect.promise(() => fs.stat(target)).pipe(Effect.map((info) => Math.floor(info.mtimeMs)))
+
+/**
+ * The tool output the way a model gets it. Only `content` is sent to the model, so
+ * the structured `output` is not something the model can ever read or copy.
+ */
+const modelText = (result: { readonly content?: ReadonlyArray<Tool.Content> }) =>
+  (result.content ?? [])
+    .filter((item) => item.type === "text")
+    .map((item) => item.text)
+    .join("\n")
+
+/**
+ * The stamp the way a model gets it, parsed back out of that text: the structured
+ * `output.updated` is not something the model can ever copy.
+ */
+const stampInText = (result: { readonly content?: ReadonlyArray<Tool.Content> }) => {
+  const text = modelText(result)
+  const match = /(?:^| · )updated (\d+)$/m.exec(text)
+  if (match === null) throw new Error(`no stamp for expectedMtime in the tool text: ${text}`)
+  return Number(match[1])
+}
+
 describe("NoteTool", () => {
   it.live("reports an empty notes folder without asking for write permission", () =>
     withTempDir(({ path: directory }) => {
@@ -222,6 +247,34 @@ describe("NoteTool", () => {
     ),
   )
 
+  it.live("prints the file mtime the model has to send back, and keeps taking writes from it", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const tools = yield* Tool.Service
+        const note = onDisk(directory, "plan")
+        yield* run(tools, "call-create", { action: "create", name: "plan", title: "План", body: "строка" })
+
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const readResult = yield* run(tools, `call-read-${attempt}`, { action: "read", name: "plan" })
+          const stamp = stampInText(readResult)
+
+          expect(stamp).toBe(yield* fileMtime(note))
+
+          const edited = yield* run(tools, `call-edit-from-text-${attempt}`, {
+            action: "edit",
+            name: "plan",
+            body: `правка ${attempt}`,
+            mode: "append",
+            expectedMtime: stamp,
+          })
+          expect(edited).toMatchObject({ status: "completed" })
+        }
+
+        expect(yield* read(note)).toContain("строка\nправка 0\nправка 1\nправка 2\nправка 3")
+      }).pipe(Effect.provide(harness(directory))),
+    ),
+  )
+
   it.live("derives a name from the title and sets the length", () =>
     withTempDir(({ path: directory }) =>
       Effect.gen(function* () {
@@ -252,6 +305,52 @@ describe("NoteTool", () => {
         const listed = yield* run(tools, "call-list", { action: "list" })
 
         expect(JSON.stringify(listed.output)).toContain("blank-note [inbox] (untitled)")
+      }).pipe(Effect.provide(harness(directory))),
+    ),
+  )
+
+  it.live("a list row carries the note's tags and its own mtime, and the description promises both", () =>
+    withTempDir(({ path: directory }) =>
+      Effect.gen(function* () {
+        const tools = yield* Tool.Service
+        yield* run(tools, "call-create", {
+          action: "create",
+          name: "plan",
+          title: "План",
+          tags: ["net", "infra"],
+        })
+        yield* run(tools, "call-create-other", {
+          action: "create",
+          name: "second",
+          title: "Второй",
+          tags: ["net"],
+        })
+        // A note without tags must not leave a dangling separator behind.
+        yield* run(tools, "call-create-untagged", { action: "create", name: "plain", title: "Просто" })
+        // Push the file mtime away from the frontmatter `Date.now()`, so printing the
+        // wrong stamp cannot pass here by landing on the same millisecond.
+        yield* retime(onDisk(directory, "plan"), Date.now() + 5000)
+
+        const text = modelText(yield* run(tools, "call-list", { action: "list" }))
+        const plan = yield* fileMtime(onDisk(directory, "plan"))
+        const second = yield* fileMtime(onDisk(directory, "second"))
+        const plain = yield* fileMtime(onDisk(directory, "plain"))
+
+        expect(text.split("\n").toSorted()).toEqual(
+          [
+            `- plan [inbox] План · tags net, infra · updated ${plan}`,
+            `- second [inbox] Второй · tags net · updated ${second}`,
+            `- plain [inbox] Просто · updated ${plain}`,
+          ].toSorted(),
+        )
+        // Every epoch-millisecond number the model could read as a stamp is the mtime
+        // floor of one of the listed notes, never a frontmatter timestamp.
+        expect(text.match(/\d{13}/g)?.toSorted()).toEqual([String(plan), String(second), String(plain)].toSorted())
+
+        const promised = NoteTool.description.split("\n").find((line) => line.includes("list —")) ?? ""
+        expect(promised).not.toBe("")
+        expect(promised).toMatch(/\btags\b/)
+        expect(promised).toMatch(/\bmtime\b/)
       }).pipe(Effect.provide(harness(directory))),
     ),
   )

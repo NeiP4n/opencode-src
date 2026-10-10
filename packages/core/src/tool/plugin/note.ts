@@ -54,8 +54,8 @@ export const description = [
   "Read and write the project notes: markdown files in .opencode/notes/, one file per note, and the file name is the note id.",
   "",
   "Actions:",
-  "  list — every note with status, tags and last update, newest first.",
-  "  read — one note with its full body; the updated value it reports is the file mtime to pass back as expectedMtime.",
+  "  list — every note as `- name [status] title`, then its tags and its `updated` file mtime, newest first; an `updated` value from here can be passed straight back as expectedMtime.",
+  "  read — one note with its full body; the `updated` number in its output is the file mtime to pass back as expectedMtime.",
   "  create — a new note from title and body; pass a short latin name, or omit it to derive one from the title.",
   "  edit — rewrite or append the body; pass name, body, optional mode and expectedMtime from a read.",
   "  update — change title, status, tags or length without touching the body; pass name and expectedMtime.",
@@ -87,9 +87,7 @@ export const Plugin = {
     const listing = Effect.fn("NoteTool.listing")(function* () {
       const found = yield* notes.list()
       if (found.length === 0) return `No notes yet in ${FOLDER}.`
-      return found
-        .map((note) => `- ${note.name} [${note.frontmatter.status}] ${note.frontmatter.title || "(untitled)"}`)
-        .join("\n")
+      return found.map(row).join("\n")
     })
 
     const reading = Effect.fn("NoteTool.reading")(function* (input: Input) {
@@ -205,14 +203,19 @@ const needStamp = (input: Input) =>
 
 /**
  * The reported `updated` is the file mtime, because that is the value the store
- * checks; the frontmatter timestamp is shown in the text so the model can see both.
+ * checks. It is written into the text too: `content` is the only part of a tool
+ * result the model ever sees, so a stamp left only in the structured output would
+ * never come back. The frontmatter timestamp is not printed — it is `Date.now()`
+ * taken before the write, while the file mtime keeps sub-millisecond precision
+ * that `Date.now()` cannot, so the two differ by a millisecond often enough to
+ * make every later write fail.
  */
 function reported(note: NoteStore.Info) {
   const meta = [
     note.frontmatter.status,
     note.frontmatter.tags.join(", "),
     note.frontmatter.length ? `length ${note.frontmatter.length}` : "",
-    `written ${note.frontmatter.updated}`,
+    `updated ${note.mtime}`,
   ]
     .filter((part) => part !== "")
     .join(" · ")
@@ -221,6 +224,19 @@ function reported(note: NoteStore.Info) {
     name: note.name,
     updated: note.mtime,
   }
+}
+
+/**
+ * A listing row carries the same `updated` value the `read` action reports, because
+ * that is the value the store checks: it is the note's own mtime, already floored the
+ * way the store floors it, so a stamp copied from a listing is a stamp that writes.
+ * The frontmatter timestamp would be wrong here exactly as it was in the read text.
+ */
+function row(note: NoteStore.Info) {
+  const meta = [note.frontmatter.tags.length ? `tags ${note.frontmatter.tags.join(", ")}` : "", `updated ${note.mtime}`]
+    .filter((part) => part !== "")
+    .join(" · ")
+  return `- ${note.name} [${note.frontmatter.status}] ${note.frontmatter.title || "(untitled)"} · ${meta}`
 }
 
 function failed(error: unknown) {
