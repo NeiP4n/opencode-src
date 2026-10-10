@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Hub } from "@opencode/core/hub/index"
+import { HubTool } from "@opencode/core/tool/plugin/hub"
 
 // A fixed machine: which tools resolve (and under which local name) and which
 // backends have a shell. Keeps every case independent of the host running it.
@@ -263,3 +264,18 @@ test("gh entries render the same command in bash and PowerShell and list gh as a
   expect(Hub.get("github.setup-git")?.danger).toBe(true)
   expect(Hub.get("github.pr-create")?.danger).toBe(true)
 })
+
+describe("unknown entry", () => {
+  test("a program name points at the entries that run it, with their args", () => {
+    const fd = HubTool.unknownEntry("fd")
+    expect(fd).toStartWith("Unknown hub command: fd. An id names a hub entry, not a program.")
+    expect(fd).toContain("- search.glob args {pattern, path}: Find files by name pattern")
+    const git = HubTool.unknownEntry("git")
+    expect(git.split("\n")[2]).toBe("- git.status: Compact status")
+  })
+
+  test("a guess that fits nothing points at list and shell", () => {
+    expect(HubTool.unknownEntry("zzz")).toEndWith("Use list or query to find an entry, or shell for anything else.")
+  })
+})
+

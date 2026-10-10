@@ -26,10 +26,12 @@ const description = (tools: string[]) =>
   [
     "Run a ready-made fast command from the Universal Tool Hub instead of hand-writing shell.",
     "Prefer this tool over shell when a catalog entry covers the task: hub commands use fast modern CLIs (rg, fd, jq, yq, mlr) and pick the best available backend.",
-    "Call with list or query to discover entries, id plus args to run one.",
+    "Call with list or query to discover entries, id plus args to run one. An entry id names a recipe such as search.content, not a program; args is an object from the entry's placeholder names to values, e.g. {\"pattern\": \"TODO\"}.",
     "With install plus id prints the package-manager command for missing tools. Use shell as fallback when no entry fits.",
     `Entries are filtered to this machine (${process.platform}); the hub picks the shell itself (${HubHost.order().join(" > ")}) and quotes args for it, so pass raw values without shell quoting.`,
-    tools.length > 0 ? `Tools already available: ${tools.join(", ")}.` : "No optional hub tools detected yet.",
+    tools.length > 0
+      ? `Programs the entries can use here (not entry ids): ${tools.join(", ")}.`
+      : "No optional hub tools detected yet.",
   ].join(" ")
 
 export const Input = Schema.Struct({
@@ -94,6 +96,34 @@ const entryInfo = (entry: Hub.Entry) => {
     template,
     placeholders: Hub.placeholders(template),
   }
+}
+
+// A guessed id (often a program name like fd or git) gets the entries that fit it, with
+// their placeholders, so the next call can run one instead of listing first.
+export const unknownEntry = (id: string) => {
+  const words = id.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+  // Ids that start with the guess first, then entries whose command runs it as a program, then text matches.
+  const rank = (entry: Hub.Entry) => {
+    if (words.some((word) => entry.id.startsWith(`${word}.`))) return 0
+    const programs = Object.values(entry.templates).join(" ")
+    if (words.some((word) => new RegExp(`(^|[\\s|;(])${word}\\b`).test(programs))) return 1
+    if (words.some((word) => matches(entry, word))) return 2
+    return undefined
+  }
+  const close = Hub.all
+    .filter(Hub.supportsPlatform)
+    .flatMap((entry) => {
+      const score = rank(entry)
+      return score === undefined ? [] : [{ entry, score }]
+    })
+    .toSorted((a, b) => a.score - b.score)
+    .slice(0, 8)
+    .map((item) => entryInfo(item.entry))
+    .map((entry) => `- ${entry.id}${entry.placeholders.length ? ` args {${entry.placeholders.join(", ")}}` : ""}: ${entry.title}`)
+  return [
+    `Unknown hub command: ${id}. An id names a hub entry, not a program.`,
+    close.length > 0 ? `Entries that may fit:\n${close.join("\n")}` : "Use list or query to find an entry, or shell for anything else.",
+  ].join("\n")
 }
 
 const matches = (entry: Hub.Entry, query: string, category?: string) => {
@@ -258,7 +288,7 @@ export const Plugin = {
               }
               if (!input.id) return yield* failure("Pass an entry id, or use list/query to discover one")
               const entry = Hub.get(input.id)
-              if (!entry) return yield* failure(`Unknown hub command: ${input.id}`)
+              if (!entry) return yield* failure(unknownEntry(input.id))
               // The operator's terminal choice applies unless the model asks for one explicitly.
               const preferred = input.backend ?? (yield* Effect.promise(() => Hub.read())).terminal
               let rendered: Hub.Rendered
