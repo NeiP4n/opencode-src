@@ -11,7 +11,7 @@ import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
 import { roomListRevision, sameRoom, useJoinedRooms, type JoinedRoom } from "../util/room"
-import { DialogConnect } from "./dialog-rooms"
+import { DialogConnect, DialogHost } from "./dialog-rooms"
 import { openProjectDialog } from "./dialog-project"
 import { useProjects } from "../context/projects"
 import { DialogPrompt } from "../ui/dialog-prompt"
@@ -173,8 +173,8 @@ export function ProjectTree(props: { width: number }) {
     })
   }
 
-  const connect = () => {
-    dialog.replace(() => <DialogConnect onClose={() => dialog.clear()} />, undefined, { size: "large" })
+  const openRooms = (window: typeof DialogHost) => {
+    dialog.replace(() => window({ onClose: () => dialog.clear() }), undefined, { size: "large" })
     dialog.setCentered(true)
   }
 
@@ -343,7 +343,7 @@ export function ProjectTree(props: { width: number }) {
           )}
         </For>
         <box paddingTop={projects().length > 0 ? 1 : 0}>
-          <Row id="multiplayer" hover={hover} setHover={setHover} onClick={connect}>
+          <box flexDirection="row" paddingLeft={1} paddingRight={1}>
             <text fg={theme.text.action.secondary.base} attributes={TextAttributes.BOLD}>
               {"⇄ "}
             </text>
@@ -352,10 +352,26 @@ export function ProjectTree(props: { width: number }) {
                 {t("Multiplayer")}
               </text>
             </box>
-            <text fg={hover() === "multiplayer" ? theme.text.action.primary.hovered : theme.text.action.primary.base}>
-              {t("+ Connect")}
-            </text>
-          </Row>
+            <For
+              each={[
+                { id: "multiplayer:host", label: t("+ Host"), window: DialogHost },
+                { id: "multiplayer:connect", label: t("+ Connect"), window: DialogConnect },
+              ]}
+            >
+              {(action) => (
+                <box
+                  paddingLeft={1}
+                  onMouseOver={() => setHover(action.id)}
+                  onMouseOut={() => setHover(undefined)}
+                  onMouseUp={() => openRooms(action.window)}
+                >
+                  <text fg={hover() === action.id ? theme.text.action.primary.hovered : theme.text.action.primary.base}>
+                    {action.label}
+                  </text>
+                </box>
+              )}
+            </For>
+          </box>
           <For each={rooms.latest ?? []}>
             {(room) => (
               <Row

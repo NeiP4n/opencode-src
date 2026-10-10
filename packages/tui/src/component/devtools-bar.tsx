@@ -17,7 +17,6 @@ import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { PanelBox, PanelTitle, Row } from "./devtools-panel"
 import { RegistryPanel } from "./devtools-registry"
-import { DialogConnect, DialogHost } from "./dialog-rooms"
 import { openProjectDialog } from "./dialog-project"
 import { openTeamEditor } from "./dialog-teams"
 import { useProjects } from "../context/projects"
@@ -449,26 +448,6 @@ export function DevToolsBar() {
         }}
       >
         <text fg={theme.text.muted}>{t("Registry")}</text>
-      </BarItem>
-      <BarItem
-        active={false}
-        onClick={() => {
-          close()
-          dialog.replace(() => <DialogHost onClose={() => dialog.clear()} />, undefined, { size: "large" })
-          dialog.setCentered(true)
-        }}
-      >
-        <text fg={theme.text.muted}>{t("Host")}</text>
-      </BarItem>
-      <BarItem
-        active={false}
-        onClick={() => {
-          close()
-          dialog.replace(() => <DialogConnect onClose={() => dialog.clear()} />, undefined, { size: "large" })
-          dialog.setCentered(true)
-        }}
-      >
-        <text fg={theme.text.muted}>{t("Connect")}</text>
       </BarItem>
       <BarItem
         active={false}

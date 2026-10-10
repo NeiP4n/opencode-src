@@ -44,8 +44,8 @@ async function render(state: string) {
 test("Host lists reachable addresses and hands out a join code", async () => {
   await using state = await tmpdir()
   await using setup = await render(state.path)
-  const bar = await setup.waitForFrame((frame) => frame.includes("Host") && frame.includes("Connect"))
-  const entry = cell(bar, "Host")
+  const bar = await setup.waitForFrame((frame) => frame.includes("+ Host") && frame.includes("+ Connect"))
+  const entry = cell(bar, "+ Host")
   await setup.mockMouse.click(entry.x, entry.y)
   const frame = await setup.waitForFrame((frame) => frame.includes("Get join code"))
   // only addresses other devices can reach, not loopback or container bridges
@@ -65,8 +65,8 @@ test("Host lists reachable addresses and hands out a join code", async () => {
 test("Connect searches the network in its own window and offers manual entry", async () => {
   await using state = await tmpdir()
   await using setup = await render(state.path)
-  const bar = await setup.waitForFrame((frame) => frame.includes("Connect"))
-  const entry = cell(bar, "Connect")
+  const bar = await setup.waitForFrame((frame) => frame.includes("+ Connect"))
+  const entry = cell(bar, "+ Connect")
   await setup.mockMouse.click(entry.x, entry.y)
   const frame = await setup.waitForFrame((frame) => frame.includes("Join by address"))
   expect(frame).toContain("Rooms on this network")
@@ -97,7 +97,7 @@ const guestPrompt = (id: string, name: string, text: string) => ({
 
 async function renderSession(state: string, input: { rooms: () => unknown[]; onCreate?: () => void }) {
   return createAppFixture({
-    width: 130,
+    width: 170,
     height: 40,
     state,
     args: { sessionID: room.sessionID },
@@ -131,12 +131,12 @@ async function renderSession(state: string, input: { rooms: () => unknown[]; onC
 test("a hosted session names guest authors and shows a multiplayer indicator that opens Host", async () => {
   await using state = await tmpdir()
   await using setup = await renderSession(state.path, { rooms: () => [room] })
-  const frame = await setup.waitForFrame((frame) => frame.includes("⇄ Multiplayer"))
+  const frame = await setup.waitForFrame((frame) => frame.includes("⇄ Multiplayer · Lab"))
   expect(frame).toContain("⇄ Multiplayer · Lab · 2 guests")
   expect(frame).toContain("Alex · via room")
   expect(frame).toContain("Sam · via room")
 
-  const indicator = cell(frame, "⇄ Multiplayer")
+  const indicator = cell(frame, "⇄ Multiplayer · Lab")
   await setup.mockMouse.click(indicator.x + 2, indicator.y)
   const host = await setup.waitForFrame((frame) => frame.includes("Get join code"))
   expect(host).toContain("Only me")
@@ -148,9 +148,9 @@ test("hosting a session issues a join code at once and shows the indicator", asy
   await using state = await tmpdir()
   const rooms: unknown[] = []
   await using setup = await renderSession(state.path, { rooms: () => rooms, onCreate: () => rooms.push(room) })
-  const bar = await setup.waitForFrame((frame) => frame.includes("Host") && frame.includes("Connect"))
-  expect(bar).not.toContain("⇄ Multiplayer")
-  const entry = cell(bar, "Host")
+  const bar = await setup.waitForFrame((frame) => frame.includes("+ Host") && frame.includes("+ Connect"))
+  expect(bar).not.toContain("⇄ Multiplayer · Lab")
+  const entry = cell(bar, "+ Host")
   await setup.mockMouse.click(entry.x, entry.y)
   const dialog = await setup.waitForFrame((frame) => frame.includes("Host this session"))
   const button = cell(dialog, "Host this session")
@@ -168,10 +168,10 @@ test("the Language bar item switches the bar and room windows to Russian and bac
   const bar = await setup.waitForFrame((frame) => frame.includes("Language EN"))
   const entry = cell(bar, "Language EN")
   await setup.mockMouse.click(entry.x, entry.y)
-  const translated = await setup.waitForFrame((frame) => frame.includes("Подключиться") && frame.includes("Язык RU"))
+  const translated = await setup.waitForFrame((frame) => frame.includes("+ Подключиться") && frame.includes("Язык RU"))
   expect(translated).toContain("Спроси что угодно…")
   expect(translated).toContain("команды")
-  const connect = cell(translated, "Подключиться")
+  const connect = cell(translated, "+ Подключиться")
   await setup.mockMouse.click(connect.x, connect.y)
   const dialog = await setup.waitForFrame((frame) => frame.includes("Вход по адресу"))
   expect(dialog).toContain("Комнаты в этой сети")
@@ -197,8 +197,8 @@ test("a joined room opens in the main area and stays in the left panel under Mul
   })
   try {
     await using setup = await render(state.path)
-    const bar = await setup.waitForFrame((frame) => frame.includes("Connect"))
-    const entry = cell(bar, "Connect")
+    const bar = await setup.waitForFrame((frame) => frame.includes("+ Connect"))
+    const entry = cell(bar, "+ Connect")
     await setup.mockMouse.click(entry.x, entry.y)
     const dialog = await setup.waitForFrame((frame) => frame.includes("Join by address"))
     const address = cell(dialog, "e.g. 192.168.1.5")
@@ -211,7 +211,7 @@ test("a joined room opens in the main area and stays in the left panel under Mul
     )
     expect(joined).toContain("⇄ Multiplayer · Far lab · host studio")
     // A separate section below the projects: hosted sessions and joined rooms, each marked as multiplayer.
-    expect(joined).toMatch(/⇄ Multiplayer +\+ Connect/)
+    expect(joined).toMatch(/⇄ Multiplayer +\+ Host \+ Connect/)
     expect(joined).toMatch(/⇄ Lab +hosting/)
     expect(joined).toContain(`⇄ Far lab · 127.0.0.1:${host.port}`)
   } finally {

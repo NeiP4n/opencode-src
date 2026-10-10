@@ -82,9 +82,17 @@ $Cli = Join-Path $Source "packages\cli"
 # The command is `opencode-pp`, so a regular opencode on the same machine keeps `opencode`.
 # The preload goes by absolute path: bunfig.toml names it by package, which Bun resolves from
 # the directory the command is started in.
+# A console left on its OEM code page (866, 437 and so on) turns the interface's symbols into `?`, so the
+# command switches it to UTF-8 while it runs and puts the old code page back on exit.
 Set-Content -Path (Join-Path $Bin "opencode-pp.cmd") -Encoding ASCII -Value @"
 @echo off
+setlocal
+for /f "tokens=2 delims=:" %%c in ('chcp') do set /a OPENCODE_PP_CP=%%c
+chcp 65001 >nul
 "$Bun" --preload="$Cli\node_modules\@opentui\solid\scripts\preload.js" "$Cli\src\index.ts" %*
+set OPENCODE_PP_EXIT=%ERRORLEVEL%
+if defined OPENCODE_PP_CP chcp %OPENCODE_PP_CP% >nul
+exit /b %OPENCODE_PP_EXIT%
 "@
 # Earlier versions of this installer took the name `opencode` in this folder; give it back.
 Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $Bin "opencode.cmd")

@@ -71,9 +71,10 @@ import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogOpen, DialogOpenKey, moveOpenSession } from "./component/dialog-open"
 import { ProjectTree } from "./component/project-tree"
 import { RoomChat } from "./component/room-chat"
+import { DialogConnect, DialogHost } from "./component/dialog-rooms"
 import { sameRoom, useJoinedRooms } from "./util/room"
 import { openTeamEditor } from "./component/dialog-teams"
-import { ProjectsProvider, useProjects } from "./context/projects"
+import { ProjectsProvider } from "./context/projects"
 import { NotesProvider } from "./context/notes"
 import { NotesCommands } from "./component/notes-commands"
 import { clampSessionTabsWidth, sessionTabsFitVertically, SESSION_SIDEBAR_WIDTH } from "./ui/layout"
@@ -471,7 +472,6 @@ function App() {
   const dialog = useDialog()
   const local = useLocal()
   const sessionTabs = useSessionTabs()
-  const projects = useProjects()
   const [joinedRooms] = useJoinedRooms()
   const panels = usePanel()
   const keymap = Keymap.use()
@@ -585,8 +585,8 @@ function App() {
   const pasteSummaryEnabled = () => config.data.prompt?.paste !== "full"
   // The project tree replaces the session tabs and always sits on the left when the terminal is wide enough.
   const tabsVertical = () => sessionTabsFitVertically(dimensions().width, tabsResize.size())
-  const tabsAvailable = () =>
-    route.data.type !== "plugin" && (projects.list().length > 0 || joinedRooms.joined.length > 0)
+  // Always offered outside plugin pages: Multiplayer's Host and Connect live in the panel too.
+  const tabsAvailable = () => route.data.type !== "plugin"
   const fullscreenPanel = () =>
     route.data.type === "session" &&
     panels.current()?.sessionID === route.data.sessionID &&
@@ -982,6 +982,25 @@ function App() {
           ))
         },
         category: "Integration",
+      },
+      // The left panel holds these too; the palette keeps them reachable when the terminal is too narrow for it.
+      {
+        name: "room.host",
+        title: "Host a room",
+        run: () => {
+          dialog.replace(() => <DialogHost onClose={() => dialog.clear()} />, undefined, { size: "large" })
+          dialog.setCentered(true)
+        },
+        category: "Multiplayer",
+      },
+      {
+        name: "room.connect",
+        title: "Connect to a room",
+        run: () => {
+          dialog.replace(() => <DialogConnect onClose={() => dialog.clear()} />, undefined, { size: "large" })
+          dialog.setCentered(true)
+        },
+        category: "Multiplayer",
       },
       {
         name: "opencode.settings",

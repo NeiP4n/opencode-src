@@ -153,6 +153,7 @@ const ru: Record<string, string> = {
   Open: "Открыть",
   // Multiplayer: the left panel section and a joined room's chat
   Multiplayer: "Мультиплеер",
+  "+ Host": "+ Хост",
   "+ Connect": "+ Подключиться",
   hosting: "хост",
   "leave?": "выйти?",
