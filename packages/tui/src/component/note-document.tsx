@@ -5,7 +5,17 @@ import { useConfig } from "../config"
 import { Keymap } from "../context/keymap"
 import { useTheme, useThemes } from "../context/theme"
 import { getScrollAcceleration } from "../util/scroll"
-import { ago, NOTE_LENGTHS, NOTE_STATUS_MARKER, nextStatus, noteLength, noteTitle, parseTags } from "../util/note"
+import { useT } from "../util/i18n"
+import {
+  ago,
+  NOTE_LENGTHS,
+  NOTE_STATUS_LABEL,
+  NOTE_STATUS_MARKER,
+  nextStatus,
+  noteLength,
+  noteTitle,
+  parseTags,
+} from "../util/note"
 
 export type NoteSaveResult = "saved" | "conflict" | "failed"
 
@@ -32,6 +42,7 @@ export function NoteDocument(props: {
   const theme = useTheme()
   const { currentSyntax: syntax } = useThemes()
   const config = useConfig().data
+  const t = useT()
   const [mode, setMode] = createSignal<Mode>("view")
   // The version the editor started from: a save is refused when the note moved past it.
   const [base, setBase] = createSignal<NoteInfo["mtime"]>(0)
@@ -41,6 +52,13 @@ export function NoteDocument(props: {
   let editor: TextareaRenderable | undefined
 
   const changed = () => mode() === "edit" && (conflict() || props.note.mtime !== base())
+
+  // "ago" rides along the age rather than the number, so a language that puts the
+  // unit first gets its own word order instead of a glued-together English one.
+  const updatedLabel = () => {
+    const age = ago(props.note.frontmatter.updated, props.now)
+    return age === "now" ? t("updated {age}", { age }) : t("updated {age} ago", { age })
+  }
 
   const edit = () => {
     setBase(props.note.mtime)
@@ -61,7 +79,7 @@ export function NoteDocument(props: {
     const result = await props.onSave(editor.plainText, expectedMtime).finally(() => setSaving(false))
     if (result === "saved") return cancel()
     if (result === "conflict") return void setConflict(true)
-    setNotice("Could not save the note. Your text is still here; try again.")
+    setNotice(t("Could not save the note. Your text is still here; try again."))
   }
 
   // Reloading takes the latest version into the editor, explicitly chosen by the user.
@@ -82,7 +100,9 @@ export function NoteDocument(props: {
     setMode("view")
     setNotice(
       parsed.invalid.length
-        ? `Skipped ${parsed.invalid.map((tag) => `"${tag}"`).join(", ")}: tags are lowercase latin letters, digits and hyphens.`
+        ? t("Skipped {tags}: tags are lowercase latin letters, digits and hyphens.", {
+            tags: parsed.invalid.map((tag) => `"${tag}"`).join(", "),
+          })
         : undefined,
     )
     props.onTags(parsed.tags)
@@ -128,18 +148,18 @@ export function NoteDocument(props: {
                 </Action>
               }
             >
-              <Field value={props.note.frontmatter.title} placeholder="Note title" onSubmit={rename} />
+              <Field value={props.note.frontmatter.title} placeholder={t("Note title")} onSubmit={rename} />
             </Show>
           </box>
           <Show when={mode() !== "edit"}>
             <Action id="note-edit" onClick={edit}>
-              ✎ Edit
+              {t("✎ Edit")}
             </Action>
           </Show>
           <Show when={props.onChat}>
             {(onChat) => (
               <Action id="note-chat" onClick={onChat()}>
-                ⇤ Chat
+                {t("⇤ Chat")}
               </Action>
             )}
           </Show>
@@ -150,7 +170,7 @@ export function NoteDocument(props: {
             tone="formfield"
             onClick={() => props.onStatus(nextStatus(props.note.frontmatter.status))}
           >
-            {`${NOTE_STATUS_MARKER[props.note.frontmatter.status]} ${props.note.frontmatter.status}`}
+            {`${NOTE_STATUS_MARKER[props.note.frontmatter.status]} ${t(NOTE_STATUS_LABEL[props.note.frontmatter.status])}`}
           </Action>
           <Show
             when={mode() === "tags"}
@@ -158,26 +178,26 @@ export function NoteDocument(props: {
               <Action id="note-tags" tone="formfield" onClick={() => setMode("tags")}>
                 {props.note.frontmatter.tags.length
                   ? props.note.frontmatter.tags.map((tag) => `#${tag}`).join(" ")
-                  : "+ tags"}
+                  : t("+ tags")}
               </Action>
             }
           >
             <box width={30}>
               <Field
                 value={props.note.frontmatter.tags.join(" ")}
-                placeholder="tags, space separated"
+                placeholder={t("tags, space separated")}
                 onSubmit={retag}
               />
             </box>
           </Show>
           <text fg={theme.text.muted} wrapMode="none">
-            {`updated ${ago(props.note.frontmatter.updated, props.now)}${ago(props.note.frontmatter.updated, props.now) === "now" ? "" : " ago"}`}
+            {updatedLabel()}
           </text>
           {props.indicator}
         </box>
         <box flexDirection="row" flexWrap="wrap" columnGap={1} paddingTop={1}>
           <text fg={theme.text.muted} wrapMode="none">
-            Length
+            {t("Length")}
           </text>
           <For each={NOTE_LENGTHS}>
             {(length) => (
@@ -186,7 +206,7 @@ export function NoteDocument(props: {
                 selected={noteLength(props.note) === length.value}
                 onClick={() => noteLength(props.note) !== length.value && props.onLength(length.value)}
               >
-                {length.label}
+                {t(length.label)}
               </Segment>
             )}
           </For>
@@ -204,14 +224,14 @@ export function NoteDocument(props: {
         <box flexShrink={0} flexDirection="row" flexWrap="wrap" columnGap={2} paddingLeft={2} paddingRight={2}>
           <text fg={theme.text.feedback.warning.base} wrapMode="word">
             {conflict()
-              ? "Not saved: this note changed since you started editing. Your text is kept."
-              : "This note changed while you were editing. Your text is kept."}
+              ? t("Not saved: this note changed since you started editing. Your text is kept.")
+              : t("This note changed while you were editing. Your text is kept.")}
           </text>
           <Action id="note-reload" onClick={reload}>
-            Reload latest
+            {t("Reload latest")}
           </Action>
           <Action id="note-overwrite" tone="destructive" onClick={() => void save(props.note.mtime)}>
-            Overwrite with mine
+            {t("Overwrite with mine")}
           </Action>
         </box>
       </Show>
@@ -232,7 +252,7 @@ export function NoteDocument(props: {
               flexGrow={1}
               wrapMode="word"
               initialValue={props.note.body}
-              placeholder="Write in markdown"
+              placeholder={t("Write in markdown")}
               placeholderColor={theme.text.muted}
               textColor={theme.text.formfield.base}
               focusedTextColor={theme.text.formfield.focused}
@@ -250,10 +270,10 @@ export function NoteDocument(props: {
         <Match when={props.note.body.trim().length === 0}>
           <box flexGrow={1} paddingLeft={2} paddingRight={2} paddingTop={1} gap={1}>
             <text fg={theme.text.muted} wrapMode="word">
-              This note is empty.
+              {t("This note is empty.")}
             </text>
             <text fg={theme.text.muted} wrapMode="word">
-              Ask the AI to write it here, or press ✎ Edit to start writing yourself.
+              {t("Ask the AI to write it here, or press ✎ Edit to start writing yourself.")}
             </text>
           </box>
         </Match>
@@ -286,13 +306,13 @@ export function NoteDocument(props: {
         <text fg={theme.text.muted} wrapMode="none" truncate>
           {mode() === "edit"
             ? saving()
-              ? "Saving…"
-              : "ctrl+s save · esc cancel"
+              ? t("Saving…")
+              : t("ctrl+s save · esc cancel")
             : mode() === "view"
               ? props.writing
-                ? "The AI is writing into this note…"
-                : "Ask in the chat and the AI writes into this note"
-              : "enter save · esc cancel"}
+                ? t("The AI is writing into this note…")
+                : t("Ask in the chat and the AI writes into this note")
+              : t("enter save · esc cancel")}
         </text>
       </box>
     </box>

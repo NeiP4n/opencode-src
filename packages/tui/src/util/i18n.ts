@@ -318,6 +318,74 @@ const ru: Record<string, string> = {
   "Enter the team's name": "Укажи название команды",
   "Add at least one member": "Добавь хотя бы одного участника",
   "Model must look like provider/model": "Модель указывается как provider/model",
+  // Notes panel
+  "No project": "Нет проекта",
+  "{count} note": "{count} заметка",
+  "{count} notes": "{count} заметок",
+  "loading…": "загрузка…",
+  "Note title, enter to create": "Название заметки, enter создать",
+  // #tag stays latin: it is what the user types into the filter, not prose.
+  "Filter by title or #tag": "Фильтр по названию или #tag",
+  "This chat writes into the selected note only.": "Этот чат пишет только в выбранную заметку.",
+  "Could not read notes: {error}": "Не удалось прочитать заметки: {error}",
+  "No notes yet.": "Заметок пока нет.",
+  "+ New note": "+ Новая заметка",
+  "or ask the AI in any chat of this project to write one.": "или попроси ИИ в любом чате этого проекта написать её.",
+  'No notes match "{query}".': "Ничего не найдено по «{query}».",
+  "delete?": "Удалить?",
+  // Note statuses
+  Inbox: "Входящие",
+  Active: "Активная",
+  Done: "Готово",
+  Archived: "В архиве",
+  // Note document
+  "Could not save the note. Your text is still here; try again.":
+    "Не удалось сохранить заметку. Текст на месте, попробуй ещё раз.",
+  "Skipped {tags}: tags are lowercase latin letters, digits and hyphens.":
+    "Пропущено {tags}: теги — латинские строчные буквы, цифры и дефисы.",
+  "Note title": "Название заметки",
+  "✎ Edit": "✎ Правка",
+  "⇤ Chat": "⇤ Чат",
+  "+ tags": "+ теги",
+  "tags, space separated": "теги через пробел",
+  "updated {age}": "обновлено {age}",
+  "updated {age} ago": "обновлено {age} назад",
+  Length: "Длина",
+  "Brief & useful": "Кратко и по делу",
+  Balanced: "Сбалансированно",
+  "Detailed & useful": "Подробно и по делу",
+  "Not saved: this note changed since you started editing. Your text is kept.":
+    "Не сохранено: заметку изменили с начала правки. Твой текст сохранён.",
+  "This note changed while you were editing. Your text is kept.":
+    "Заметку изменили, пока ты правил. Твой текст сохранён.",
+  "Reload latest": "Взять последнюю",
+  "Overwrite with mine": "Перезаписать моим",
+  "Write in markdown": "Пиши в markdown",
+  "This note is empty.": "Заметка пустая.",
+  "Ask the AI to write it here, or press ✎ Edit to start writing yourself.":
+    "Попроси ИИ написать её здесь или нажми ✎ Правка, чтобы писать самому.",
+  "Saving…": "Сохраняю…",
+  "ctrl+s save · esc cancel": "ctrl+s сохранить · esc отмена",
+  "The AI is writing into this note…": "ИИ пишет в эту заметку…",
+  "Ask in the chat and the AI writes into this note": "Спроси в чате — ИИ напишет в эту заметку",
+  "enter save · esc cancel": "enter сохранить · esc отмена",
+  // Note commands
+  "Notes live in projects. Create a project first with {command}.":
+    "Заметки живут в проектах. Сначала создай проект через {command}.",
+  "Show the notes of the project; a chat bound to a note shows it as its document":
+    "Показать заметки проекта; чат, привязанный к заметке, показывает её как документ",
+  "New note": "Новая заметка",
+  "Show full chat": "Показать весь чат",
+  "Show bound note": "Показать привязанную заметку",
+  "Note length: {length}": "Длина заметки: {length}",
+  "How much the AI writes into the note bound to this chat": "Сколько ИИ пишет в заметку, привязанную к этому чату",
+  // Note canvas
+  "✎ Note": "✎ Заметка",
+  "Continue writing": "Продолжить",
+  Summarize: "Сжать",
+  Improve: "Улучшить",
+  Outline: "План",
+  "✎ Note: {title} · open": "✎ Заметка: {title} · открыть",
 }
 
 export function translate(language: Language | undefined, text: string, values?: Record<string, string | number>) {

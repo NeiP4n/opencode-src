@@ -1,6 +1,8 @@
 import type { NoteInfo, NoteLength, NoteStatus } from "@opencode/client"
 
 // How much the AI writes into a note bound to its chat, in the order the control shows them.
+// The label is an English dictionary key: it is rendered through `translate()`, so a
+// component that only knows the value can still show it in the configured language.
 export const NOTE_LENGTHS: readonly { readonly value: NoteLength; readonly label: string }[] = [
   { value: "brief", label: "Brief & useful" },
   { value: "balanced", label: "Balanced" },
@@ -8,6 +10,17 @@ export const NOTE_LENGTHS: readonly { readonly value: NoteLength; readonly label
 ]
 
 export const NOTE_STATUSES: readonly NoteStatus[] = ["inbox", "active", "done", "archived"]
+
+/**
+ * How a status reads on screen. The value stays the protocol one that `nextStatus`
+ * cycles through, so translating the label can never change what a click writes back.
+ */
+export const NOTE_STATUS_LABEL: Record<NoteStatus, string> = {
+  inbox: "Inbox",
+  active: "Active",
+  done: "Done",
+  archived: "Archived",
+}
 
 export const NOTE_STATUS_MARKER: Record<NoteStatus, string> = {
   inbox: "○",

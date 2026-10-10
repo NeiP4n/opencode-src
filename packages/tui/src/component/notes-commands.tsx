@@ -6,6 +6,7 @@ import { useRoute } from "../context/route"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
+import { useT } from "../util/i18n"
 import { NOTE_LENGTHS, noteLength } from "../util/note"
 
 const GROUP = "Notes"
@@ -14,6 +15,7 @@ const GROUP = "Notes"
 // note bound to the open session, wherever the keyboard is.
 export function NotesCommands() {
   const notes = useNotes()
+  const t = useT()
   const data = useData()
   const route = useRoute()
   const dialog = useDialog()
@@ -30,7 +32,9 @@ export function NotesCommands() {
     if (projects.list().length === 0)
       return void toast.show({
         variant: "info",
-        message: "Notes live in projects. Create a project first with + Project.",
+        message: t("Notes live in projects. Create a project first with {command}.", {
+          command: t("+ Project"),
+        }),
       })
     notes.setTab("notes")
     const id = sessionID()
@@ -65,7 +69,7 @@ export function NotesCommands() {
         {
           id: "notes.open",
           title: "Notes",
-          description: "Show the notes of the project; a chat bound to a note shows it as its document",
+          description: t("Show the notes of the project; a chat bound to a note shows it as its document"),
           group: GROUP,
           slash: { name: "notes" },
           palette: true,
@@ -73,7 +77,7 @@ export function NotesCommands() {
         },
         {
           id: "notes.new",
-          title: "New note",
+          title: t("New note"),
           group: GROUP,
           palette: true,
           run: () => {
@@ -83,7 +87,7 @@ export function NotesCommands() {
         },
         {
           id: "notes.view.toggle",
-          title: id && notes.canvas(id) ? "Show full chat" : "Show bound note",
+          title: t(id && notes.canvas(id) ? "Show full chat" : "Show bound note"),
           group: GROUP,
           palette: true,
           enabled: note !== undefined,
@@ -91,8 +95,8 @@ export function NotesCommands() {
         },
         ...NOTE_LENGTHS.map((length) => ({
           id: `notes.length.${length.value}`,
-          title: `Note length: ${length.label}`,
-          description: "How much the AI writes into the note bound to this chat",
+          title: t("Note length: {length}", { length: t(length.label) }),
+          description: t("How much the AI writes into the note bound to this chat"),
           group: GROUP,
           palette: true as const,
           enabled: note !== undefined && noteLength(note) !== length.value,

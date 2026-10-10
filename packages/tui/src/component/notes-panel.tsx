@@ -4,6 +4,7 @@ import { createMemo, createSignal, For, Show } from "solid-js"
 import { useConfig } from "../config"
 import { useTheme } from "../context/theme"
 import { ago, matchesNote, NOTE_STATUS_MARKER, noteTitle } from "../util/note"
+import { useT } from "../util/i18n"
 import { Row } from "./panel-row"
 
 export type NotesPanelProject = { readonly id: string; readonly name: string }
@@ -28,6 +29,7 @@ export function NotesPanel(props: {
 }) {
   const theme = useTheme()
   const config = useConfig().data
+  const t = useT()
   const [hover, setHover] = createSignal<string>()
   const [filter, setFilter] = createSignal("")
   const [picking, setPicking] = createSignal(false)
@@ -60,11 +62,13 @@ export function NotesPanel(props: {
         <text fg={theme.text.muted}>{props.projects.length > 1 ? (picking() ? "▾ " : "▸ ") : "  "}</text>
         <box flexGrow={1} minWidth={0}>
           <text fg={theme.text.base} attributes={TextAttributes.BOLD} wrapMode="none" truncate>
-            {props.project?.name ?? "No project"}
+            {props.project?.name ?? t("No project")}
           </text>
         </box>
         <text fg={theme.text.muted} wrapMode="none">
-          {props.loaded ? `${props.notes.length} ${props.notes.length === 1 ? "note" : "notes"}` : "loading…"}
+          {props.loaded
+            ? t(props.notes.length === 1 ? "{count} note" : "{count} notes", { count: props.notes.length })
+            : t("loading…")}
         </text>
       </Row>
       <Show when={picking()}>
@@ -92,7 +96,7 @@ export function NotesPanel(props: {
           <text fg={theme.text.action.primary.base}>{"+ "}</text>
           <input
             flexGrow={1}
-            placeholder="Note title, enter to create"
+            placeholder={t("Note title, enter to create")}
             placeholderColor={theme.text.muted}
             textColor={theme.text.formfield.base}
             focusedTextColor={theme.text.formfield.focused}
@@ -118,7 +122,7 @@ export function NotesPanel(props: {
           <text fg={theme.text.muted}>{"⌕ "}</text>
           <input
             flexGrow={1}
-            placeholder="Filter by title or #tag"
+            placeholder={t("Filter by title or #tag")}
             placeholderColor={theme.text.muted}
             textColor={theme.text.formfield.base}
             focusedTextColor={theme.text.formfield.focused}
@@ -133,7 +137,7 @@ export function NotesPanel(props: {
       {/* The chat of a note is bound to it, so the model writes there and nowhere else. */}
       <box paddingLeft={2} paddingRight={1}>
         <text fg={theme.text.muted} wrapMode="word">
-          This chat writes into the selected note only.
+          {t("This chat writes into the selected note only.")}
         </text>
       </box>
       <scrollbox flexGrow={1} minHeight={0} horizontalScrollbarOptions={{ visible: false }}>
@@ -172,7 +176,7 @@ export function NotesPanel(props: {
                   }
                   wrapMode="none"
                 >
-                  {armed() === note.name ? " delete?" : " ×"}
+                  {armed() === note.name ? " " + t("delete?") : " ×"}
                 </text>
               </box>
             </Row>
@@ -181,30 +185,34 @@ export function NotesPanel(props: {
         <Show when={props.error}>
           {(error) => (
             <box paddingLeft={2} paddingRight={1}>
-              <text fg={theme.text.feedback.error.base} wrapMode="word">{`Could not read notes: ${error()}`}</text>
+              <text fg={theme.text.feedback.error.base} wrapMode="word">
+                {t("Could not read notes: {error}", { error: error() })}
+              </text>
             </box>
           )}
         </Show>
         <Show when={props.loaded && !props.error && props.notes.length === 0 && !props.creating}>
           <box paddingLeft={2} paddingRight={1} gap={1}>
             <text fg={theme.text.muted} wrapMode="word">
-              No notes yet.
+              {t("No notes yet.")}
             </text>
             <Row id="notes:empty-new" hover={hover} setHover={setHover} onClick={() => props.onCreating(true)}>
               <text
                 fg={hover() === "notes:empty-new" ? theme.text.action.primary.hovered : theme.text.action.primary.base}
               >
-                + New note
+                {t("+ New note")}
               </text>
             </Row>
             <text fg={theme.text.muted} wrapMode="word">
-              or ask the AI in any chat of this project to write one.
+              {t("or ask the AI in any chat of this project to write one.")}
             </text>
           </box>
         </Show>
         <Show when={props.notes.length > 0 && visible().length === 0}>
           <box paddingLeft={2} paddingRight={1}>
-            <text fg={theme.text.muted} wrapMode="word">{`No notes match "${filter().trim()}".`}</text>
+            <text fg={theme.text.muted} wrapMode="word">
+              {t('No notes match "{query}".', { query: filter().trim() })}
+            </text>
           </box>
         </Show>
       </scrollbox>

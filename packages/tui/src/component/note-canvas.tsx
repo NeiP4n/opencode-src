@@ -8,6 +8,7 @@ import { usePlugin } from "../plugin/context"
 import { emptyPrompt } from "../prompt/history"
 import { useToast } from "../ui/toast"
 import { errorMessage } from "../util/error"
+import { useT } from "../util/i18n"
 import { noteTitle } from "../util/note"
 import { NoteDocument } from "./note-document"
 import { RoomIndicator } from "./room-indicator"
@@ -65,11 +66,12 @@ const QUICK_ACTIONS = [
 export function NoteQuickActions() {
   const theme = useTheme()
   const prompt = usePromptRef()
+  const t = useT()
   const [hovered, setHovered] = createSignal<string>()
   return (
     <box flexDirection="row" flexWrap="wrap" columnGap={2} paddingLeft={2} paddingRight={1}>
       <text fg={theme.text.muted} wrapMode="none">
-        ✎ Note
+        {t("✎ Note")}
       </text>
       <For each={QUICK_ACTIONS}>
         {(action) => (
@@ -86,7 +88,7 @@ export function NoteQuickActions() {
               fg={hovered() === action.label ? theme.text.action.secondary.hovered : theme.text.action.secondary.base}
               wrapMode="none"
             >
-              {action.label}
+              {t(action.label)}
             </text>
           </box>
         )}
@@ -99,6 +101,7 @@ export function NoteQuickActions() {
 export function NoteChip(props: { sessionID: string; note: NoteInfo }) {
   const theme = useTheme()
   const notes = useNotes()
+  const t = useT()
   const [hovered, setHovered] = createSignal(false)
   return (
     <box
@@ -118,7 +121,7 @@ export function NoteChip(props: { sessionID: string; note: NoteInfo }) {
         wrapMode="none"
         truncate
       >
-        {`✎ Note: ${noteTitle(props.note)} · open`}
+        {t("✎ Note: {title} · open", { title: noteTitle(props.note) })}
       </text>
     </box>
   )
