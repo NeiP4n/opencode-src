@@ -1,14 +1,72 @@
 import { expect } from "bun:test"
 import { SessionExecution } from "@opencode/core/session/execution"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
-import { Effect, Layer } from "effect"
+import { Effect, Fiber, Layer, Schedule } from "effect"
 import { tmpdir } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { ServerFetch } from "../src/fetch"
 import { ServerRoomDiscovery } from "../src/room-discovery"
 import { PORT, QUERY, decodeReply } from "@opencode/protocol/room-discovery"
+import { isRoomGuestURL } from "@opencode/protocol/groups/room"
 import { createSocket } from "node:dgram"
 import { hostname } from "node:os"
+
+// Every guest path the server.room group registers (verified against the group's
+// endpoint list). Each one carries a room token instead of the server credential,
+// so the Authorization middleware must let it through; the room handler then
+// checks the token against the one room it names.
+const GUEST_PATHS = [
+  "/api/room/join",
+  "/api/room/public",
+  "/api/room/room_1/guest",
+  "/api/room/room_1/guest/session",
+  "/api/room/room_1/guest/session/message",
+  "/api/room/room_1/guest/session/ses_1/model",
+  "/api/room/room_1/guest/session/ses_1/agent",
+  "/api/room/room_1/guest/session/ses_1/command",
+  "/api/room/room_1/guest/model",
+  "/api/room/room_1/guest/agent",
+  "/api/room/room_1/guest/command",
+  "/api/room/room_1/guest/log",
+  "/api/room/room_1/guest/message",
+  "/api/room/room_1/guest/note",
+  "/api/room/room_1/guest/prompt",
+  "/api/room/room_1/guest/permission",
+  "/api/room/room_1/guest/permission/per_1/reply",
+]
+
+// Host-only paths: the guest token is not a server credential, so none of these
+// may skip the password check. Covers room.list/create/update/remove/code, the
+// link endpoints, and every member/ban endpoint.
+const HOST_PATHS = [
+  "/api/room",
+  "/api/room/room_1",
+  "/api/room/room_1/code",
+  "/api/room/link",
+  "/api/room/link/remove",
+  "/api/room/room_1/member",
+  "/api/room/room_1/member/guest_1",
+  "/api/room/room_1/member/guest_1/ban",
+  "/api/room/room_1/ban",
+  "/api/room/room_1/ban/ban_1",
+]
+
+// Paths under /api/room/ that no endpoint registers, plus session paths. A broad
+// "/api/room/<id>/guest/*" prefix would wrongly exempt these from the password;
+// isRoomGuestURL must refuse every one.
+const UNKNOWN_PATHS = [
+  "/api/room/room_1/guest/unknown",
+  "/api/room/room_1/guest/session/ses_1/unknown",
+  "/api/room/room_1/guest/permission/per_1",
+  "/api/room/unknown",
+  "/api/room/room_1/unknown",
+  "/api/room/room_1/guestX",
+  "/api/session",
+  "/api/session/ses_1",
+  "/api/session/ses_1/message",
+]
+
+const guestURL = (path: string) => isRoomGuestURL(new URL(`http://room.test${path}`))
 
 // Rooms only admit prompts; no model runs in these tests.
 const idle = Layer.succeed(
@@ -68,6 +126,24 @@ const setup = Effect.gen(function* () {
   return { call, session, room, code, directory: tmp.path }
 })
 
+it.live("isRoomGuestURL admits every registered guest route", () =>
+  Effect.sync(() => {
+    for (const path of GUEST_PATHS) expect(`${path} -> ${guestURL(path)}`).toBe(`${path} -> true`)
+  }),
+)
+
+it.live("isRoomGuestURL refuses host routes, so a guest token is never a server credential", () =>
+  Effect.sync(() => {
+    for (const path of HOST_PATHS) expect(`${path} -> ${guestURL(path)}`).toBe(`${path} -> false`)
+  }),
+)
+
+it.live("isRoomGuestURL refuses unregistered room paths and session paths", () =>
+  Effect.sync(() => {
+    for (const path of UNKNOWN_PATHS) expect(`${path} -> ${guestURL(path)}`).toBe(`${path} -> false`)
+  }),
+)
+
 it.live("a join code admits a guest whose token opens only that room", () =>
   Effect.gen(function* () {
     const { call, session, room, code } = yield* setup
@@ -100,13 +176,24 @@ it.live("a join code admits a guest whose token opens only that room", () =>
   }).pipe(Effect.scoped),
 )
 
-it.live("devices on the network see room names without a credential", () =>
+it.live("the room list anyone may read names only the open rooms; a closed one keeps its id but not its name", () =>
   Effect.gen(function* () {
     const { call, room } = yield* setup
     const listed = yield* call("/api/room/public")
     expect(listed.status).toBe(200)
-    expect(listed.body.rooms).toEqual([{ id: room.id, name: "Lab", open: false }])
     expect(typeof listed.body.host).toBe("string")
+
+    // The room stays in the list, because Connect needs to offer it and to tell
+    // one closed room apart from no room at all; only the name is withheld.
+    expect(listed.body.rooms).toHaveLength(1)
+    expect(listed.body.rooms[0].id).toBe(room.id)
+    expect(listed.body.rooms[0].open).toBe(false)
+    // Absent on the wire, not present-and-undefined: a stray "name": null would
+    // read as a room called nothing rather than as a room whose name is private.
+    expect(Object.keys(listed.body.rooms[0])).toEqual(["id", "open"])
+
+    yield* call(`/api/room/${room.id}`, { method: "PATCH", headers: host, body: { open: true } })
+    expect((yield* call("/api/room/public")).body.rooms).toEqual([{ id: room.id, name: "Lab", open: true }])
   }).pipe(Effect.scoped),
 )
 
@@ -410,5 +497,63 @@ it.live("a guest who leaves drops out of the host's members and its token stops 
     expect((yield* call(`/api/room/${room.id}/guest`, { method: "DELETE", headers: guest })).status).toBe(204)
     expect((yield* call(`/api/room/${room.id}/member`, { headers: host })).body.data).toEqual([])
     expect((yield* call(`/api/room/${room.id}/guest`, { headers: guest })).status).toBe(401)
+  }).pipe(Effect.scoped),
+)
+
+it.live("a guest reads the host's passport, and a cohost runs a command once the host allows it", () =>
+  Effect.gen(function* () {
+    const { call, directory } = yield* setup
+    // a session with an agent, as people use them, so its permission rules ask the host
+    const session = (yield* call("/api/session", {
+      method: "POST",
+      headers: host,
+      body: { title: "Work", location: { directory }, agent: "build" },
+    })).body.data
+    const room = (yield* call("/api/room", { method: "POST", headers: host, body: { sessionID: session.id } })).body
+      .data
+    const code = (yield* call(`/api/room/${room.id}/code`, { method: "POST", headers: host })).body.code as string
+    const joined = (yield* call("/api/room/join", { method: "POST", body: { code, name: "Phone" } })).body
+    const guest = { authorization: `Bearer ${joined.token}` }
+
+    const passport = yield* call(`/api/room/${room.id}/guest/passport`, { headers: guest })
+    expect(passport.status).toBe(200)
+    expect(passport.body.os).toBe(process.platform)
+    expect(passport.body.shells.length).toBeGreaterThan(0)
+    expect(passport.body.plots).toEqual([])
+    // the passport is for guests of this room only
+    expect((yield* call(`/api/room/${room.id}/guest/passport`)).status).toBe(401)
+
+    const run = () =>
+      call(`/api/room/${room.id}/guest/run`, {
+        method: "POST",
+        headers: guest,
+        body: { command: "echo from-the-host" },
+      })
+    expect((yield* run()).status).toBe(403)
+    yield* call(`/api/room/${room.id}/member/${joined.guest.id}`, {
+      method: "PATCH",
+      headers: host,
+      body: { role: "cohost" },
+    })
+
+    // nothing runs until the host answers the request in its session
+    const pending = yield* run().pipe(Effect.forkScoped)
+    const request = yield* call(`/api/session/${session.id}/permission`, { headers: host }).pipe(
+      Effect.map((response) => response.body.data as { id: string; action: string }[]),
+      Effect.filterOrFail((requests) => requests.length > 0),
+      Effect.retry(Schedule.spaced("20 millis")),
+      Effect.timeout("5 seconds"),
+      Effect.map((requests) => requests[0]),
+    )
+    expect(request.action).toBe("room.run")
+    yield* call(`/api/session/${session.id}/permission/${request.id}/reply`, {
+      method: "POST",
+      headers: host,
+      body: { decision: "once" },
+    })
+    const result = yield* Fiber.join(pending)
+    expect(result.status).toBe(200)
+    expect(result.body.exitCode).toBe(0)
+    expect(result.body.output).toContain("from-the-host")
   }).pipe(Effect.scoped),
 )

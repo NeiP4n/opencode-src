@@ -34,6 +34,7 @@ import { Workspace } from "@opencode/core/workspace"
 import { Room } from "@opencode/core/room"
 import { Orchestra } from "@opencode/core/orchestra"
 import { Peer } from "@opencode/core/peer"
+import { Plot } from "@opencode/core/plot"
 import { Watcher } from "@opencode/core/filesystem/watcher"
 import { HttpRouter } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -78,6 +79,7 @@ const applicationServiceNodes = [
   Room.node,
   Orchestra.node,
   Peer.node,
+  Plot.node,
   LocationServiceMap.node,
   LocationActivity.node,
   SessionRestart.node,

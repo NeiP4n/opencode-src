@@ -17,6 +17,7 @@ import { Formatter } from "../../formatter.js"
 import { Location } from "../../location.js"
 import { FileAccess } from "../../file-access.js"
 import { Permission } from "../../permission.js"
+import { Plot } from "../../plot.js"
 import { fileDiff } from "./file-diff.js"
 
 export const name = "edit"
@@ -144,6 +145,7 @@ export const Plugin = {
     const formatter = yield* Formatter.Service
     const location = yield* Location.Service
     const permission = yield* Permission.Service
+    const plots = yield* Plot.Service
 
     yield* ctx.tool
       .transform((editor) =>
@@ -206,6 +208,10 @@ export const Plugin = {
                 replacements > 0 && (replacements === 1 || input.replaceAll === true)
                   ? fileDiff(target.resource, source, replaced)
                   : undefined
+              // Another team's plot (участок) is off limits, whoever asks.
+              yield* plots
+                .guard({ sessionID: context.sessionID, files: [target.absolute] })
+                .pipe(Effect.mapError((error) => new ToolFailure({ message: error.message })))
               yield* permission.assert({
                 action: "edit",
                 resources: [target.resource],

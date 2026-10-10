@@ -108,3 +108,42 @@ export const Message = Schema.Struct({
   created: Schema.Number,
 }).annotate({ identifier: "Room.Message" })
 export interface Message extends Schema.Schema.Type<typeof Message> {}
+
+// What a host's computer offers the AIs of its guests: its system, its shells and the
+// tools its Registry finds, the state of the shared project, and the plots teams hold
+// there, so another computer's AI can ask it for what only this machine can do.
+export const Passport = Schema.Struct({
+  machine: Schema.String,
+  os: Schema.String,
+  release: Schema.String,
+  arch: Schema.String,
+  shells: Schema.Array(Schema.String),
+  tools: Schema.Array(Schema.String),
+  project: Schema.Struct({
+    directory: Schema.String,
+    branch: Schema.String.pipe(Schema.optional),
+    commit: Schema.String.pipe(Schema.optional),
+    // Files changed and not yet committed.
+    changed: Schema.Number.pipe(Schema.optional),
+  }),
+  plots: Schema.Array(
+    Schema.Struct({
+      team: Schema.String,
+      machine: Schema.String,
+      purpose: Schema.String,
+      paths: Schema.Array(Schema.String),
+      expires: Schema.Number,
+    }),
+  ),
+}).annotate({ identifier: "Room.Passport" })
+export interface Passport extends Schema.Schema.Type<typeof Passport> {}
+
+// A command a cohost's AI ran on the host's computer, once the host allowed it.
+export const RunResult = Schema.Struct({
+  shell: Schema.String,
+  exitCode: Schema.Number,
+  output: Schema.String,
+  // Set when the output was longer than what comes back.
+  cut: Schema.Boolean.pipe(Schema.optional),
+}).annotate({ identifier: "Room.RunResult" })
+export interface RunResult extends Schema.Schema.Type<typeof RunResult> {}

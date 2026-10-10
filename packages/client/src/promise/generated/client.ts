@@ -304,6 +304,10 @@ import type {
   RoomLinkSaveOutput,
   RoomLinkRemoveInput,
   RoomLinkRemoveOutput,
+  RoomGuestPassportInput,
+  RoomGuestPassportOutput,
+  RoomGuestRunInput,
+  RoomGuestRunOutput,
   RoomGuestLeaveInput,
   RoomGuestLeaveOutput,
   RoomGuestSessionListInput,
@@ -2637,6 +2641,29 @@ export function make(options: ClientOptions) {
               requestOptions,
             ),
         },
+        passport: (input: RoomGuestPassportInput, requestOptions?: RequestOptions) =>
+          request<RoomGuestPassportOutput>(
+            {
+              method: "GET",
+              path: `/api/room/${encodeURIComponent(input.roomID)}/guest/passport`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        run: (input: RoomGuestRunInput, requestOptions?: RequestOptions) =>
+          request<RoomGuestRunOutput>(
+            {
+              method: "POST",
+              path: `/api/room/${encodeURIComponent(input.roomID)}/guest/run`,
+              body: { command: input["command"], sessionID: input["sessionID"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
         leave: (input: RoomGuestLeaveInput, requestOptions?: RequestOptions) =>
           request<RoomGuestLeaveOutput>(
             {

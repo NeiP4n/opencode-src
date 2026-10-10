@@ -19,13 +19,14 @@ import { location } from "./fixture/location"
 import { tmpdir, withTempDir } from "./fixture/tmpdir"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { testEffect } from "./lib/effect"
+import { noPlotsNode } from "./lib/plot"
 import { permissionLayer } from "./lib/permission"
 import { toolIdentity, executeTool, registerToolPlugin, toolDefinitions } from "./lib/tool"
 
 const writeToolNode = makeLocationNode({
   name: "test/write-tool-plugin",
   layer: Layer.effectDiscard(registerToolPlugin(WriteTool.Plugin)),
-  deps: [Tool.node, FileAccess.node, FileMutation.node, Environment.node, Formatter.node, Permission.node],
+  deps: [Tool.node, FileAccess.node, FileMutation.node, Environment.node, Formatter.node, Permission.node, noPlotsNode],
 })
 
 const sessionID = Session.ID.make("ses_write_tool_test")

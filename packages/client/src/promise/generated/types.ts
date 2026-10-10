@@ -487,6 +487,19 @@ export type RoomInfo1 = {
 
 export type RoomLink = { url: string; roomID: string; token: string; name: string; guest: string }
 
+export type RoomPassport = {
+  machine: string
+  os: string
+  release: string
+  arch: string
+  shells: Array<string>
+  tools: Array<string>
+  project: { directory: string; branch?: string | undefined; commit?: string | undefined; changed?: number | undefined }
+  plots: Array<{ team: string; machine: string; purpose: string; paths: Array<string>; expires: number }>
+}
+
+export type RoomRunResult = { shell: string; exitCode: number; output: string; cut?: boolean | undefined }
+
 export type RoomMemberView = {
   id: string
   name: string
@@ -7183,7 +7196,7 @@ export type RoomCodeInput = { readonly roomID: { readonly roomID: string }["room
 
 export type RoomCodeOutput = RoomJoinCode
 
-export type RoomPublicOutput = { host: string; rooms: Array<{ id: string; name: string; open: boolean }> }
+export type RoomPublicOutput = { host: string; rooms: Array<{ id: string; name?: string; open: boolean }> }
 
 export type RoomJoinInput = {
   readonly code?: {
@@ -7373,6 +7386,18 @@ export type RoomLinkRemoveInput = {
 }
 
 export type RoomLinkRemoveOutput = void
+
+export type RoomGuestPassportInput = { readonly roomID: { readonly roomID: string }["roomID"] }
+
+export type RoomGuestPassportOutput = RoomPassport
+
+export type RoomGuestRunInput = {
+  readonly roomID: { readonly roomID: string }["roomID"]
+  readonly command: { readonly command: string; readonly sessionID?: string | undefined }["command"]
+  readonly sessionID?: { readonly command: string; readonly sessionID?: string | undefined }["sessionID"]
+}
+
+export type RoomGuestRunOutput = RoomRunResult
 
 export type RoomGuestLeaveInput = { readonly roomID: { readonly roomID: string }["roomID"] }
 

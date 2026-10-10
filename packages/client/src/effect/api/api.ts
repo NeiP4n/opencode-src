@@ -2524,7 +2524,7 @@ export type RoomCodeOperation<E = never> = (input: RoomCodeInput) => Effect.Effe
 
 export type RoomPublicOutput = {
   readonly host: string
-  readonly rooms: ReadonlyArray<{ readonly id: Room.ID; readonly name: string; readonly open: boolean }>
+  readonly rooms: ReadonlyArray<{ readonly id: Room.ID; readonly name?: string | undefined; readonly open: boolean }>
 }
 export type RoomPublicOperation<E = never> = () => Effect.Effect<RoomPublicOutput, E>
 
@@ -2595,6 +2595,20 @@ export type RoomLinkSaveOperation<E = never> = (input: RoomLinkSaveInput) => Eff
 export type RoomLinkRemoveInput = { readonly url: string; readonly roomID: string }
 export type RoomLinkRemoveOutput = void
 export type RoomLinkRemoveOperation<E = never> = (input: RoomLinkRemoveInput) => Effect.Effect<RoomLinkRemoveOutput, E>
+
+export type RoomGuestPassportInput = { readonly roomID: Room.ID }
+export type RoomGuestPassportOutput = Room.Passport
+export type RoomGuestPassportOperation<E = never> = (
+  input: RoomGuestPassportInput,
+) => Effect.Effect<RoomGuestPassportOutput, E>
+
+export type RoomGuestRunInput = {
+  readonly roomID: Room.ID
+  readonly command: string
+  readonly sessionID?: Session.ID | undefined
+}
+export type RoomGuestRunOutput = Room.RunResult
+export type RoomGuestRunOperation<E = never> = (input: RoomGuestRunInput) => Effect.Effect<RoomGuestRunOutput, E>
 
 export type RoomGuestLeaveInput = { readonly roomID: Room.ID }
 export type RoomGuestLeaveOutput = void
@@ -3702,6 +3716,8 @@ export interface RoomApi<E = never> {
       readonly agent: RoomGuestSessionAgentOperation<E>
       readonly command: RoomGuestSessionCommandOperation<E>
     }
+    readonly passport: RoomGuestPassportOperation<E>
+    readonly run: RoomGuestRunOperation<E>
     readonly leave: RoomGuestLeaveOperation<E>
     readonly model: { readonly list: RoomGuestModelListOperation<E> }
     readonly agent: { readonly list: RoomGuestAgentListOperation<E> }

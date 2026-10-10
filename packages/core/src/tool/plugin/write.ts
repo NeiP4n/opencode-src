@@ -15,6 +15,7 @@ import { FileMutation } from "../../file-mutation.js"
 import { Formatter } from "../../formatter.js"
 import { FileAccess } from "../../file-access.js"
 import { Permission } from "../../permission.js"
+import { Plot } from "../../plot.js"
 import { fileDiff } from "./file-diff.js"
 
 export const name = "write"
@@ -51,6 +52,7 @@ export const Plugin = {
     const environment = yield* Environment.Service
     const formatter = yield* Formatter.Service
     const permission = yield* Permission.Service
+    const plots = yield* Plot.Service
 
     yield* ctx.tool
       .transform((editor) =>
@@ -75,6 +77,10 @@ export const Plugin = {
               )
               const next = Bom.split(input.content)
               const preview = fileDiff(target.resource, current?.text ?? "", next.text, current ? "modified" : "added")
+              // Another team's plot (участок) is off limits, whoever asks.
+              yield* plots
+                .guard({ sessionID: context.sessionID, files: [target.absolute] })
+                .pipe(Effect.mapError((error) => new ToolFailure({ message: error.message })))
               yield* permission.assert({
                 action: "edit",
                 resources: [target.resource],
@@ -92,7 +98,11 @@ export const Plugin = {
               return result
             }).pipe(
               Effect.map((output) => ({ output, content: toModelContent(output) })),
-              Effect.mapError((error) => new ToolFailure({ message: `Unable to write ${input.path}`, error })),
+              Effect.mapError((error) =>
+                error instanceof ToolFailure
+                  ? error
+                  : new ToolFailure({ message: `Unable to write ${input.path}`, error }),
+              ),
             ),
         }),
       )

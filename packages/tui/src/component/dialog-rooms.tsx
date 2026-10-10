@@ -204,7 +204,9 @@ export function DialogHost(props: { onClose?: () => void }) {
             <Labeled label={t("Room")}>
               <text fg={theme.text.base} attributes={TextAttributes.BOLD} wrapMode="none" truncate>
                 {room.name}
-                <span style={{ fg: theme.text.muted }}>{` · ${room.directory ? t("whole project") : t("one session")}`}</span>
+                <span
+                  style={{ fg: theme.text.muted }}
+                >{` · ${room.directory ? t("whole project") : t("one session")}`}</span>
               </text>
             </Labeled>
             <Show
@@ -470,7 +472,7 @@ export function DialogConnect(props: { onClose?: () => void }) {
                 {(room) => (
                   <box flexDirection="row" gap={1} paddingLeft={2}>
                     <text fg={theme.text.base} attributes={TextAttributes.BOLD}>
-                      {room.name}
+                      {room.name ?? t("Room, needs a code")}
                     </text>
                     <box flexGrow={1} />
                     <Button variant="primary" disabled={busy()} onClick={() => pick(room)}>

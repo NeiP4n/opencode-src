@@ -104,6 +104,10 @@ export interface Interface {
   readonly close: Effect.Effect<void>
   readonly ask: (input: AssertInput) => Effect.Effect<AskResult, SessionErrors.NotFoundError>
   readonly assert: (input: AssertInput) => Effect.Effect<void, Error | SessionErrors.NotFoundError>
+  // Asks the operator whatever the agent's rules say, for requests that come from outside
+  // the model, such as a room guest's command; an earlier "always" still counts. A decline
+  // is an ordinary failure here, not the defect assert raises to stop a model's tool.
+  readonly confirm: (input: AssertInput) => Effect.Effect<void, DeclinedError | CorrectedError>
   readonly reply: (input: ReplyInput) => Effect.Effect<void, NotFoundError>
   readonly get: (id: ID) => Effect.Effect<Request | undefined>
   readonly forSession: (sessionID: SessionSchema.ID) => Effect.Effect<ReadonlyArray<Request>>
@@ -336,7 +340,15 @@ const layer = Layer.effect(
       return Array.from(pending.values(), (item) => item.request).filter((request) => request.sessionID === sessionID)
     })
 
-    return Service.of({ ask, assert, reply, get, forSession, list, close })
+    const confirm = Effect.fn("Permission.confirm")(function* (input: AssertInput) {
+      if (closed) return yield* new DeclinedError()
+      const saved = yield* savedRules()
+      if (input.resources.every((resource) => evaluate(input.action, resource, saved).effect === "allow")) return
+      const item = yield* create(request(input), input.agent)
+      return yield* Deferred.await(item.deferred)
+    })
+
+    return Service.of({ ask, assert, confirm, reply, get, forSession, list, close })
   }),
 )
 

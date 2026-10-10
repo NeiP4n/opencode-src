@@ -5,6 +5,7 @@ import type { Context } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
 import { Effect, Schema } from "effect"
 import { Peer } from "../../peer.js"
+import type { Room } from "@opencode/schema/room"
 import { Permission } from "../../permission.js"
 
 export const name = "peers"
@@ -14,18 +15,23 @@ const description = [
   "Actions: list shows the rooms, what you may do in each and their sessions;",
   "read returns a room session's latest messages;",
   "send gives the AI in a room session a task or a question; its answer comes back to you automatically as a <peer-report> message, so end your turn instead of waiting;",
-  "create starts a new session in a project room, optionally with a first task sent the same way.",
+  "create starts a new session in a project room, optionally with a first task sent the same way;",
+  "passport describes the other computer: its system, shells, installed tools, the project's branch and commit, and the plots (участки) teams hold there, so you know what it can check that this computer cannot;",
+  "run executes one command on the other computer in the project, for example its tests on another operating system; the host approves each run, you need the cohost role, and the output comes back directly.",
+  "Respect plots: do not ask the other AI to change files inside a plot another team holds.",
   "Pass room as the room ID from list, and sessionID to pick a session other than the room's own.",
   "Write to the other AI as to a capable colleague: say what you need, what you already know, and what the answer should contain.",
 ].join("\n")
 
 export const Input = Schema.Struct({
-  action: Schema.Literals(["list", "read", "send", "create"]),
+  action: Schema.Literals(["list", "read", "send", "create", "passport", "run"]),
   room: Schema.optionalKey(Schema.String).annotate({ description: "Room ID from list, for read, send and create" }),
   sessionID: Schema.optionalKey(Schema.String).annotate({
     description: "Session of the room for read and send; the room's own session when omitted",
   }),
-  text: Schema.optionalKey(Schema.String).annotate({ description: "Message for send, or the first task for create" }),
+  text: Schema.optionalKey(Schema.String).annotate({
+    description: "Message for send, the first task for create, or the command for run",
+  }),
   title: Schema.optionalKey(Schema.String).annotate({ description: "Title of the session to create" }),
   limit: Schema.optionalKey(Schema.Int).annotate({ description: "How many recent messages read returns (default 10)" }),
 })
@@ -121,6 +127,25 @@ export const Plugin = {
                     output: `Sent to ${link.name} · ${session.title ?? session.id}. The answer will arrive here as a <peer-report> when that AI finishes.`,
                   }
                 }
+                case "passport": {
+                  const link = yield* linkOf(input.room)
+                  const passport = yield* peers.passport(link).pipe(Effect.mapError(failed))
+                  return { output: describePassport(link, passport) }
+                }
+                case "run": {
+                  const link = yield* linkOf(input.room)
+                  if (!input.text?.trim()) return yield* new ToolFailure({ message: "Pass the command as text" })
+                  yield* ask(link.name)
+                  const result = yield* peers
+                    .run({ link, command: input.text, sessionID: input.sessionID })
+                    .pipe(Effect.mapError(failed))
+                  return {
+                    output: [
+                      `Ran on ${link.name} with ${result.shell}, exit code ${result.exitCode}${result.cut ? " (output cut to its end)" : ""}:`,
+                      result.output || "(no output)",
+                    ].join("\n"),
+                  }
+                }
                 case "create": {
                   const link = yield* linkOf(input.room)
                   yield* ask(link.name)
@@ -171,6 +196,24 @@ export const Plugin = {
     yield* ctx.session.hook("compaction", hide)
     yield* ctx.session.hook("generate", hide)
   }),
+}
+
+function describePassport(link: Peer.Link, passport: Room.Passport) {
+  return [
+    `${link.name}: ${passport.machine} · ${passport.os} ${passport.release} ${passport.arch}`,
+    `Shells: ${passport.shells.join(", ") || "none found"}`,
+    `Tools: ${passport.tools.join(", ") || "none from the Registry"}`,
+    `Project ${passport.project.directory}${passport.project.branch ? ` on ${passport.project.branch} at ${passport.project.commit}` : ""}${passport.project.changed ? `, ${passport.project.changed} file(s) changed and not committed` : ""}`,
+    passport.plots.length === 0
+      ? "No plots are taken there."
+      : [
+          "Plots taken there:",
+          ...passport.plots.map(
+            (plot) =>
+              `- ${plot.paths.join(", ")} · ${plot.team} on ${plot.machine} · ${plot.purpose} · until ${new Date(plot.expires).toLocaleTimeString()}`,
+          ),
+        ].join("\n"),
+  ].join("\n")
 }
 
 // The AI on the other side learns who writes and that its final answer travels back.

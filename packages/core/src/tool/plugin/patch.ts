@@ -13,6 +13,7 @@ import { Location } from "../../location.js"
 import { FileAccess } from "../../file-access.js"
 import { Patch } from "@opencode/util/patch"
 import { Permission } from "../../permission.js"
+import { Plot } from "../../plot.js"
 import DESCRIPTION from "../patch.txt"
 import { fileDiff } from "./file-diff.js"
 
@@ -73,6 +74,7 @@ export const Plugin = {
     const formatter = yield* Formatter.Service
     const location = yield* Location.Service
     const permission = yield* Permission.Service
+    const plots = yield* Plot.Service
 
     yield* ctx.tool
       .transform((editor) =>
@@ -193,6 +195,10 @@ export const Plugin = {
                 change.target,
                 ...(change.type === "update" && change.moveTarget ? [change.moveTarget] : []),
               ])
+              // Another team's plot (участок) is off limits, whoever asks.
+              yield* plots
+                .guard({ sessionID: context.sessionID, files: targets.map((target) => target.absolute) })
+                .pipe(Effect.mapError((error) => new ToolFailure({ message: error.message })))
               yield* permission.assert({
                 action: "edit",
                 resources: [...new Set(targets.map((target) => target.resource))],

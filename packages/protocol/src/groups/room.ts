@@ -28,13 +28,53 @@ import {
 import { BooleanFromString } from "./session.js"
 import { PublicSessionMessage, SessionMessagesQuery } from "./message.js"
 
-const GUEST_PATH = /^\/api\/room\/(join|public|[^/]+\/guest(\/.*)?)$/
-
 // Guest routes carry a room token instead of the server credential, so the
 // Authorization middleware lets them through and the room handler verifies the
-// token against the one room it names.
+// token against the one room it names. The paths are listed one by one rather
+// than as a "/api/room/<id>/guest/*" prefix: a prefix would hand every future
+// handler under that prefix the same exemption, so an unregistered path would
+// reach the server unchecked. A route belongs here once RoomGroup registers it.
+const GUEST_PATHS = [
+  // room.join, room.public
+  /^\/api\/room\/(join|public)$/,
+  // room.guest.get, room.guest.leave
+  /^\/api\/room\/[^/]+\/guest$/,
+  // room.guest.session.list, room.guest.session.create
+  /^\/api\/room\/[^/]+\/guest\/session$/,
+  // room.guest.session.messages
+  /^\/api\/room\/[^/]+\/guest\/session\/message$/,
+  // room.guest.session.model
+  /^\/api\/room\/[^/]+\/guest\/session\/[^/]+\/model$/,
+  // room.guest.session.agent
+  /^\/api\/room\/[^/]+\/guest\/session\/[^/]+\/agent$/,
+  // room.guest.session.command
+  /^\/api\/room\/[^/]+\/guest\/session\/[^/]+\/command$/,
+  // room.guest.model.list
+  /^\/api\/room\/[^/]+\/guest\/model$/,
+  // room.guest.agent.list
+  /^\/api\/room\/[^/]+\/guest\/agent$/,
+  // room.guest.command.list
+  /^\/api\/room\/[^/]+\/guest\/command$/,
+  // room.guest.log
+  /^\/api\/room\/[^/]+\/guest\/log$/,
+  // room.guest.messages
+  /^\/api\/room\/[^/]+\/guest\/message$/,
+  // room.guest.note
+  /^\/api\/room\/[^/]+\/guest\/note$/,
+  // room.guest.prompt
+  /^\/api\/room\/[^/]+\/guest\/prompt$/,
+  // room.guest.permission.list
+  /^\/api\/room\/[^/]+\/guest\/permission$/,
+  // room.guest.permission.reply
+  /^\/api\/room\/[^/]+\/guest\/permission\/[^/]+\/reply$/,
+  // room.guest.passport
+  /^\/api\/room\/[^/]+\/guest\/passport$/,
+  // room.guest.run
+  /^\/api\/room\/[^/]+\/guest\/run$/,
+]
+
 export function isRoomGuestURL(url: URL) {
-  return GUEST_PATH.test(url.pathname)
+  return GUEST_PATHS.some((path) => path.test(url.pathname))
 }
 
 // A room on another computer this computer joined, with the guest token its host issued.
@@ -130,14 +170,19 @@ export const RoomGroup = HttpApiGroup.make("server.room")
     HttpApiEndpoint.get("room.public", "/api/room/public", {
       success: Schema.Struct({
         host: Schema.String,
-        rooms: Schema.Array(Schema.Struct({ id: Room.ID, name: Schema.String, open: Schema.Boolean })),
+        // A closed room is listed so a device can see it exists and ask for its code,
+        // but its name stays on the host: this route needs no credential, and the
+        // name is the only part of a closed room worth hiding. Optional rather than
+        // empty: absent says "the host is not sharing it", empty would look like a
+        // room actually called nothing.
+        rooms: Schema.Array(Schema.Struct({ id: Room.ID, name: optional(Schema.String), open: Schema.Boolean })),
       }),
     }).annotateMerge(
       OpenApi.annotations({
         identifier: "room.public",
         summary: "List joinable rooms",
         description:
-          "Names of the rooms this host shares, for devices looking for rooms on the network, and whether each one lets guests in without a code.",
+          "Names of the rooms this host shares, for devices looking for rooms on the network, and whether each one lets guests in without a code. A closed room is listed without its name.",
       }),
     ),
   )
@@ -229,6 +274,35 @@ export const RoomGroup = HttpApiGroup.make("server.room")
         identifier: "room.link.remove",
         summary: "Forget a joined room",
         description: "Forget a room this computer left; its AI no longer reaches it.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("room.guest.passport", "/api/room/:roomID/guest/passport", {
+      params: { roomID: Room.ID },
+      success: Room.Passport,
+      error: [UnauthorizedError, RoomNotFoundError, SessionNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.passport",
+        summary: "Describe the host's computer",
+        description:
+          "The host's system, shells, Registry tools, the shared project's git state and the plots teams hold there.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("room.guest.run", "/api/room/:roomID/guest/run", {
+      params: { roomID: Room.ID },
+      payload: Schema.Struct({ command: Schema.String, sessionID: Session.ID.pipe(Schema.optional) }),
+      success: Room.RunResult,
+      error: [UnauthorizedError, ForbiddenError, RoomNotFoundError, SessionNotFoundError, InvalidRequestError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "room.guest.run",
+        summary: "Run a command on the host's computer",
+        description:
+          "Run one command in a room session's directory with the host's shell, once the host allows it; cohosts only.",
       }),
     ),
   )

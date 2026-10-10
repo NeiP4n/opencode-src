@@ -19,6 +19,7 @@ import { location } from "./fixture/location"
 import { tmpdir, withTempDir } from "./fixture/tmpdir"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { testEffect } from "./lib/effect"
+import { noPlotsNode } from "./lib/plot"
 import { permissionLayer } from "./lib/permission"
 import { toolIdentity, executeTool, registerToolPlugin, toolDefinitions } from "./lib/tool"
 
@@ -33,6 +34,7 @@ const editToolNode = makeLocationNode({
     Formatter.node,
     Location.node,
     Permission.node,
+    noPlotsNode,
   ],
 })
 

@@ -3,6 +3,9 @@ import { NoteStore } from "@opencode/core/note"
 import { Permission } from "@opencode/core/permission"
 import { Room } from "@opencode/core/room"
 import { Peer } from "@opencode/core/peer"
+import { Plot } from "@opencode/core/plot"
+import { Passport } from "@opencode/core/passport"
+import path from "node:path"
 import { Session } from "@opencode/core/session"
 import { Model } from "@opencode/core/model"
 import { Agent } from "@opencode/core/agent"
@@ -81,6 +84,7 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
     const instances = yield* Instance.Service
     const auth = yield* ServerAuth.Config
     const peers = yield* Peer.Service
+    const plots = yield* Plot.Service
 
     // Guest routes skip the server credential; the room token is the only proof,
     // and it only opens the room it was issued for, while the host keeps its guest a member.
@@ -186,7 +190,15 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
         rooms.list().pipe(
           Effect.map((list) => ({
             host: hostname(),
-            rooms: list.map((room) => ({ id: room.id, name: room.name, open: room.open === true })),
+            // A closed room stays in the list, because a device needs to see it exists
+            // to ask its host for the code; the name does not, so it is left out. This
+            // route answers without a credential, and the name was the only thing about
+            // a closed room that gave a passer-by anything.
+            rooms: list.map((room) => ({
+              id: room.id,
+              name: room.open === true ? room.name : undefined,
+              open: room.open === true,
+            })),
           })),
         ),
       )
@@ -386,6 +398,52 @@ export const RoomHandler = HttpApiBuilder.group(Api, "server.room", (handlers) =
       .handle("room.link.save", (ctx) => peers.saveLink(ctx.payload).pipe(Effect.as(HttpApiSchema.NoContent.make())))
       .handle("room.link.remove", (ctx) =>
         peers.removeLink(ctx.payload).pipe(Effect.as(HttpApiSchema.NoContent.make())),
+      )
+      .handle(
+        "room.guest.passport",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestOf(ctx.params.roomID)
+          const session = yield* inRoom(joined.room, undefined)
+          const directory = joined.room.directory ?? session.location.directory
+          const held = yield* plots.list(directory)
+          return {
+            ...Passport.read(directory),
+            plots: held.map((plot) => ({
+              team: plot.team,
+              machine: plot.machine,
+              purpose: plot.purpose,
+              paths: plot.paths.map((item) => path.relative(directory, item) || "."),
+              expires: plot.expires,
+            })),
+          }
+        }),
+      )
+      .handle(
+        "room.guest.run",
+        Effect.fn(function* (ctx) {
+          const joined = yield* guestWho(ctx.params.roomID, "cohost")
+          const session = yield* inRoom(joined.room, ctx.payload.sessionID)
+          const command = ctx.payload.command.trim()
+          if (!command) return yield* new InvalidRequestError({ message: "Command is empty", field: "command" })
+          // The host sees the request in the session and decides; nothing runs before that.
+          yield* Permission.Service.use((permission) =>
+            permission.confirm({
+              action: "room.run",
+              resources: [command],
+              metadata: { guest: joined.guest.name, command },
+              sessionID: session.id,
+            }),
+          ).pipe(
+            instances.provide(session),
+            locationErrors,
+            Effect.catchTag("LocationNotFoundError", Effect.die),
+            Effect.catch(() => Effect.fail(new ForbiddenError({ message: "The host did not allow this command" }))),
+          )
+          return yield* Effect.tryPromise({
+            try: (signal) => Passport.run(command, session.location.directory, signal),
+            catch: (error) => new InvalidRequestError({ message: `Could not run the command: ${String(error)}` }),
+          })
+        }),
       )
       .handle(
         "room.guest.leave",

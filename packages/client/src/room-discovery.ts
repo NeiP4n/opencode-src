@@ -5,7 +5,9 @@ import { PORT, QUERY, REPLY_PORT, decodeReply } from "@opencode/protocol/room-di
 
 export type FoundRoom = {
   readonly id: string
-  readonly name: string
+  // Absent for a closed room: the host lists it without its name, because this list
+  // is readable without a credential. Such a room still needs its join code.
+  readonly name?: string
   readonly host: string
   readonly url: string
   // Joined without a code.

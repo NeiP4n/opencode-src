@@ -306,6 +306,10 @@ import type {
   RoomLinkSaveOutput,
   RoomLinkRemoveInput,
   RoomLinkRemoveOutput,
+  RoomGuestPassportInput,
+  RoomGuestPassportOutput,
+  RoomGuestRunInput,
+  RoomGuestRunOutput,
   RoomGuestLeaveInput,
   RoomGuestLeaveOutput,
   RoomGuestSessionListInput,
@@ -1901,6 +1905,19 @@ const EndpointRoomLinkRemove = (raw: RawClient["server.room"]) => (input: RoomLi
     ),
   )
 
+const EndpointRoomGuestPassport = (raw: RawClient["server.room"]) => (input: RoomGuestPassportInput) =>
+  preserveEffect<RoomGuestPassportOutput>()(
+    raw["room.guest.passport"]({ params: { roomID: input["roomID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointRoomGuestRun = (raw: RawClient["server.room"]) => (input: RoomGuestRunInput) =>
+  preserveEffect<RoomGuestRunOutput>()(
+    raw["room.guest.run"]({
+      params: { roomID: input["roomID"] },
+      payload: { command: input["command"], sessionID: input["sessionID"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointRoomGuestLeave = (raw: RawClient["server.room"]) => (input: RoomGuestLeaveInput) =>
   preserveEffect<RoomGuestLeaveOutput>()(
     raw["room.guest.leave"]({ params: { roomID: input["roomID"] } }).pipe(Effect.mapError(mapClientError)),
@@ -2095,6 +2112,8 @@ const adaptGroupRoom = (raw: RawClient["server.room"]) => ({
       agent: EndpointRoomGuestSessionAgent(raw),
       command: EndpointRoomGuestSessionCommand(raw),
     },
+    passport: EndpointRoomGuestPassport(raw),
+    run: EndpointRoomGuestRun(raw),
     leave: EndpointRoomGuestLeave(raw),
     model: { list: EndpointRoomGuestModelList(raw) },
     agent: { list: EndpointRoomGuestAgentList(raw) },

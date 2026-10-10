@@ -78,6 +78,8 @@ import { OrchestraTool } from "../tool/plugin/orchestra.js"
 import { Orchestra } from "../orchestra.js"
 import { PeerTool } from "../tool/plugin/peer.js"
 import { Peer } from "../peer.js"
+import { PlotTool } from "../tool/plugin/plot.js"
+import { Plot } from "../plot.js"
 import { QuestionTool } from "../tool/plugin/question.js"
 import { ReadToolFileSystem } from "../tool/read-filesystem.js"
 import { ReadTool } from "../tool/plugin/read.js"
@@ -137,6 +139,7 @@ const services = [
   KV.Service,
   Orchestra.Service,
   Peer.Service,
+  Plot.Service,
   LLMClient.Service,
   Location.Service,
   ManagedPolicy.Service,
@@ -193,6 +196,7 @@ export const requirements = LayerNode.group([
   KV.node,
   Orchestra.node,
   Peer.node,
+  Plot.node,
   llmClient,
   Location.node,
   ManagedPolicy.node,
@@ -256,6 +260,7 @@ const pre = [
   HubTool.Plugin,
   OrchestraTool.Plugin,
   PeerTool.Plugin,
+  PlotTool.Plugin,
   ShellTool.Plugin,
   SkillTool.Plugin,
   NoteTool.Plugin,

@@ -47,6 +47,10 @@ export interface Interface {
   readonly sessions: (link: Link) => Effect.Effect<ReadonlyArray<RemoteSession>, PeerError>
   readonly chat: (link: Link, sessionID?: string) => Effect.Effect<typeof Chat.Type, PeerError>
   readonly create: (link: Link, title?: string) => Effect.Effect<RemoteSession, PeerError>
+  // What the host's computer offers: system, shells, tools, project state and plots.
+  readonly passport: (link: Link) => Effect.Effect<Room.Passport, PeerError>
+  // Runs a command on the host's computer once the host allows it; cohosts only.
+  readonly run: (input: { link: Link; command: string; sessionID?: string }) => Effect.Effect<Room.RunResult, PeerError>
   // Posts a message from this computer's AI into a session of the room. When the AI
   // there has answered and stopped, its answer is delivered back into `from` as a
   // <peer-report> and wakes it, so the sending AI never has to poll.
@@ -67,6 +71,8 @@ const TASK_TTL = Duration.hours(2)
 const POLL = Duration.seconds(3)
 const REPORT_LIMIT = 6000
 const REQUEST_TIMEOUT = Duration.seconds(10)
+// A run waits for the host to allow it and then for the command, which the host stops after ten minutes.
+const RUN_TIMEOUT = Duration.minutes(30)
 // Statuses that will not change by asking again: the guest was removed or the room closed.
 const GONE = new Set([401, 403, 404])
 
@@ -107,7 +113,7 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service> = Layer.e
       link: Pick<Link, "url" | "token">,
       path: string,
       schema: S,
-      init: { method?: string; body?: unknown } = {},
+      init: { method?: string; body?: unknown; timeout?: Duration.Duration } = {},
     ) =>
       Effect.tryPromise({
         try: async (signal) => {
@@ -131,7 +137,7 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service> = Layer.e
             : new PeerError({ message: error instanceof Error ? error.message : String(error) }),
       }).pipe(
         Effect.timeoutOrElse({
-          duration: REQUEST_TIMEOUT,
+          duration: init.timeout ?? REQUEST_TIMEOUT,
           orElse: () => Effect.fail(new PeerError({ message: "The host did not answer in time" })),
         }),
         Effect.flatMap((value) =>
@@ -206,6 +212,13 @@ const layer: Layer.Layer<Service, never, KV.Service | Session.Service> = Layer.e
       joined: (link) => call(link, room(link), Joined),
       sessions: (link) => call(link, `${room(link)}/session`, Sessions).pipe(Effect.map((result) => result.data)),
       chat,
+      passport: (link) => call(link, `${room(link)}/passport`, Room.Passport),
+      run: (input) =>
+        call(input.link, `${room(input.link)}/run`, Room.RunResult, {
+          method: "POST",
+          body: { command: input.command, sessionID: input.sessionID },
+          timeout: RUN_TIMEOUT,
+        }),
       create: (link, title) =>
         call(link, `${room(link)}/session`, Created, { method: "POST", body: { title } }).pipe(
           Effect.map((result) => result.data),
